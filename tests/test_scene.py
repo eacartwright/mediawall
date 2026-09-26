@@ -68,5 +68,59 @@ class SceneTests(unittest.TestCase):
         self.assertFalse(self.scene.select("nope"))
 
 
+class LayerTests(unittest.TestCase):
+    """Browsers always stack above other objects (their own group)."""
+
+    def setUp(self):
+        self.scene = Scene()
+        s = self.scene
+        self.b1 = s.add_object("browser", 0, 0)
+        self.a = s.add_object("container", 0, 0)
+        self.b2 = s.add_object("browser", 0, 0)
+        self.c = s.add_object("container", 0, 0)
+
+    def order(self):
+        return [o.id for o in self.scene.layer_order()]    # top first
+
+    def test_browsers_listed_above_everything(self):
+        self.assertEqual(self.order(),
+                         [self.b2.id, self.b1.id, self.c.id, self.a.id])
+
+    def test_moves_stay_within_group(self):
+        s = self.scene
+        # The top ordinary object can't pass the browsers.
+        self.assertFalse(s.bring_forward(self.c.id))
+        self.assertFalse(s.bring_to_front(self.c.id))
+        # The bottom browser can't go below ordinary objects.
+        self.assertFalse(s.send_backward(self.b1.id))
+        self.assertFalse(s.send_to_back(self.b1.id))
+        # Within a group, moves work as usual.
+        self.assertTrue(s.bring_to_front(self.a.id))
+        self.assertTrue(s.send_backward(self.b2.id))
+        self.assertEqual(self.order(),
+                         [self.b1.id, self.b2.id, self.a.id, self.c.id])
+
+    def test_front_and_back_are_per_group(self):
+        s = self.scene
+        self.assertTrue(s.is_at_front(self.c.id))
+        self.assertFalse(s.is_at_back(self.c.id))
+        self.assertTrue(s.is_at_back(self.a.id))
+        self.assertTrue(s.is_at_front(self.b2.id))
+        self.assertTrue(s.is_at_back(self.b1.id))
+
+    def test_display_names(self):
+        s = self.scene
+        src = s.add_source(r"C:\pics\trip\beach.jpg", "image", 400, 200)
+        media = s.add_media(src.id, 0, 0)
+        s.add_media_to_container(src.id, self.a.id)
+        self.b1.folder = "/home/me/Pictures/Japan/"
+
+        self.assertEqual(s.display_name(media.id), "beach.jpg")
+        self.assertEqual(s.display_name(self.a.id), "Container · beach.jpg")
+        self.assertEqual(s.display_name(self.c.id), "Container (empty)")
+        self.assertEqual(s.display_name(self.b1.id), "Browser · Japan")
+        self.assertEqual(s.display_name(self.b2.id), "Browser")
+
+
 if __name__ == "__main__":
     unittest.main()

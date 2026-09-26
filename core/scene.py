@@ -30,6 +30,7 @@ Coordinates:
 from __future__ import annotations
 
 import math
+import re
 import uuid
 from dataclasses import dataclass, field, replace
 from pathlib import Path
@@ -54,6 +55,9 @@ CLIP_SHAPES = {"rect"}      # future: "rounded", "ellipse", "path", ...
 
 FIT_CONTAIN = "contain"     # whole image visible inside the container
 FIT_COVER = "cover"         # container completely filled, edges cropped
+
+# Object types that always stack above the others (workspace tools).
+OVERLAY_TYPES = {"browser"}
 
 # Uniform scaling (wheel zoom) stops at these sizes.
 SCALE_MIN_SIDE = 20.0       # the shorter side
@@ -770,6 +774,37 @@ class Scene:
         return True
 
     # -------------------------------------------------
+    # Names (for lists such as the Layers panel)
+    # -------------------------------------------------
+
+    def source_name(self, source_id) -> str:
+        source = self.sources.get(source_id)
+        if source is None:
+            return "(unknown)"
+        # Either separator, so a path saved on another OS still works.
+        return re.split(r"[\\/]", source.path)[-1] or source.path
+
+    def display_name(self, object_id) -> str:
+        obj = self.get(object_id)
+        if obj is None:
+            return ""
+
+        if obj.type == "media":
+            return self.source_name(obj.source_id)
+
+        if obj.type == "container":
+            content = self.content_of(obj.id)
+            if content is None:
+                return "Container (empty)"
+            return "Container · " + self.source_name(content.source_id)
+
+        if obj.type == "browser":
+            parts = [p for p in re.split(r"[\\/]", obj.folder) if p]
+            return "Browser · " + parts[-1] if parts else "Browser"
+
+        return obj.type
+
+    # -------------------------------------------------
     # Selection
     # -------------------------------------------------
 
@@ -788,8 +823,36 @@ class Scene:
     # compact, unique 1..n sequence. Container content has z = 0.
     # -------------------------------------------------
 
+    # Stacking: two groups, ordinary objects below and overlay objects
+    # (browsers) above, each ordered by z. Z-order operations move an
+    # object only within its own group.
+
+    @staticmethod
+    def _is_overlay(obj):
+        return obj.type in OVERLAY_TYPES
+
     def _by_z(self):
-        return sorted(self.top_level(), key=lambda o: o.z)
+        """Top-level objects, bottom to top."""
+        return sorted(self.top_level(), key=lambda o: (self._is_overlay(o), o.z))
+
+    def layer_order(self) -> list:
+        """Top-level objects, top to bottom (as a Layers list shows them)."""
+        return list(reversed(self._by_z()))
+
+    def _group(self, obj):
+        return [o for o in self._by_z() if self._is_overlay(o) == self._is_overlay(obj)]
+
+    def is_at_front(self, object_id) -> bool:
+        obj = self.get(object_id)
+        if obj is None or obj.parent_id is not None:
+            return True
+        return self._group(obj)[-1] is obj
+
+    def is_at_back(self, object_id) -> bool:
+        obj = self.get(object_id)
+        if obj is None or obj.parent_id is not None:
+            return True
+        return self._group(obj)[0] is obj
 
     def _top_z(self):
         return max((o.z for o in self.top_level()), default=0)
@@ -833,7 +896,7 @@ class Scene:
         if obj is None or obj.parent_id is not None:
             return False
 
-        order = self._by_z()
+        order = self._group(obj)
         i = order.index(obj)
         j = i + step
 

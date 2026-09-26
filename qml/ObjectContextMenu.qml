@@ -12,11 +12,11 @@ Menu {
     property Item target: null
 
     readonly property string targetId: target ? target.objectId : ""
-    // The model's stacking position (browsers add a display offset to z).
-    readonly property int targetZ: target ? target.objZ : 0
-
-    readonly property bool atFront: targetZ >= sceneModel.count
-    readonly property bool atBack: targetZ <= 1
+    // Stacking within the object's group (browsers stack above
+    // everything else). The target is always the selected object:
+    // right-clicking selects it first.
+    readonly property bool atFront: sceneModel.selectedAtFront
+    readonly property bool atBack: sceneModel.selectedAtBack
 
     // Media with more than one frame (a free GIF, or one in a container)
     readonly property bool targetAnimated:

@@ -1198,6 +1198,11 @@ Potential future properties:
 - type
 - z-order
 
+### Implemented (2026-09-26)
+
+- Stacking has two groups: ordinary objects below, and browsers (workspace tools, `OVERLAY_TYPES` in `core/scene.py`) always above. Each group is ordered by `z`, and every z-order operation moves an object only within its own group, so "Bring to Front" on an image puts it at the top of the images, still below any browser. `Scene.is_at_front()` / `is_at_back()` answer per group; the right-click menu and the Layers panel use them.
+- The **Layers panel** is a flyout on the right edge (the "Layers" tab opens and closes it; it's hidden in Present). It lists every top-level object, top first, with a type badge and a name (`Scene.display_name`: the file name, `Container · <file>` or `Container (empty)`, `Browser · <folder>`). The selected object is highlighted and kept in view; clicking a row selects that object on the canvas. **Top / Up / Down / Bottom** buttons move the selected object. Visibility, locking, and drag-to-reorder are not done yet.
+
 ---
 
 # 24. Selection
@@ -1335,7 +1340,7 @@ The browser is kept compact, with the media as large as possible:
 
 - The header shows the folder name and the current file's path relative to it. Only the header moves the browser; the ✕ closes (deletes) it, which can be undone.
 - The preview background is about 90% transparent, so the canvas shows around the media.
-- Browsers always draw above other canvas objects (they are workspace tools). Among themselves they keep their normal stacking order.
+- Browsers always draw above other canvas objects (they are workspace tools). Among themselves they keep their normal stacking order, and z-order operations move them only among browsers (section 23).
 - Over the preview: the wheel moves to the previous/next file; holding the left button while scrolling zooms around the pointer, and left-drag then pans. The zoom is temporary and resets when the file changes. Double-clicking adds the current file to the canvas.
 
 ---
@@ -1707,6 +1712,7 @@ mediawall/
 │   ├── ResizeHandles.qml   shared four-corner resize handles
 │   ├── ObjectContextMenu.qml  shared right-click menu
 │   ├── LogWindow.qml       the Log window
+│   ├── Sidebar.qml         right-edge flyout: Layers panel
 │   └── Zoom.js             shared mouse-wheel zoom step
 │
 ├── tools/
@@ -1918,7 +1924,9 @@ Remaining: hiding the mouse cursor while idle, scaling the wall to screens of a 
 
 ---
 
-## Phase 11 — Layers / Inspector — **Partial** (z-order operations only)
+## Phase 11 — Layers / Inspector — **Partial** (z-order operations and Layers panel)
+
+Done: z-order operations (grouped: browsers above everything), Layers panel with selection sync and Top/Up/Down/Bottom (section 23).
 
 Implement:
 
@@ -2238,6 +2246,7 @@ The prototype currently provides:
 - free images: scroll-wheel scaling around the pointer (when selected), and Crop / Zoom Inside, which wraps the image in a matching container
 - single selection; clicking empty canvas deselects
 - z-order and Delete through a right-click menu, plus shortcuts
+- a Layers panel (right-edge flyout): every object top first, selection linked both ways, Top/Up/Down/Bottom
 - unit tests for `core/`
 
 ### How interactions reach the model
@@ -2438,6 +2447,7 @@ The following design decisions are currently established:
 - New container content is framed to fill (cover).
 - "Scale Content with Container" (locked scaling) is on by default.
 - Only top-level objects take part in z-order.
+- Browsers form their own stacking group above everything else; z-order operations never move an object across groups (2026-09-26).
 - Rotation handles rotate relative to where they are grabbed, so objects never jump when the knob is clicked.
 - Double-clicking the rotation knob resets rotation to 0° (the content's rotation, in Adjust mode). The same resets are in the right-click menu (Reset Rotation / Reset Content Rotation), shown only when something is rotated.
 - Every object has four corner resize handles (shared `ResizeHandles` component). Dragging a corner pins the opposite corner, including on rotated objects. Images keep their aspect ratio; containers and browsers resize freely.

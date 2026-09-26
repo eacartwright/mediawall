@@ -171,8 +171,12 @@ class SceneModel(QAbstractListModel):
 
     historyChanged = Signal()
 
-    # The selected object's content changed (or the selection did).
-    selectedHasContentChanged = Signal()
+    # Something about the selected object may have changed (its content,
+    # its stacking), or the selection itself did.
+    selectionStateChanged = Signal()
+
+    # The Layers list changed (objects, names, or stacking).
+    layersChanged = Signal()
 
     def __init__(self, scene=None, parent=None):
         super().__init__(parent)
@@ -303,6 +307,8 @@ class SceneModel(QAbstractListModel):
 
         self.countChanged.emit()
         self.selectedIdChanged.emit()
+        self.selectionStateChanged.emit()
+        self.layersChanged.emit()
 
     # -------------------------------------------------
     # Change recording (undo history + "modified")
@@ -320,7 +326,8 @@ class SceneModel(QAbstractListModel):
         self._current = snapshot(self._scene)
         self.modified.emit()
         self.historyChanged.emit()
-        self.selectedHasContentChanged.emit()
+        self.selectionStateChanged.emit()
+        self.layersChanged.emit()
 
     @Slot(str)
     def setMergeKey(self, key):
@@ -419,7 +426,8 @@ class SceneModel(QAbstractListModel):
         self._current = snapshot(cur)
         self.countChanged.emit()
         self.selectedIdChanged.emit()
-        self.selectedHasContentChanged.emit()
+        self.selectionStateChanged.emit()
+        self.layersChanged.emit()
         self.modified.emit()
         self.historyChanged.emit()
 
@@ -461,7 +469,43 @@ class SceneModel(QAbstractListModel):
 
     # True when the selected object is a container holding media.
     selectedHasContent = Property(bool, _get_selected_has_content,
-                                  notify=selectedHasContentChanged)
+                                  notify=selectionStateChanged)
+
+    # Stacking of the selected object within its group (browsers stack
+    # above everything else). True when nothing is selected.
+    def _get_selected_at_front(self):
+        return self._scene.is_at_front(self._scene.selected_id)
+
+    selectedAtFront = Property(bool, _get_selected_at_front,
+                               notify=selectionStateChanged)
+
+    def _get_selected_at_back(self):
+        return self._scene.is_at_back(self._scene.selected_id)
+
+    selectedAtBack = Property(bool, _get_selected_at_back,
+                              notify=selectionStateChanged)
+
+    # -------------------------------------------------
+    # Layers list: top-level objects, top to bottom
+    # -------------------------------------------------
+
+    def _get_layers(self):
+        scene = self._scene
+        layers = []
+        for obj in scene.layer_order():
+            kind = obj.type
+            if obj.type == "media":
+                source = scene.sources.get(obj.source_id)
+                kind = source.type if source else "image"
+            layers.append({
+                "id": obj.id,
+                "type": obj.type,
+                "kind": kind,
+                "name": scene.display_name(obj.id),
+            })
+        return layers
+
+    layers = Property("QVariantList", _get_layers, notify=layersChanged)
 
     @Slot(str)
     def select(self, object_id):
@@ -470,7 +514,7 @@ class SceneModel(QAbstractListModel):
             return
         if self._scene.select(new):
             self.selectedIdChanged.emit()
-            self.selectedHasContentChanged.emit()
+            self.selectionStateChanged.emit()
 
     # -------------------------------------------------
     # Drop target (container highlighted while dragging media over it)

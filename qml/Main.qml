@@ -437,6 +437,21 @@ ApplicationWindow {
 
 
         // -------------------------------------------------
+        // Sidebar (Layers): a flyout on the right edge
+        // -------------------------------------------------
+
+        Sidebar {
+            anchors.top: toolbar.visible ? toolbar.bottom : parent.top
+            anchors.bottom: parent.bottom
+            anchors.right: parent.right
+
+            visible: !window.presenting
+
+            z: 2
+        }
+
+
+        // -------------------------------------------------
         // Exit button (Full Screen / Present): shows when the mouse
         // moves, fades out after a moment unless hovered.
         // -------------------------------------------------
