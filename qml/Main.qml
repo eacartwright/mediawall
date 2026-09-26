@@ -456,6 +456,12 @@ ApplicationWindow {
                         roleValue: "container"
                         ContainerObject { sceneItem: scene; contextMenu: objectMenu }
                     }
+
+                    // Audio tracks draw nothing; they only host a player.
+                    DelegateChoice {
+                        roleValue: "audio"
+                        AudioTrackObject { sceneItem: scene }
+                    }
                 }
             }
         }

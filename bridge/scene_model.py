@@ -186,6 +186,9 @@ class SceneModel(QAbstractListModel):
     # The Layers list changed (objects, names, or stacking).
     layersChanged = Signal()
 
+    # An audio track was added (the sidebar shows its Audio tab).
+    audioTrackAdded = Signal(str)
+
     def __init__(self, scene=None, parent=None):
         super().__init__(parent)
         self._scene = scene if scene is not None else Scene()
@@ -606,6 +609,14 @@ class SceneModel(QAbstractListModel):
     def addMedia(self, path, media_type, x, y):
         source = self._register_source(path, media_type)
         return self._insert(lambda: self._scene.add_media(source.id, x, y))
+
+    @Slot(str, result=str)
+    def addAudioTrack(self, path):
+        """Add an audio file as a track in the Audio tab (no canvas item)."""
+        source = self._register_source(path, "audio")
+        track_id = self._insert(lambda: self._scene.add_audio_track(source.id))
+        self.audioTrackAdded.emit(track_id)
+        return track_id
 
     @Slot(str, result=str)
     def duplicate(self, object_id):

@@ -2,9 +2,10 @@
 Qt bridge: every sound-producing media instance, for the sidebar's
 Audio tab (readme section 14).
 
-Rows are media instances whose source is a video or an audio file, in
-Layers order (top first); a container's content is listed as itself,
-with ownerId pointing at the container (what selecting the row selects).
+Rows are audio tracks first, then media instances whose source is a
+video or an audio file, in Layers order (top first). A container's
+content is listed as itself, with ownerId pointing at the container
+(what selecting the row selects).
 
 SceneModel calls refresh() after every change. When the set of rows is
 unchanged, rows are updated in place, so a slider being dragged in the
@@ -17,7 +18,7 @@ from PySide6.QtCore import QAbstractListModel, QByteArray, QModelIndex, Qt
 AUDIO_SOURCE_TYPES = {"video", "audio"}
 
 ROLE_NAMES = [
-    "itemId", "ownerId", "name", "kind", "inContainer", "missing",
+    "itemId", "ownerId", "name", "kind", "isTrack", "inContainer", "missing",
     "playing", "muted", "volume", "loop", "speed", "preservePitch",
     "loopA", "loopB",
 ]
@@ -37,7 +38,7 @@ class AudioModel(QAbstractListModel):
 
     def _collect(self):
         scene = self._scene()
-        items = []
+        items = [track.id for track in scene.audio_tracks()]
         for obj in scene.layer_order():
             media = scene.content_of(obj.id) if obj.type == "container" else obj
             if media is None or media.type != "media":
@@ -80,6 +81,7 @@ class AudioModel(QAbstractListModel):
             "ownerId": media.parent_id or media.id,
             "name": scene.source_name(media.source_id),
             "kind": source.type if source else "video",
+            "isTrack": media.type == "audio",
             "inContainer": media.parent_id is not None,
             "missing": bool(source and source.missing),
             "playing": media.playing,

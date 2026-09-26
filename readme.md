@@ -843,7 +843,9 @@ The sidebar's **Audio** tab (next to Layers) lists every video instance, top fir
 
 Panels find a video's player (for its position) through a registry on the scene item (`registerView` / `viewFor` in `Main.qml`), keyed by media instance id.
 
-Not yet: audio tracks from the Browser, video-as-audio, solo, per-track audio stream selection.
+**Audio tracks** (MP3, M4A, and other audio files) are added from a Browser: double-click the preview, or use **Add to Audio** (the Add to Canvas button's label for audio files). A track is an object of type `audio` with a source and the same playback settings as a video, saved and undoable like any other object, but with no place on the canvas: no geometry, no stacking, not in the Layers list (`NON_VISUAL_TYPES` in `core/scene.py`). On the QML side it is a row of `sceneModel` whose delegate (`AudioTrackObject.qml`) draws nothing and only hosts a player. Tracks start **audible and looping** (canvas videos start muted). They are listed first in the Audio tab, with a ✕ to remove them and, if the file is missing, **Locate…**. Adding a track opens the Audio tab and pauses the browser's preview of that file, so it isn't heard twice. Audio previews in a browser are audible by default, with their own mute state separate from video previews.
+
+Not yet: video-as-audio, solo, per-track audio stream selection, mouse-wheel volume over a whole row (the wheel works over the volume slider; elsewhere it scrolls the list).
 
 ---
 
@@ -1720,6 +1722,7 @@ mediawall/
 │   ├── MediaObject.qml     free media instance
 │   ├── BrowserObject.qml   Browse Object
 │   ├── ContainerObject.qml container (viewport with clipped content)
+│   ├── AudioTrackObject.qml audio track (a player with no canvas item)
 │   ├── MediaView.qml       displays one media source (image, GIF/WebP, video, audio)
 │   ├── VideoControls.qml   play/seek/mute bar for video and audio
 │   ├── MediaErrorBox.qml   "Missing file" / "Can't display file" box
@@ -1916,7 +1919,9 @@ Done: all of the above, through the shared `MediaView` component, so video works
 
 ## Phase 9 — Audio Rack — **Partial**
 
-Done: per-video volume, mute, loop, speed, pitch behavior, and A-B loop, in the sidebar's Audio tab (section 14.5).
+Done: audio tracks (MP3/M4A etc., added from a browser), audio preview, and per-video / per-track volume, mute, loop, speed, pitch behavior, and A-B loop, in the sidebar's Audio tab (section 14.5).
+
+Remaining: video-as-audio, solo, audio stream selection.
 
 Implement:
 
@@ -2257,6 +2262,7 @@ The prototype currently provides:
 - animated GIF and WebP playback, on the canvas and in browser previews; each instance can be paused or played from its right-click menu
 - video on the canvas, in containers, and in browser previews, with per-instance play/pause, mute, and loop (right-click menu), and an on-object seek bar when selected
 - per-video speed (0.25x to 4x), Keep pitch, and A-B loop; an Audio tab in the sidebar with every video's sound and playback settings (section 14.5)
+- audio tracks added from a browser (double-click or Add to Audio), controlled in the Audio tab
 - audio previews in browsers
 - containers: move, resize, rotate; hold one clipped media instance with its own pan, zoom, and rotation (Adjust mode); fit/fill; locked or independent scaling; release/remove content
 - media can be dragged into empty containers, or added from a browser to a selected empty container
@@ -2280,8 +2286,6 @@ During a drag, resize, or rotate, QML moves the item directly so interaction sta
 - **No edge handles yet**, only corners; resizing one side on its own isn't possible.
 - **Resize has no modifier options** yet (e.g. resize from center, or free aspect on images).
 - **Browser folders are saved as absolute paths only**, so a browser's folder is not found automatically if the project is opened on a machine with a different folder layout.
-- **Audio files can be previewed but not used yet**; that arrives with the Audio Rack (Phase 9).
-- **Video speed/pitch controls** aren't on video objects; they're planned for the Audio Rack.
 - **Adjust mode shows no ghost for video**, only the orange bounds outline (a second copy of the video would play out of sync).
 - **Each video instance runs its own decoder.** Two instances of the same file play independently, not in sync. Many simultaneous videos will be limited by decoding performance.
 - **Hardware video decoding hasn't been verified** on the target machines. Qt prints "No HW decoder found" when it falls back to software decoding.
@@ -2478,6 +2482,8 @@ The following design decisions are currently established:
 - Qt Quick Controls use the Fusion style everywhere, with a fixed dark palette, so the app looks the same on every platform and OS theme (2026-09-26).
 - The toolbar overlays the canvas rather than pushing it down, so object screen positions are identical in the window, Full Screen, and Present (2026-09-26). Projects made earlier appear 50 px higher once.
 - Present mode keeps Browsers visible and usable; the rest of the canvas is view-only (2026-09-26).
+- Audio tracks are objects of type `audio` with no canvas presence; they start audible and looping (2026-09-26).
+- Speed changes pitch by default (Keep pitch off), as in Celluloid (2026-09-26).
 - The window uses 4x MSAA so rotated edges are smooth (2026-09-26).
 
 ### Open decisions

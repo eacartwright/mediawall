@@ -37,12 +37,20 @@ from pathlib import Path
 from typing import Optional
 
 
-OBJECT_TYPES = {"media", "browser", "container"}
+OBJECT_TYPES = {"media", "browser", "container", "audio"}
+
+# Objects with a player and per-instance playback settings.
+PLAYABLE_TYPES = {"media", "audio"}
+
+# Objects with no place on the canvas (audio tracks live in the Audio
+# tab only): no geometry, no stacking, not in the Layers list.
+NON_VISUAL_TYPES = {"audio"}
 
 DEFAULT_SIZES = {
     "media": (300.0, 200.0),
     "browser": (420.0, 300.0),
     "container": (360.0, 260.0),
+    "audio": (0.0, 0.0),
 }
 
 DEFAULT_MEDIA_WIDTH = 300.0
@@ -385,6 +393,18 @@ class Scene:
             pending_size=source.aspect <= 0,
         )
 
+    def add_audio_track(self, source_id) -> SceneObject:
+        """
+        Add an audio track: a player with no place on the canvas (it
+        lives in the Audio tab). Tracks start audible and looping.
+        """
+        return self.add_object(
+            "audio", 0, 0, source_id=source_id, muted=False, loop=True, z=0,
+        )
+
+    def audio_tracks(self) -> list:
+        return [o for o in self.objects if o.type == "audio"]
+
     def duplicate_object(self, object_id, offset=20.0) -> Optional[SceneObject]:
         """
         Duplicate a top-level object, slightly offset, on top of the stack.
@@ -541,7 +561,7 @@ class Scene:
         or preserve_pitch.
         """
         obj = self.get(object_id)
-        if obj is None or obj.type != "media" or name not in (
+        if obj is None or obj.type not in PLAYABLE_TYPES or name not in (
                 "muted", "loop", "volume", "speed", "preserve_pitch"):
             return False
 
@@ -564,7 +584,7 @@ class Scene:
         they are put in order; points closer than MIN_LOOP_MS are rejected.
         """
         obj = self.get(object_id)
-        if obj is None or obj.type != "media":
+        if obj is None or obj.type not in PLAYABLE_TYPES:
             return False
 
         a, b = normalized_loop(loop_a, loop_b)
@@ -579,7 +599,7 @@ class Scene:
 
     def set_playing(self, object_id, playing) -> bool:
         obj = self.get(object_id)
-        if obj is None or obj.type != "media":
+        if obj is None or obj.type not in PLAYABLE_TYPES:
             return False
 
         if obj.playing == bool(playing):
@@ -848,7 +868,7 @@ class Scene:
         if obj is None:
             return ""
 
-        if obj.type == "media":
+        if obj.type in PLAYABLE_TYPES:
             return self.source_name(obj.source_id)
 
         if obj.type == "container":
@@ -891,8 +911,9 @@ class Scene:
         return obj.type in OVERLAY_TYPES
 
     def _by_z(self):
-        """Top-level objects, bottom to top."""
-        return sorted(self.top_level(), key=lambda o: (self._is_overlay(o), o.z))
+        """Top-level visual objects, bottom to top."""
+        visual = [o for o in self.top_level() if o.type not in NON_VISUAL_TYPES]
+        return sorted(visual, key=lambda o: (self._is_overlay(o), o.z))
 
     def layer_order(self) -> list:
         """Top-level objects, top to bottom (as a Layers list shows them)."""
@@ -903,24 +924,24 @@ class Scene:
 
     def is_at_front(self, object_id) -> bool:
         obj = self.get(object_id)
-        if obj is None or obj.parent_id is not None:
+        if obj is None or obj.parent_id is not None or obj.type in NON_VISUAL_TYPES:
             return True
         return self._group(obj)[-1] is obj
 
     def is_at_back(self, object_id) -> bool:
         obj = self.get(object_id)
-        if obj is None or obj.parent_id is not None:
+        if obj is None or obj.parent_id is not None or obj.type in NON_VISUAL_TYPES:
             return True
         return self._group(obj)[0] is obj
 
     def _top_z(self):
-        return max((o.z for o in self.top_level()), default=0)
+        return max((o.z for o in self._by_z()), default=0)
 
     def _normalize_z(self):
         for z, obj in enumerate(self._by_z(), start=1):
             obj.z = z
         for obj in self.objects:
-            if obj.parent_id is not None:
+            if obj.parent_id is not None or obj.type in NON_VISUAL_TYPES:
                 obj.z = 0
 
     def _z_order_ids(self):
@@ -928,7 +949,7 @@ class Scene:
 
     def bring_to_front(self, object_id) -> bool:
         obj = self.get(object_id)
-        if obj is None or obj.parent_id is not None:
+        if obj is None or obj.parent_id is not None or obj.type in NON_VISUAL_TYPES:
             return False
         before = self._z_order_ids()
         obj.z = self._top_z() + 1
@@ -937,10 +958,10 @@ class Scene:
 
     def send_to_back(self, object_id) -> bool:
         obj = self.get(object_id)
-        if obj is None or obj.parent_id is not None:
+        if obj is None or obj.parent_id is not None or obj.type in NON_VISUAL_TYPES:
             return False
         before = self._z_order_ids()
-        obj.z = min(o.z for o in self.top_level()) - 1
+        obj.z = min(o.z for o in self._by_z()) - 1
         self._normalize_z()
         return self._z_order_ids() != before
 
@@ -952,7 +973,7 @@ class Scene:
 
     def _swap_z(self, object_id, step) -> bool:
         obj = self.get(object_id)
-        if obj is None or obj.parent_id is not None:
+        if obj is None or obj.parent_id is not None or obj.type in NON_VISUAL_TYPES:
             return False
 
         order = self._group(obj)

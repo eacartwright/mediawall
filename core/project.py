@@ -25,7 +25,7 @@ import tempfile
 from pathlib import Path
 
 from core.scene import (
-    CLIP_SHAPES, OBJECT_TYPES, MediaSource, Scene, SceneObject,
+    CLIP_SHAPES, OBJECT_TYPES, PLAYABLE_TYPES, MediaSource, Scene, SceneObject,
     clamp_speed, new_id, normalized_loop,
 )
 
@@ -42,6 +42,8 @@ TYPE_FIELDS = {
               "speed", "preserve_pitch", "loop_a", "loop_b"],
     "browser": ["folder", "current_index", "include_subfolders"],
     "container": ["lock_content", "clip_shape"],
+    "audio": ["source_id", "playing", "muted", "volume", "loop",
+              "speed", "preserve_pitch", "loop_a", "loop_b"],
 }
 
 
@@ -90,8 +92,8 @@ def scene_to_dict(scene: Scene, project_path=None) -> dict:
 
     objects = []
     # Top-level objects in stacking order, each container's content
-    # right after it, so the file reads naturally.
-    for obj in scene._by_z():
+    # right after it, so the file reads naturally; audio tracks last.
+    for obj in scene._by_z() + scene.audio_tracks():
         for item in [obj, scene.content_of(obj.id)]:
             if item is None:
                 continue
@@ -247,11 +249,11 @@ def scene_from_dict(data, project_path=None):
             except (TypeError, ValueError) as exc:
                 warnings.append(f"Ignored bad value for {name!r} ({exc}).")
 
-        if object_type == "media" and obj.source_id not in scene.sources:
+        if object_type in PLAYABLE_TYPES and obj.source_id not in scene.sources:
             warnings.append("Skipped a media object whose source is unknown.")
             continue
 
-        if object_type == "media":
+        if object_type in PLAYABLE_TYPES:
             obj.volume = min(1.0, max(0.0, obj.volume))
             obj.speed = clamp_speed(obj.speed)
             obj.loop_a, obj.loop_b = normalized_loop(obj.loop_a, obj.loop_b)

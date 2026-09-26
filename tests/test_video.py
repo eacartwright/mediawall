@@ -108,5 +108,52 @@ class VideoSceneTests(unittest.TestCase):
         self.assertEqual((m.speed, m.loop_a, m.loop_b), (4.0, -1.0, -1.0))
 
 
+
+class AudioTrackTests(unittest.TestCase):
+
+    def setUp(self):
+        self.scene = Scene()
+        self.src = self.scene.add_source("/music/song.m4a", "audio")
+        self.box = self.scene.add_object("container", 0, 0)
+
+    def test_track_defaults(self):
+        track = self.scene.add_audio_track(self.src.id)
+        self.assertEqual(track.type, "audio")
+        self.assertFalse(track.muted)          # unlike canvas videos
+        self.assertTrue(track.loop)
+        self.assertTrue(track.playing)
+        self.assertEqual(self.scene.display_name(track.id), "song.m4a")
+
+    def test_track_is_not_on_the_canvas(self):
+        track = self.scene.add_audio_track(self.src.id)
+        self.assertNotIn(track, self.scene.layer_order())
+        self.assertFalse(self.scene.bring_to_front(track.id))
+        self.assertFalse(self.scene.send_backward(track.id))
+        self.assertTrue(self.scene.is_at_front(track.id))
+        self.assertEqual(track.z, 0)
+        # Other objects' stacking ignores it.
+        self.assertTrue(self.scene.is_at_front(self.box.id))
+
+    def test_track_playback_settings(self):
+        track = self.scene.add_audio_track(self.src.id)
+        self.assertTrue(self.scene.set_media_option(track.id, "volume", 0.4))
+        self.assertTrue(self.scene.set_media_option(track.id, "speed", 0.5))
+        self.assertTrue(self.scene.set_loop(track.id, 1000, 4000))
+        self.assertTrue(self.scene.set_playing(track.id, False))
+
+    def test_track_saved_and_loaded(self):
+        from core.project import scene_from_dict, scene_to_dict
+
+        track = self.scene.add_audio_track(self.src.id)
+        self.scene.set_media_option(track.id, "volume", 0.4)
+
+        loaded, warnings = scene_from_dict(scene_to_dict(self.scene))
+        t = loaded.get(track.id)
+        self.assertEqual(warnings, [])
+        self.assertEqual((t.type, t.source_id, t.volume, t.muted),
+                         ("audio", self.src.id, 0.4, False))
+        self.assertIn(self.src.id, loaded.sources)
+
+
 if __name__ == "__main__":
     unittest.main()

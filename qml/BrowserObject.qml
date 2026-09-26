@@ -83,6 +83,12 @@ Rectangle {
         currentEntry !== null &&
         (currentEntry.type === "image" || currentEntry.type === "video")
 
+    // Audio files are added as tracks in the sidebar's Audio tab.
+    readonly property bool currentIsAudio:
+        currentEntry !== null && currentEntry.type === "audio"
+
+    readonly property bool canAdd: canPlace || currentIsAudio
+
     readonly property bool currentIsPlayer:
         currentEntry !== null &&
         (currentEntry.type === "video" || currentEntry.type === "audio")
@@ -90,6 +96,18 @@ Rectangle {
     // Preview playback state (workspace only, not saved).
     property bool previewPlaying: true
     property bool previewMuted: true
+
+    // Audio previews are audible by default (there's nothing to see).
+    property bool previewAudioMuted: false
+    readonly property bool currentMuted:
+        currentIsAudio ? previewAudioMuted : previewMuted
+
+    function toggleMute() {
+        if (currentIsAudio)
+            previewAudioMuted = !previewAudioMuted
+        else
+            previewMuted = !previewMuted
+    }
 
     // Every file starts playing when you move to it. Otherwise pausing
     // a video would leave later GIFs frozen, with no button to restart
@@ -226,7 +244,14 @@ Rectangle {
         )
     }
 
+    // Images and videos go on the canvas; audio becomes a track.
     function addCurrentToCanvas() {
+        if (currentIsAudio) {
+            sceneModel.addAudioTrack(currentEntry.path)
+            previewPlaying = false      // don't play it twice
+            return
+        }
+
         if (!canPlace)
             return
 
@@ -444,7 +469,7 @@ Rectangle {
             path: root.currentEntry ? root.currentEntry.path : ""
 
             playing: root.previewPlaying
-            muted: root.previewMuted
+            muted: root.currentMuted
             loop: true
         }
 
@@ -558,10 +583,10 @@ Rectangle {
 
                 view: previewView
                 playing: root.previewPlaying
-                muted: root.previewMuted
+                muted: root.currentMuted
 
                 onTogglePlay: root.previewPlaying = !root.previewPlaying
-                onToggleMute: root.previewMuted = !root.previewMuted
+                onToggleMute: root.toggleMute()
             }
 
             Rectangle {
@@ -602,8 +627,8 @@ Rectangle {
 
                     Button {
                         Layout.preferredHeight: 26
-                        text: "Add to Canvas"
-                        enabled: root.canPlace
+                        text: root.currentIsAudio ? "Add to Audio" : "Add to Canvas"
+                        enabled: root.canAdd
                         onClicked: root.addCurrentToCanvas()
                     }
 

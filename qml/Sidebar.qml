@@ -15,6 +15,15 @@ Item {
     // The scene item (Main.qml), for looking up players by media id.
     property Item sceneItem
 
+    // Show the Audio tab when a track is added.
+    Connections {
+        target: sceneModel
+        function onAudioTrackAdded(trackId) {
+            sidebar.open = true
+            tabs.currentIndex = 1
+        }
+    }
+
     function formatMs(ms) {
         var t = Math.max(0, ms) / 1000
         var m = Math.floor(t / 60)
@@ -277,6 +286,7 @@ Item {
                         required property string ownerId
                         required property string name
                         required property string kind
+                        required property bool isTrack
                         required property bool inContainer
                         required property bool missing
                         required property bool playing
@@ -355,6 +365,26 @@ Item {
                                           : ""
                                     color: "#aaaaaa"
                                     font.pixelSize: 11
+                                }
+
+                                Button {
+                                    Layout.preferredHeight: 22
+                                    visible: card.missing
+                                    text: "Locate…"
+                                    onClicked: sceneModel.locateMissing(card.itemId)
+                                }
+
+                                // Tracks have no canvas item, so they're
+                                // removed here (undoable).
+                                Button {
+                                    Layout.preferredHeight: 22
+                                    Layout.preferredWidth: 26
+                                    visible: card.isTrack
+                                    text: "✕"
+                                    onClicked: sceneModel.removeObject(card.itemId)
+                                    ToolTip.visible: hovered
+                                    ToolTip.text: "Remove this audio track"
+                                    ToolTip.delay: 500
                                 }
                             }
 
@@ -531,7 +561,8 @@ Item {
                         anchors.centerIn: parent
                         width: parent.width - 32
                         visible: audioList.count === 0
-                        text: "No videos on the canvas yet"
+                        text: "No videos or audio tracks yet.\n\nDouble-click an audio file in a "
+                              + "Browser (or use Add to Audio) to add a track."
                         color: "#888888"
                         font.pixelSize: 12
                         wrapMode: Text.WordWrap
