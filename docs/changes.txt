@@ -87,14 +87,20 @@ CHANGES:
 
 NEW FEATURES:
 
-- Add A-B looping for videos.
+- [DONE 2026-09-26] Set A / B at the current position from the right-click menu or the Audio tab; markers on the seek bar; saved and undoable.
+  Add A-B looping for videos.
 
-- Add a compact sidebar flyout (or something similar) that shows the total layers in canvas and if a container or free media is selected it highlights it in this list so you know where to move it up and down. Likewise, if you select something in the list it highlights it in the canvas.
+- [DONE 2026-09-26] "Layers · Audio" tab on the right edge opens a flyout. Layers lists every object top first; selection linked both ways; Top/Up/Down/Bottom. Browsers now stack in their own group above everything.
+  Add a compact sidebar flyout (or something similar) that shows the total layers in canvas and if a container or free media is selected it highlights it in this list so you know where to move it up and down. Likewise, if you select something in the list it highlights it in the canvas.
 
-- Add a flyout/sidebar option to control audio. So this would be probably a combination of the layer window idea, where I could click a video file either on the canvas and have it selected in this list and adjust it's volume (and speed+pitch) and probably also things like pause and A+B loop.
+- [DONE 2026-09-26] Audio tab in the same flyout: every video (and audio track) with play/pause, mute, volume, speed 0.25x-4x, Keep pitch (off = pitch follows speed), loop, and A-B. Clicking a card selects the video.
+  Add a flyout/sidebar option to control audio. So this would be probably a combination of the layer window idea, where I could click a video file either on the canvas and have it selected in this list and adjust it's volume (and speed+pitch) and probably also things like pause and A+B loop.
 
-- For adding strictly audio files (MP3, M4A, etc.) I'm thinking I still would want to do this with the Browser. For that, I'm thinking a similar workflow. It plays the audio on repeat like a video, if I double click (some kind of compact placeholder for audio files) the browser it adds the audio track to the media control sidebar where it can be further adjusted (volume, speed+pitch, maybe also A+B looping).
+- [DONE 2026-09-26] Double-click an audio file in a Browser (or "Add to Audio") to add a looping, audible track to the Audio tab; remove with its X. Not done yet: solo, video-as-audio.
+  For adding strictly audio files (MP3, M4A, etc.) I'm thinking I still would want to do this with the Browser. For that, I'm thinking a similar workflow. It plays the audio on repeat like a video, if I double click (some kind of compact placeholder for audio files) the browser it adds the audio track to the media control sidebar where it can be further adjusted (volume, speed+pitch, maybe also A+B looping).
 
-- A true full screen mode, perhaps a button near the top, that "removes" the top of the program and possibly also obscures the taskbar. I'm not sure if this will have to be different logic for Windows and Linux. Also it would be nice if there was an easy way to exit this mode that didn't require a keystroke, so perhaps a double-click anywhere on the canvas or a small "X" button overlaid in the top-right.
+- [DONE 2026-09-26] Full Screen (F11, editing) and Present (F5, view-only canvas, Browsers still work) buttons. Exit with Esc, a double-click on the canvas, or the X that appears top-right on mouse move. Check on Linux too.
+  A true full screen mode, perhaps a button near the top, that "removes" the top of the program and possibly also obscures the taskbar. I'm not sure if this will have to be different logic for Windows and Linux. Also it would be nice if there was an easy way to exit this mode that didn't require a keystroke, so perhaps a double-click anywhere on the canvas or a small "X" button overlaid in the top-right.
 
-- Create a way to start the application from a single file. Eventually perhaps an option to hide the terminal or a debug option to view it for development purposes. Or perhap a button in the app itself to hide or reveal it.
+- [DONE 2026-09-26] Run tools/create_launchers.py once per machine: Windows shortcuts (no terminal / debug), Linux menu entries (normal / debug). The Log button shows what the terminal would; also saved to logs/mediawall.log.
+  Create a way to start the application from a single file. Eventually perhaps an option to hide the terminal or a debug option to view it for development purposes. Or perhap a button in the app itself to hide or reveal it.
