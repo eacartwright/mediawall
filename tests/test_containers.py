@@ -253,6 +253,77 @@ class ContainerProjectTests(unittest.TestCase):
         self.assertEqual(len(warnings), 1)
 
 
+class BrowsingContainerTests(unittest.TestCase):
+
+    def setUp(self):
+        self.scene = Scene()
+        self.wide = self.scene.add_source("/trip/day1/wide.jpg", "image", 400, 200)
+        self.tall = self.scene.add_source("/trip/day2/tall.jpg", "image", 200, 400)
+        self.box = self.scene.add_object("container", 0, 0)       # 360 x 260
+
+    def test_fit_mode_is_remembered_for_new_content(self):
+        self.assertEqual(self.box.fit_mode, FIT_COVER)
+        self.assertTrue(self.scene.fit_content(self.box.id, FIT_CONTAIN))  # empty: mode only
+        content, _ = self.scene.add_media_to_container(self.wide.id, self.box.id)
+        # 2:1 into 360x260, contain: width matches
+        self.assertAlmostEqual(content.width, 360)
+        self.assertAlmostEqual(content.height, 180)
+
+    def test_browse_mode_uses_the_current_files_folder(self):
+        self.scene.add_media_to_container(self.wide.id, self.box.id)
+        self.assertTrue(self.scene.set_browsing(self.box.id, True))
+        self.assertTrue(self.box.browse_mode)
+        self.assertEqual(Path(self.box.browse_folder), Path("/trip/day1"))
+        self.assertTrue(self.box.browse_subfolders)
+        self.assertTrue(self.scene.set_browsing(self.box.id, False))
+        self.assertFalse(self.box.browse_mode)
+
+    def test_empty_container_needs_a_folder(self):
+        self.assertFalse(self.scene.set_browsing(self.box.id, True))
+        self.assertTrue(self.scene.set_browsing(self.box.id, True, "/trip"))
+        self.assertEqual(self.box.browse_folder, "/trip")
+
+    def test_showing_another_file_keeps_the_instance(self):
+        content, _ = self.scene.add_media_to_container(self.wide.id, self.box.id)
+        self.scene.set_playing(content.id, False)
+        self.scene.set_loop(content.id, 1000, 2000)
+
+        self.assertTrue(self.scene.show_file_in_container(self.box.id, self.tall.id))
+
+        self.assertIs(self.scene.content_of(self.box.id), content)
+        self.assertEqual(content.source_id, self.tall.id)
+        self.assertFalse(content.playing)                          # settings kept
+        self.assertEqual((content.loop_a, content.loop_b), (-1.0, -1.0))
+        # 1:2 into 360x260, cover (the default): width matches
+        self.assertAlmostEqual(content.width, 360)
+        self.assertAlmostEqual(content.height, 720)
+
+    def test_showing_a_file_in_an_empty_container(self):
+        self.assertTrue(self.scene.show_file_in_container(self.box.id, self.tall.id))
+        self.assertEqual(self.scene.content_of(self.box.id).source_id, self.tall.id)
+
+    def test_browse_state_saved(self):
+        self.scene.set_browsing(self.box.id, True, "/trip")
+        self.scene.set_browse_subfolders(self.box.id, False)
+        self.scene.fit_content(self.box.id, FIT_CONTAIN)
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "p.mediawall"
+            save_project(self.scene, path)
+            loaded, warnings = load_project(path)
+        box = loaded.get(self.box.id)
+        self.assertEqual((box.browse_mode, box.browse_folder, box.browse_subfolders,
+                          box.fit_mode), (True, "/trip", False, FIT_CONTAIN))
+
+    def test_bad_fit_mode_is_repaired(self):
+        data = {
+            "format": FORMAT, "version": 1, "media_sources": {},
+            "objects": [{"id": "c", "type": "container", "fit_mode": "zoom"}],
+        }
+        scene, warnings = scene_from_dict(data)
+        self.assertEqual(scene.get("c").fit_mode, FIT_COVER)
+        self.assertEqual(len(warnings), 1)
+
+
 class ScaleObjectTests(unittest.TestCase):
 
     def setUp(self):

@@ -63,6 +63,7 @@ CLIP_SHAPES = {"rect"}      # future: "rounded", "ellipse", "path", ...
 
 FIT_CONTAIN = "contain"     # whole image visible inside the container
 FIT_COVER = "cover"         # container completely filled, edges cropped
+FIT_MODES = {FIT_CONTAIN, FIT_COVER}
 
 # Object types that always stack above the others (workspace tools).
 OVERLAY_TYPES = {"browser"}
@@ -191,6 +192,14 @@ class SceneObject:
     # container
     lock_content: bool = True     # resizing the container scales content
     clip_shape: str = "rect"
+    fit_mode: str = FIT_COVER     # how new content is framed (Fit/Fill)
+
+    # A browsing container: the wheel steps through the media in a
+    # folder, showing each file as its content. Workspace state, like a
+    # browser's: saved, but not undone.
+    browse_mode: bool = False
+    browse_folder: str = ""
+    browse_subfolders: bool = True
 
     @property
     def center(self):
@@ -237,22 +246,38 @@ class Scene:
         if source.width == width and source.height == height:
             return []
 
+        # The known size turned sideways: a rotation correction (phone
+        # videos are stored sideways with a rotation flag; the player may
+        # report the stored size first, then the displayed one). Everything
+        # sized from the old shape is re-sized, not just pending instances.
+        rotated = (source.width, source.height) == (int(height), int(width))
+
         source.width, source.height = int(width), int(height)
         changed = []
 
         for obj in self.objects:
-            if obj.source_id != source_id or not obj.pending_size:
+            if obj.source_id != source_id or not (obj.pending_size or rotated):
                 continue
 
+            was_pending = obj.pending_size
             obj.pending_size = False
 
             if obj.parent_id is None:
-                obj.height = obj.width / source.aspect
+                if was_pending:
+                    obj.height = obj.width / source.aspect
+                else:
+                    # Already placed: fit the corrected shape inside the
+                    # box it had, around the same center.
+                    cx, cy = obj.center
+                    obj.width, obj.height = fitted_size(
+                        obj.width, obj.height, source.aspect, FIT_CONTAIN)
+                    obj.x, obj.y = cx - obj.width / 2, cy - obj.height / 2
                 changed.append(obj.id)
             else:
                 container = self._container(obj.parent_id)
                 if container is not None:
-                    self._frame_content(container, obj, source.aspect)
+                    self._frame_content(container, obj, source.aspect,
+                                        container.fit_mode)
                     changed.append(container.id)
 
         return changed
@@ -735,7 +760,7 @@ class Scene:
             parent_id=container_id,
             pending_size=source.aspect <= 0,
         )
-        self._frame_content(container, content, source.aspect)
+        self._frame_content(container, content, source.aspect, container.fit_mode)
         self.objects.append(content)
         return content, released
 
@@ -762,7 +787,7 @@ class Scene:
 
         media.parent_id = container_id
         media.z = 0
-        self._frame_content(container, media, aspect)
+        self._frame_content(container, media, aspect, container.fit_mode)
 
         if self.selected_id == media_id:
             self.selected_id = container_id
@@ -819,10 +844,20 @@ class Scene:
         return True
 
     def fit_content(self, container_id, mode) -> bool:
+        """
+        Re-frame the content (Fit or Fill). The container remembers the
+        mode, and frames new content (e.g. while browsing) the same way.
+        """
         container = self._container(container_id)
-        content = self.content_of(container_id) if container else None
-        if content is None:
+        if container is None or mode not in FIT_MODES:
             return False
+
+        mode_changed = container.fit_mode != mode
+        container.fit_mode = mode
+
+        content = self.content_of(container_id)
+        if content is None:
+            return mode_changed
 
         source = self.sources.get(content.source_id)
         before = (content.x, content.y, content.width, content.height,
@@ -831,7 +866,72 @@ class Scene:
                             source.aspect if source else 0.0, mode)
         after = (content.x, content.y, content.width, content.height,
                  content.rotation)
-        return after != before
+        return mode_changed or after != before
+
+    # ---- Browsing containers ----
+
+    def set_browsing(self, container_id, on, folder=None) -> bool:
+        """
+        Turn a container's browse mode on or off. Turning it on uses
+        `folder`, or else the folder of the file it shows now; with
+        neither, it stays off (returns False).
+        """
+        container = self._container(container_id)
+        if container is None:
+            return False
+
+        if not on:
+            if not container.browse_mode:
+                return False
+            container.browse_mode = False
+            return True
+
+        if not folder:
+            content = self.content_of(container_id)
+            source = self.sources.get(content.source_id) if content else None
+            if source is None:
+                return False
+            folder = str(Path(source.path).parent)
+
+        if container.browse_mode and container.browse_folder == folder:
+            return False
+        container.browse_mode = True
+        container.browse_folder = folder
+        return True
+
+    def set_browse_subfolders(self, container_id, include) -> bool:
+        container = self._container(container_id)
+        if container is None or container.browse_subfolders == bool(include):
+            return False
+        container.browse_subfolders = bool(include)
+        return True
+
+    def show_file_in_container(self, container_id, source_id) -> bool:
+        """
+        Show another file in a container (browsing): the content keeps
+        its id and playback settings, takes the new source, and is
+        framed with the container's Fit/Fill mode. A-B loop points
+        belonged to the old file, so they're cleared. An empty container
+        gets new content.
+        """
+        container = self._container(container_id)
+        source = self.sources.get(source_id)
+        if container is None or source is None:
+            return False
+
+        content = self.content_of(container_id)
+        if content is None:
+            new, _ = self.add_media_to_container(source_id, container_id)
+            return new is not None
+
+        if content.source_id == source_id:
+            return False
+
+        content.source_id = source_id
+        content.loop_a = content.loop_b = -1.0
+        content.pending_size = source.aspect <= 0
+        self._frame_content(container, content, source.aspect, container.fit_mode)
+        return True
 
     # ---- Wrapping a free image in a container ("Crop / Zoom Inside") ----
     #

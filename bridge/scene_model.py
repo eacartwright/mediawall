@@ -10,6 +10,7 @@ a row of its own; it is exposed through the container row's
 content* roles, and edited through the container's id.
 """
 
+import copy
 import time
 from pathlib import Path
 
@@ -37,6 +38,10 @@ from core.scene import FIT_CONTAIN, FIT_COVER, Scene
 # Browser fields are workspace state: saved with the project, but not
 # part of undo (undoing a move shouldn't also rewind your browsing).
 BROWSER_FIELDS = ("folder", "current_index", "include_subfolders")
+
+# The same for browsing containers: their browse settings, and while
+# browsing, the content itself (which file, and how it's framed).
+CONTAINER_BROWSE_FIELDS = ("browse_mode", "browse_folder", "browse_subfolders")
 
 
 def _media_file_filter():
@@ -70,6 +75,10 @@ OBJECT_ROLE_NAMES = [
     "includeSubfolders",
     "lockContent",
     "clipShape",
+    "fitMode",
+    "browseMode",
+    "browseFolder",
+    "browseSubfolders",
 ]
 
 # Roles describing a media source. Used as "source*" for a media row,
@@ -103,7 +112,9 @@ PLAYBACK_ROLES = [ROLES[n] for n in
                   ("objPlaying", "objMuted", "objVolume", "objLoop",
                    "objSpeed", "objPreservePitch", "objLoopA", "objLoopB")]
 SOURCE_ROLES = [ROLES["source" + f] for f in SOURCE_FIELDS]
-CONTAINER_ROLES = [ROLES["lockContent"], ROLES["clipShape"]]
+CONTAINER_ROLES = [ROLES[n] for n in
+                   ("lockContent", "clipShape", "fitMode", "browseMode",
+                    "browseFolder", "browseSubfolders")]
 CONTENT_ROLES = [ROLES[n] for n in CONTENT_ROLE_NAMES]
 
 
@@ -329,6 +340,10 @@ class SceneModel(QAbstractListModel):
             "includeSubfolders": obj.include_subfolders,
             "lockContent": obj.lock_content,
             "clipShape": obj.clip_shape,
+            "fitMode": obj.fit_mode,
+            "browseMode": obj.browse_mode,
+            "browseFolder": obj.browse_folder,
+            "browseSubfolders": obj.browse_subfolders,
         }.get(name)
 
     # -------------------------------------------------
@@ -422,6 +437,25 @@ class SceneModel(QAbstractListModel):
                 if live is not None:
                     for name in BROWSER_FIELDS:
                         setattr(obj, name, getattr(live, name))
+
+        # Browsing containers: keep their browse settings, and while one
+        # is browsing, what it shows (undo never changes the file).
+        for obj in list(target.objects):
+            if obj.type != "container":
+                continue
+            live = cur.get(obj.id)
+            if live is None:
+                continue
+            for name in CONTAINER_BROWSE_FIELDS:
+                setattr(obj, name, getattr(live, name))
+            if live.browse_mode:
+                target.objects = [o for o in target.objects if o.parent_id != obj.id]
+                live_content = cur.content_of(obj.id)
+                if live_content is not None:
+                    target.objects.append(copy.deepcopy(live_content))
+                    source = cur.sources.get(live_content.source_id)
+                    if source is not None:
+                        target.sources.setdefault(source.id, copy.deepcopy(source))
 
         target_top = [o.id for o in target.top_level()]
         target_top_set = set(target_top)
@@ -859,8 +893,44 @@ class SceneModel(QAbstractListModel):
     def fitContent(self, container_id, fill):
         mode = FIT_COVER if fill else FIT_CONTAIN
         if self._scene.fit_content(container_id, mode):
-            self._emit_row(container_id, CONTENT_ROLES)
+            self._emit_row(container_id, CONTENT_ROLES + CONTAINER_ROLES)
             self._changed()
+
+    # -------------------------------------------------
+    # Browsing containers (workspace state: saved, not undone)
+    # -------------------------------------------------
+
+    @Slot(str)
+    def startBrowsing(self, container_id):
+        """Browse the current file's folder, or ask for one if empty."""
+        folder = None
+        if self._scene.content_of(container_id) is None:
+            folder = QFileDialog.getExistingDirectory(None, "Choose a Folder to Browse")
+            if not folder:
+                return
+        if self._scene.set_browsing(container_id, True, folder):
+            self._emit_row(container_id, CONTAINER_ROLES)
+            self._changed(workspace_only=True)
+
+    @Slot(str)
+    def stopBrowsing(self, container_id):
+        if self._scene.set_browsing(container_id, False):
+            self._emit_row(container_id, CONTAINER_ROLES)
+            self._changed(workspace_only=True)
+
+    @Slot(str, bool)
+    def setContainerBrowseSubfolders(self, container_id, include):
+        if self._scene.set_browse_subfolders(container_id, include):
+            self._emit_row(container_id, CONTAINER_ROLES)
+            self._changed(workspace_only=True)
+
+    @Slot(str, str, str)
+    def showInContainer(self, container_id, path, media_type):
+        """A browsing container steps to another file."""
+        source = self._register_source(path, media_type)
+        if self._scene.show_file_in_container(container_id, source.id):
+            self._emit_row(container_id, CONTENT_ROLES)
+            self._changed(workspace_only=True)
 
     @Slot(str, bool)
     def setLockContent(self, container_id, locked):

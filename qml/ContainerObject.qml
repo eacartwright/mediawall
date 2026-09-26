@@ -8,6 +8,9 @@ import "Zoom.js" as Zoom
 // Adjust mode:  drag pans the content, wheel zooms, knob rotates the
 //               content. The part outside the frame shows as a ghost.
 //               Enter by double-clicking or from the right-click menu.
+// Browsing:     the wheel steps through the media in a folder, showing
+//               each file as the content (right-click > Browse This
+//               Folder). Also works in Present: a hand-driven slideshow.
 //
 // Content geometry is in the container's local coordinates
 // (0, 0 = top-left of the unrotated container).
@@ -24,6 +27,10 @@ Item {
     required property real objRotation
     required property int objZ
     required property bool lockContent
+    required property string fitMode
+    required property bool browseMode
+    required property string browseFolder
+    required property bool browseSubfolders
 
     required property string contentId
     required property real contentX
@@ -53,9 +60,11 @@ Item {
     property var contextMenu
 
     // Present mode: view-only, never shown as selected. Disabled items
-    // let clicks through to the canvas (double-click there exits).
+    // let clicks through to the canvas (double-click there exits). A
+    // browsing container stays enabled for the wheel, but takes no
+    // clicks (see the MouseArea below).
     readonly property bool presenting: sceneItem ? sceneItem.presenting : false
-    enabled: !presenting
+    enabled: !presenting || browseMode
 
     readonly property bool selected:
         !presenting && sceneModel.selectedId === objectId
@@ -119,6 +128,46 @@ Item {
 
 
     // -------------------------------------------------
+    // Browsing: the folder's images and videos (rescanned when the
+    // folder or subfolder setting changes), and where the current
+    // content is among them.
+    // -------------------------------------------------
+
+    property var browseFiles: []
+
+    function rescanBrowse() {
+        if (!browseMode || browseFolder === "") {
+            browseFiles = []
+            return
+        }
+        browseFiles = browserBackend.scanFolder(browseFolder, browseSubfolders)
+            .filter(function(e) { return e.type === "image" || e.type === "video" })
+    }
+
+    onBrowseModeChanged: rescanBrowse()
+    onBrowseFolderChanged: rescanBrowse()
+    onBrowseSubfoldersChanged: rescanBrowse()
+
+    readonly property int browseIndex: {
+        for (var i = 0; i < browseFiles.length; i++) {
+            if (browseFiles[i].path === contentSourcePath)
+                return i
+        }
+        return -1
+    }
+
+    // Wheel up = previous, down = next, wrapping around (as in a browser).
+    function browseStep(delta) {
+        var n = browseFiles.length
+        if (n === 0)
+            return
+        var i = browseIndex < 0 ? (delta > 0 ? 0 : n - 1)
+                                : (browseIndex + delta + n) % n
+        sceneModel.showInContainer(objectId, browseFiles[i].path, browseFiles[i].type)
+    }
+
+
+    // -------------------------------------------------
     // Content geometry
     //
     // Held as center + size + rotation. Normally bound to the model.
@@ -175,7 +224,10 @@ Item {
         cg.rot = Qt.binding(function() { return root.contentRotation })
     }
 
-    Component.onCompleted: bindContent()
+    Component.onCompleted: {
+        bindContent()
+        rescanBrowse()
+    }
 
     function commitContent() {
         sceneModel.commitContent(
@@ -402,7 +454,8 @@ Item {
 
         z: 10
 
-        acceptedButtons: Qt.LeftButton | Qt.RightButton
+        // In Present only the wheel is used (browsing containers).
+        acceptedButtons: root.presenting ? Qt.NoButton : Qt.LeftButton | Qt.RightButton
 
         property string mode: ""      // "move" | "pan" | ""
         property point startMouse
@@ -458,10 +511,21 @@ Item {
                 root.adjusting = true
         }
 
-        // Adjusting: zoom the content. Otherwise, when selected, scale
-        // the whole container (content included) like a free image.
+        // Adjusting: zoom the content. Browsing: step through the
+        // folder (selected or not, and in Present). Otherwise, when
+        // selected, scale the whole container like a free image.
         onWheel: function(wheel) {
-            if (wheel.angleDelta.y === 0 || !(root.adjusting || root.selected)) {
+            if (wheel.angleDelta.y === 0) {
+                wheel.accepted = false
+                return
+            }
+
+            if (root.browseMode && !root.adjusting) {
+                root.browseStep(wheel.angleDelta.y > 0 ? -1 : 1)
+                return
+            }
+
+            if (!(root.adjusting || root.selected)) {
                 wheel.accepted = false
                 return
             }
@@ -562,6 +626,38 @@ Item {
 
         onTogglePlay: sceneModel.setPlaying(root.contentId, !root.contentPlaying)
         onToggleMute: sceneModel.setMuted(root.contentId, !root.contentMuted)
+    }
+
+
+    // -------------------------------------------------
+    // Browsing badge (selected): position in the folder and file name
+    // -------------------------------------------------
+
+    Rectangle {
+        anchors.left: parent.left
+        anchors.top: parent.top
+        anchors.margins: 22                 // clear of the corner handles
+
+        width: Math.min(badgeText.implicitWidth + 12, parent.width - 44)
+        height: badgeText.implicitHeight + 6
+        radius: 3
+
+        visible: root.browseMode && root.selected && !root.adjusting
+        color: "#cc202020"
+        z: 25
+
+        Text {
+            id: badgeText
+            anchors.centerIn: parent
+            width: parent.width - 12
+            elide: Text.ElideMiddle
+            text: root.browseFiles.length === 0
+                  ? "Browsing · no media found"
+                  : "⇅ " + (root.browseIndex + 1) + " / " + root.browseFiles.length
+                    + (root.browseIndex >= 0 ? " · " + root.browseFiles[root.browseIndex].relpath : "")
+            color: "#dddddd"
+            font.pixelSize: 11
+        }
     }
 
 

@@ -258,6 +258,37 @@ Menu {
         onTriggered: sceneModel.fitContent(menu.targetId, true)
     }
 
+    // ---- Browsing (containers) ----
+
+    MenuItem {
+        text: "Browse This Folder"
+        visible: menu.isContainer && !menu.target.browseMode
+        height: visible ? implicitHeight : 0
+        onTriggered: sceneModel.startBrowsing(menu.targetId)
+    }
+
+    MenuItem {
+        text: "Stop Browsing"
+        visible: menu.isContainer && menu.target.browseMode === true
+        height: visible ? implicitHeight : 0
+        onTriggered: sceneModel.stopBrowsing(menu.targetId)
+    }
+
+    MenuItem {
+        id: browseSubfoldersItem
+        text: "Browse Subfolders Too"
+        checkable: true
+        checked: menu.isContainer && menu.target.browseSubfolders === true
+        visible: menu.isContainer && menu.target.browseMode === true
+        height: visible ? implicitHeight : 0
+        onTriggered: {
+            sceneModel.setContainerBrowseSubfolders(menu.targetId, !menu.target.browseSubfolders)
+            browseSubfoldersItem.checked = Qt.binding(function() {
+                return menu.isContainer && menu.target.browseSubfolders === true
+            })
+        }
+    }
+
     MenuItem {
         id: lockItem
 

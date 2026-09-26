@@ -428,7 +428,8 @@ This should be a property of the media/container relationship.
 - A container holds at most one media instance. The instance is an ordinary media object whose `parent_id` is the container, with its geometry in the container's local, unrotated coordinates (0, 0 = the container's top-left).
 - Moving media into or out of a container re-parents that same instance, so its state (e.g. paused) carries over.
 - Media gets into a container by dragging a free image onto it (the container highlights; holding Shift places the image on top instead), or by selecting the container and using a browser's **Add to Container** button. Only an empty container accepts media: a full one doesn't highlight as a drop target (the media lands on the canvas instead), and Add to Container is disabled for it. To change what a container holds, release or remove its content first.
-- New content is framed to fill the container (cover). **Fit Content** and **Fill Container** re-frame it and reset its rotation.
+- New content is framed with the container's **Fit/Fill** mode (`fit_mode`, default Fill = cover). **Fit Content** and **Fill Container** (menu, or Fit/Fill in Adjust mode) re-frame it, reset its rotation, and set the mode the container remembers for new content.
+- **Browsing containers** (right-click → **Browse This Folder**; section 13): the container steps through the images and videos in a folder, by default the folder of the file it shows (an empty container asks for a folder), subfolders included (**Browse Subfolders Too**). The mouse wheel over it goes to the previous/next file (wrapping around), whether or not it's selected, and also in Present, where it is the only thing that responds; Adjust mode keeps the wheel for zoom. Each file replaces the content in place (same instance and playback settings; A-B points cleared), framed with the container's Fit/Fill mode. When selected, a badge shows the position and file name. **Stop Browsing** keeps whatever is showing. Browse settings, and while browsing the content itself, are workspace state: saved, but never changed by Undo (section 47).
 - **Adjust mode** (double-click, or right-click → Adjust Content) turns dragging into panning, the mouse wheel into zoom around the pointer, and the rotation knob into content rotation. The part of the content outside the frame shows as a faint ghost (a live texture of the content itself, so video and GIF ghosts stay in sync and nothing is loaded twice), and a small toolbar offers Fit, Fill, and Done. The toolbar stays upright whatever the rotation, sits below the container (or above it when there's no room), and stays inside the visible canvas. Enter or Space also finishes adjusting, as do clicking elsewhere and Escape.
 - The mouse wheel over a *selected* container (outside Adjust mode) scales the whole container around the pointer, content included, so the view inside the frame doesn't change. This happens whether or not "Scale Content with Container" is on; that setting only affects the resize handles.
 - **Release Content** turns the content back into a free object at the position, size, and rotation it currently appears on the canvas. **Remove Content** deletes it. Deleting a container deletes its content.
@@ -720,6 +721,8 @@ The slideshow may display:
 
 The media appears one at a time.
 
+**Decision (2026-09-26):** slideshows are replaced by **browsing containers** (section 6.4): any container can step through a folder's media with the mouse wheel, including in Present, which covers the hand-driven slideshow. Timed/automatic features below stay on the back burner.
+
 Future features include:
 
 - transition effects
@@ -907,6 +910,8 @@ There are two full-screen modes, both window state only (not saved):
 
 - **Full Screen** (toolbar button or F11): the editor fills the screen, covering the taskbar, with the toolbar hidden. Everything else works as usual.
 - **Present** (toolbar button or F5): full screen, and the canvas becomes view-only. Media and containers can't be selected, moved, or right-clicked, and no outlines, handles, or video bars show. Editing shortcuts are off. **Browsers stay visible and working** (browse, zoom, Add to Canvas) but show no selection chrome; hiding them was deliberately not done, so a live browsing wall is possible.
+
+In Present, **browsing containers** still respond to the mouse wheel (the hand-driven slideshow: e.g. two half-screen containers flipped independently); nothing else on the canvas does.
 
 Leaving: Esc (in Full Screen, Esc first deselects), F11 / F5 again, double-clicking the canvas (in Present, anywhere except a browser), or the ✕ in the top-right corner, which appears when the mouse moves and fades after about two seconds. In Present, the mouse pointer hides along with it and comes back when the mouse moves. (Only a real change of position counts as movement: Qt also re-sends hover updates every frame while something animates.) Leaving Present returns to where you were (window or Full Screen).
 
@@ -2184,6 +2189,7 @@ The application should degrade gracefully.
 - Every change to saved state ends in one place in the bridge (`SceneModel._changed`), which records the step and marks the project modified.
 - Rapid repeated changes can share a merge key and become one step. A whole scroll of wheel zoom, on a free image or inside a container, is a single undo.
 - Browser state (folder, position, subfolders setting) is workspace state: saved with the project, but not recorded as undo steps and not rewound by undo. Browsing through 50 photos doesn't fill the history.
+- The same goes for **browsing containers**: their browse settings, and while browsing, their content (which file, and its framing) are kept as they are when undoing. Undo still moves, resizes, and restacks the container itself. (So pan/zoom inside a browsing container isn't undoable.)
 - Applying an undo announces only the rows that actually appear or disappear, so untouched objects keep their on-screen state: browsers don't rescan and GIFs keep playing.
 - Selection is not part of undo.
 - History is cleared on New.
@@ -2234,7 +2240,8 @@ Ctrl+Shift+Up     bring to front
 Ctrl+Up           bring forward
 Ctrl+Down         send backward
 Ctrl+Shift+Down   send to back
-Mouse wheel       previous/next item (over a browser preview);
+Mouse wheel       previous/next item (over a browser preview, or a
+                  browsing container, also in Present);
 Left button+wheel zoom a browser preview (then left-drag pans);
                   scale a selected free image or container around the pointer;
                   zoom content (over a container in Adjust mode)
@@ -2277,6 +2284,7 @@ The prototype currently provides:
 - per-video speed (0.25x to 4x), Keep pitch, and A-B loop; an Audio tab in the sidebar with every video's sound and playback settings (section 14.5)
 - audio tracks added from a browser (double-click or Add to Audio), controlled in the Audio tab
 - video as audio: Convert to Audio Track (right-click a video), or Add to Audio for a video in a browser (section 14.2)
+- browsing containers: step through a folder's media with the mouse wheel, also in Present (section 6.4); containers remember Fit/Fill
 - audio previews in browsers
 - containers: move, resize, rotate; hold one clipped media instance with its own pan, zoom, and rotation (Adjust mode); fit/fill; locked or independent scaling; release/remove content
 - media can be dragged into empty containers, or added from a browser to a selected empty container
@@ -2309,7 +2317,7 @@ Reviewed 2026-09-26. Keep this list current; it replaces the phase notes as the 
 
 ### Next
 
-Nothing queued. Pick the next items from Soon or Later.
+1. **Layouts** (Phase 5): Save Layout… writes only the containers (no media, browsers, or audio) to a `.mediawall.layout` file; New from Layout… and Add Layout to Wall use one.
 
 Done from the last list: video as audio (section 14.2), drag-to-reorder in the Layers panel, edge resize handles, the Adjust-mode ghost for video, hiding the idle pointer in Present, and undo history kept between sessions (section 47).
 
@@ -2319,13 +2327,12 @@ Done from the last list: video as audio (section 14.2), drag-to-reorder in the L
 
 ### Later (kept on the roadmap)
 
-- **Layouts** (Phase 5): reusable canvas arrangements.
 - **Inspector** (Phase 11): exact position, size, and rotation.
 
 ### Back burner
 
 - Collections (Phase 7).
-- Slideshows (section 13), with the browser's Make Container / Add as Slideshow; containers holding more than one item.
+- Timed/automatic slideshow features (transitions, durations, shuffle); manual slideshows are done as browsing containers (section 13). The browser's Make Container.
 - Advanced presentation features (Phase 12), including non-rectangular containers.
 - Layers: visibility and locking.
 - Rotation snapping (e.g. 15° steps).
@@ -2526,6 +2533,8 @@ The following design decisions are currently established:
 - Present mode keeps Browsers visible and usable; the rest of the canvas is view-only (2026-09-26).
 - Audio tracks are objects of type `audio` with no canvas presence; they start audible and looping (2026-09-26).
 - Video as audio converts the video into a track (it leaves the canvas) rather than adding a second, unsynchronized copy (2026-09-26).
+- Slideshows are replaced by browsing containers; browsing is workspace state, not undone (2026-09-26).
+- Phone videos stored sideways with a rotation flag get their displayed (upright) size: MediaView reports the stored size in the orientation actually drawn, once it has settled; a size report that is the old one turned sideways re-sizes (fits within its box) and re-frames everything already placed, which also repairs older walls (2026-09-26).
 - Speed changes pitch by default (Keep pitch off), as in Celluloid (2026-09-26).
 - The application's name is written **MediaWall** (one word) everywhere (2026-09-26).
 - Undo history is kept between sessions in a separate `<project>.history` file (last 50 steps), matched to the project by fingerprint, not inside the project file (2026-09-26).

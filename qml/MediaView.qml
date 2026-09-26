@@ -231,10 +231,35 @@ Item {
 
                 fillMode: VideoOutput.PreserveAspectFit
 
-                onSourceRectChanged: {
-                    if (sourceRect.width > 0 && sourceRect.height > 0)
-                        view.ready(sourceRect.width, sourceRect.height)
+                // sourceRect is the frame size as stored; phone videos are
+                // often stored sideways with a rotation flag, which the
+                // player applies when drawing. contentRect is what's
+                // actually drawn, so report the stored size in the drawn
+                // orientation (portrait videos come out portrait).
+                function reportSize() {
+                    var w = sourceRect.width
+                    var h = sourceRect.height
+                    if (w <= 0 || h <= 0 || contentRect.width <= 0 || contentRect.height <= 0)
+                        return
+                    if ((contentRect.width > contentRect.height) !== (w > h)) {
+                        var t = w
+                        w = h
+                        h = t
+                    }
+                    view.ready(w, h)
                 }
+
+                // Report once the drawn shape has settled: right after
+                // loading, contentRect can briefly show the stored
+                // (sideways) shape before the rotation is applied.
+                Timer {
+                    id: reportTimer
+                    interval: 150
+                    onTriggered: videoOutput.reportSize()
+                }
+
+                onSourceRectChanged: reportTimer.restart()
+                onContentRectChanged: reportTimer.restart()
             }
 
             // Audio files have nothing to show; say what's playing.

@@ -46,6 +46,30 @@ class VideoSceneTests(unittest.TestCase):
         self.assertAlmostEqual(content.width, 360)
         self.assertAlmostEqual(content.height, 640)
 
+    def test_sideways_size_correction_resizes_everything(self):
+        # First report: the stored (sideways) size; then the displayed one.
+        media = self.scene.add_media(self.src.id, 0, 0)
+        box = self.scene.add_object("container", 0, 0)          # 360 x 260
+        content, _ = self.scene.add_media_to_container(self.src.id, box.id)
+        self.scene.set_source_size(self.src.id, 1920, 1080)
+        self.assertAlmostEqual(media.width / media.height, 16 / 9)
+
+        changed = self.scene.set_source_size(self.src.id, 1080, 1920)
+
+        self.assertEqual(set(changed), {media.id, box.id})
+        self.assertAlmostEqual(media.width / media.height, 1080 / 1920)
+        # Fitted inside the box it had (300 x 168.75), same center.
+        self.assertAlmostEqual(media.height, 300 / (16 / 9))
+        self.assertAlmostEqual(media.x + media.width / 2, 150)
+        self.assertAlmostEqual(content.width / content.height, 1080 / 1920)
+
+    def test_other_size_change_leaves_placed_instances(self):
+        media = self.scene.add_media(self.src.id, 0, 0)
+        self.scene.set_source_size(self.src.id, 1920, 1080)
+        self.scene.set_geometry(media.id, 0, 0, 100, 100, 0)
+        self.scene.set_source_size(self.src.id, 1280, 720)      # not a rotation
+        self.assertEqual((media.width, media.height), (100, 100))
+
     def test_video_defaults(self):
         media = self.scene.add_media(self.src.id, 0, 0)
         self.assertTrue(media.playing)

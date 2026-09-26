@@ -26,7 +26,8 @@ import tempfile
 from pathlib import Path
 
 from core.scene import (
-    CLIP_SHAPES, OBJECT_TYPES, PLAYABLE_TYPES, MediaSource, Scene, SceneObject,
+    CLIP_SHAPES, FIT_COVER, FIT_MODES, OBJECT_TYPES, PLAYABLE_TYPES,
+    MediaSource, Scene, SceneObject,
     clamp_speed, new_id, normalized_loop,
 )
 
@@ -42,7 +43,8 @@ TYPE_FIELDS = {
     "media": ["source_id", "playing", "parent_id", "muted", "volume", "loop",
               "speed", "preserve_pitch", "loop_a", "loop_b"],
     "browser": ["folder", "current_index", "include_subfolders"],
-    "container": ["lock_content", "clip_shape"],
+    "container": ["lock_content", "clip_shape", "fit_mode",
+                  "browse_mode", "browse_folder", "browse_subfolders"],
     "audio": ["source_id", "playing", "muted", "volume", "loop",
               "speed", "preserve_pitch", "loop_a", "loop_b"],
 }
@@ -281,6 +283,10 @@ def scene_from_dict(data, project_path=None):
             if obj.loop_a is None:
                 warnings.append("Ignored an A-B loop with points too close together.")
                 obj.loop_a = obj.loop_b = -1.0
+
+        if object_type == "container" and obj.fit_mode not in FIT_MODES:
+            warnings.append(f"Unknown fit mode {obj.fit_mode!r}; using Fill.")
+            obj.fit_mode = FIT_COVER
 
         if object_type == "container" and obj.clip_shape not in CLIP_SHAPES:
             warnings.append(
