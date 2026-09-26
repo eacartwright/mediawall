@@ -44,6 +44,43 @@ ApplicationWindow {
     }
 
 
+    // -------------------------------------------------
+    // Full Screen and Present (window state; not saved)
+    //
+    // Full Screen: the editor fills the screen, toolbar hidden.
+    // Present: full screen, canvas objects view-only and unselectable,
+    // no editing chrome. Browsers keep working.
+    // -------------------------------------------------
+
+    property bool fullScreenEditing: false
+    property bool presenting: false
+    readonly property bool fullScreen: fullScreenEditing || presenting
+
+    // Restored on leaving full screen (windowed or maximized).
+    property int windowedVisibility: Window.Windowed
+
+    onFullScreenChanged: {
+        if (fullScreen) {
+            if (visibility !== Window.FullScreen)
+                windowedVisibility = visibility
+            showFullScreen()
+            exitButton.reveal()
+        } else {
+            visibility = windowedVisibility
+        }
+    }
+
+    onPresentingChanged: if (presenting) sceneModel.select("")
+
+    // Back one level: Present -> where you were; Full Screen -> window.
+    function stepOut() {
+        if (presenting)
+            presenting = false
+        else
+            fullScreenEditing = false
+    }
+
+
     LogWindow {
         id: logWindow
         palette: window.palette
@@ -56,11 +93,13 @@ ApplicationWindow {
 
     Shortcut {
         sequences: [StandardKey.New]
+        enabled: !window.presenting
         onActivated: projectController.newProject()
     }
 
     Shortcut {
         sequences: [StandardKey.Open]
+        enabled: !window.presenting
         onActivated: projectController.openProject()
     }
 
@@ -77,48 +116,79 @@ ApplicationWindow {
 
     Shortcut {
         sequences: [StandardKey.Undo]
+        enabled: !window.presenting
         onActivated: sceneModel.undo()
     }
 
     Shortcut {
         // Both common conventions (Linux/macOS and Windows).
         sequences: ["Ctrl+Shift+Z", "Ctrl+Y"]
+        enabled: !window.presenting
         onActivated: sceneModel.redo()
     }
 
     Shortcut {
         sequence: "Ctrl+D"
+        enabled: !window.presenting
         onActivated: sceneModel.duplicateSelected()
     }
 
     Shortcut {
-        // Deselect (also leaves a container's Adjust mode).
+        // Leave Present; otherwise deselect (also leaves a container's
+        // Adjust mode); with nothing selected, leave Full Screen.
         sequence: "Escape"
-        onActivated: sceneModel.select("")
+        onActivated: {
+            if (window.presenting)
+                window.presenting = false
+            else if (sceneModel.selectedId !== "")
+                sceneModel.select("")
+            else if (window.fullScreenEditing)
+                window.fullScreenEditing = false
+        }
+    }
+
+    Shortcut {
+        sequence: "F11"
+        onActivated: {
+            if (window.presenting)
+                window.presenting = false
+            else
+                window.fullScreenEditing = !window.fullScreenEditing
+        }
+    }
+
+    Shortcut {
+        sequence: "F5"
+        onActivated: window.presenting = !window.presenting
     }
 
     Shortcut {
         sequences: [StandardKey.Delete]
+        enabled: !window.presenting
         onActivated: sceneModel.removeSelected()
     }
 
     Shortcut {
         sequence: "Ctrl+Shift+Up"
+        enabled: !window.presenting
         onActivated: sceneModel.bringToFront(sceneModel.selectedId)
     }
 
     Shortcut {
         sequence: "Ctrl+Up"
+        enabled: !window.presenting
         onActivated: sceneModel.bringForward(sceneModel.selectedId)
     }
 
     Shortcut {
         sequence: "Ctrl+Down"
+        enabled: !window.presenting
         onActivated: sceneModel.sendBackward(sceneModel.selectedId)
     }
 
     Shortcut {
         sequence: "Ctrl+Shift+Down"
+        enabled: !window.presenting
         onActivated: sceneModel.sendToBack(sceneModel.selectedId)
     }
 
@@ -141,14 +211,25 @@ ApplicationWindow {
         Rectangle {
             id: toolbar
 
+            // Overlays the canvas (rather than pushing it down), so
+            // nothing moves when entering or leaving full screen.
             anchors.top: parent.top
             anchors.left: parent.left
             anchors.right: parent.right
+
+            visible: !window.fullScreen
 
             height: 50
             z: 1
 
             color: "#303030"
+
+            // Keep clicks on the bar from reaching the canvas below.
+            MouseArea {
+                anchors.fill: parent
+                acceptedButtons: Qt.AllButtons
+                onWheel: function(wheel) { wheel.accepted = true }
+            }
 
             RowLayout {
                 anchors.fill: parent
@@ -227,6 +308,16 @@ ApplicationWindow {
                     Layout.fillWidth: true
                 }
 
+                Button {
+                    text: "Full Screen"
+                    onClicked: window.fullScreenEditing = true
+                }
+
+                Button {
+                    text: "Present"
+                    onClicked: window.presenting = true
+                }
+
                 // Messages the app would print to a terminal.
                 Button {
                     text: "Log"
@@ -256,16 +347,20 @@ ApplicationWindow {
         Item {
             id: scene
 
-            anchors.top: toolbar.bottom
-            anchors.left: parent.left
-            anchors.right: parent.right
-            anchors.bottom: parent.bottom
+            anchors.fill: parent
 
             clip: true
+
+            // Read by every object: in Present, canvas objects are
+            // view-only and show no selection; browsers keep working.
+            readonly property bool presenting: window.presenting
 
 
             // Clicking empty canvas clears the selection.
             // Right-clicking it opens the canvas menu.
+            // Double-clicking it leaves Full Screen / Present. (In
+            // Present, media objects let clicks through, so double-
+            // clicking them does too.)
             MouseArea {
                 anchors.fill: parent
                 z: -1000000
@@ -275,10 +370,15 @@ ApplicationWindow {
                 onPressed: function(mouse) {
                     sceneModel.select("")
 
-                    if (mouse.button === Qt.RightButton) {
+                    if (mouse.button === Qt.RightButton && !window.presenting) {
                         canvasMenu.clickPoint = Qt.point(mouse.x, mouse.y)
                         canvasMenu.popup()
                     }
+                }
+
+                onDoubleClicked: function(mouse) {
+                    if (mouse.button === Qt.LeftButton && window.fullScreen)
+                        window.stepOut()
                 }
             }
 
@@ -333,6 +433,74 @@ ApplicationWindow {
                     }
                 }
             }
+        }
+
+
+        // -------------------------------------------------
+        // Exit button (Full Screen / Present): shows when the mouse
+        // moves, fades out after a moment unless hovered.
+        // -------------------------------------------------
+
+        HoverHandler {
+            onPointChanged: if (window.fullScreen) exitButton.reveal()
+        }
+
+        Rectangle {
+            id: exitButton
+
+            anchors.top: parent.top
+            anchors.right: parent.right
+            anchors.margins: 12
+
+            width: 40
+            height: 40
+            radius: 20
+
+            z: 3000000      // above everything on the canvas
+
+            color: exitArea.containsMouse ? "#e0404040" : "#b0202020"
+            border.color: "#80ffffff"
+
+            opacity: 0
+            visible: window.fullScreen && opacity > 0
+
+            Behavior on opacity { NumberAnimation { duration: 250 } }
+
+            function reveal() {
+                opacity = 1
+                hideTimer.restart()
+            }
+
+            Timer {
+                id: hideTimer
+                interval: 2000
+                onTriggered: {
+                    if (exitArea.containsMouse)
+                        restart()
+                    else
+                        exitButton.opacity = 0
+                }
+            }
+
+            Text {
+                anchors.centerIn: parent
+                text: "✕"
+                color: "#ffffff"
+                font.pixelSize: 18
+            }
+
+            MouseArea {
+                id: exitArea
+                anchors.fill: parent
+                hoverEnabled: true
+                onClicked: window.stepOut()
+            }
+
+            ToolTip.visible: exitArea.containsMouse
+            ToolTip.text: window.presenting
+                          ? "Stop presenting (Esc, or double-click the canvas)"
+                          : "Leave full screen (F11, or double-click the canvas)"
+            ToolTip.delay: 500
         }
     }
 }

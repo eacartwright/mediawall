@@ -36,7 +36,13 @@ Item {
     // Shared right-click menu (ObjectContextMenu in Main.qml).
     property var contextMenu
 
-    readonly property bool selected: sceneModel.selectedId === objectId
+    // Present mode: view-only, never shown as selected. Disabled items
+    // let clicks through to the canvas (double-click there exits).
+    readonly property bool presenting: sceneItem ? sceneItem.presenting : false
+    enabled: !presenting
+
+    readonly property bool selected:
+        !presenting && sceneModel.selectedId === objectId
 
     // Used by the context menu.
     readonly property bool isAnimated: view.isAnimated

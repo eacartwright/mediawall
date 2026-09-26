@@ -32,7 +32,12 @@ Rectangle {
     // Shared right-click menu (ObjectContextMenu in Main.qml).
     property var contextMenu
 
-    readonly property bool selected: sceneModel.selectedId === objectId
+    // Present mode: browsers keep working, but without selection
+    // outline or handles.
+    readonly property bool presenting: sceneItem ? sceneItem.presenting : false
+
+    readonly property bool selected:
+        !presenting && sceneModel.selectedId === objectId
 
     x: posX
     y: posY

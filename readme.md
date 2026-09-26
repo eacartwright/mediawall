@@ -877,6 +877,17 @@ The user should not need to export a video merely to present the composition.
 
 The project itself becomes the presentation.
 
+### Implemented (2026-09-26)
+
+There are two full-screen modes, both window state only (not saved):
+
+- **Full Screen** (toolbar button or F11): the editor fills the screen, covering the taskbar, with the toolbar hidden. Everything else works as usual.
+- **Present** (toolbar button or F5): full screen, and the canvas becomes view-only. Media and containers can't be selected, moved, or right-clicked, and no outlines, handles, or video bars show. Editing shortcuts are off. **Browsers stay visible and working** (browse, zoom, Add to Canvas) but show no selection chrome; hiding them was deliberately not done, so a live browsing wall is possible.
+
+Leaving: Esc (in Full Screen, Esc first deselects), F11 / F5 again, double-clicking the canvas (in Present, anywhere except a browser), or the ✕ in the top-right corner, which appears when the mouse moves and fades after about two seconds. Leaving Present returns to where you were (window or Full Screen).
+
+The toolbar overlays the canvas instead of pushing it down, so objects keep exactly the same screen positions when entering or leaving full screen: what you arrange is what you present.
+
 ---
 
 # 16. Project Persistence
@@ -1899,15 +1910,11 @@ Implement:
 
 ---
 
-## Phase 10 — Presentation Mode — **Not started**
+## Phase 10 — Presentation Mode — **Partial**
 
-Implement:
+Done: Full Screen and Present modes, hidden editor UI, view-only canvas, keyboard shortcuts and a mouse-only exit (section 15). Browsers stay visible in Present by choice.
 
-- fullscreen
-- hide editor UI
-- hide workspace objects
-- presentation-only rendering
-- keyboard shortcut
+Remaining: hiding the mouse cursor while idle, scaling the wall to screens of a different size.
 
 ---
 
@@ -2174,7 +2181,11 @@ Ctrl+O            open project
 Ctrl+S            save
 Ctrl+Shift+S      save as
 Delete            remove selected object
-Escape            deselect (also leaves a container's Adjust mode)
+Escape            leave Present; otherwise deselect (also leaves a
+                  container's Adjust mode); with nothing selected,
+                  leave Full Screen
+F11               Full Screen on/off
+F5                Present on/off
 Enter / Space     finish adjusting (in a container's Adjust mode)
 Ctrl+Shift+Up     bring to front
 Ctrl+Up           bring forward
@@ -2192,7 +2203,6 @@ Double-click      enter Adjust mode (on a container with content);
 Planned:
 
 ```text
-F11          presentation mode
 Arrow keys   move selected object
 Shift+Arrow  move faster
 ```
@@ -2205,7 +2215,8 @@ Exact bindings can still change.
 
 The prototype currently provides:
 
-- a canvas with a toolbar (New, Open, Save, Save As, Add Browser, Add Container)
+- a canvas with a toolbar (New, Open, Save, Save As, Undo, Redo, Add Browser, Add Container, Full Screen, Present, Log)
+- Full Screen (editing) and Present (view-only canvas, browsers still usable) modes (section 15)
 - a right-click menu on empty canvas (Add Browser Here, Add Container Here)
 - project save/load to `.mediawall` files, with unsaved-changes prompts and the project name in the window title
 - missing media shown as a "Missing file" box that keeps its size and position; undecodable files shown as "Can't display file"
@@ -2437,6 +2448,8 @@ The following design decisions are currently established:
 - EXIF orientation is always applied; object sizes use the displayed (rotated) dimensions.
 - GIF and WebP are treated as potentially animated and displayed with an animated image element. Playback state is per instance, stored in the scene model.
 - Qt Quick Controls use the Fusion style everywhere, with a fixed dark palette, so the app looks the same on every platform and OS theme (2026-09-26).
+- The toolbar overlays the canvas rather than pushing it down, so object screen positions are identical in the window, Full Screen, and Present (2026-09-26). Projects made earlier appear 50 px higher once.
+- Present mode keeps Browsers visible and usable; the rest of the canvas is view-only (2026-09-26).
 - The window uses 4x MSAA so rotated edges are smooth (2026-09-26).
 
 ### Open decisions
