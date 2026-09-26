@@ -1010,6 +1010,37 @@ class Scene:
         self._normalize_z()
         return self._z_order_ids() != before
 
+    def move_to_layer_position(self, object_id, position) -> bool:
+        """
+        Move an object to `position` in layer_order() (0 = top), as
+        dragging it in the Layers list does. It stays within its own
+        group, so a position among the other group is clamped to the
+        nearest end of its own.
+        """
+        obj = self.get(object_id)
+        if obj is None or obj.parent_id is not None or obj.type in NON_VISUAL_TYPES:
+            return False
+
+        order = self.layer_order()               # top first
+        group = [o for o in order if self._is_overlay(o) == self._is_overlay(obj)]
+        group_start = order.index(group[0])      # groups are contiguous
+
+        target = min(max(position - group_start, 0), len(group) - 1)
+        current = group.index(obj)
+        if target == current:
+            return False
+
+        group.pop(current)
+        group.insert(target, obj)
+
+        # Reassign this group's z values, bottom to top, keeping the
+        # same set of numbers so the other group is unaffected.
+        zs = sorted(o.z for o in group)
+        for z, o in zip(zs, reversed(group)):
+            o.z = z
+        self._normalize_z()
+        return True
+
     def bring_forward(self, object_id) -> bool:
         return self._swap_z(object_id, +1)
 

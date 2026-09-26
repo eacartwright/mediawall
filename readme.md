@@ -933,6 +933,8 @@ The project file stores:
 
 It should NOT normally store the media bytes.
 
+**Paths (as implemented):** each media file is saved with its full absolute path, which is always tried first, plus a path relative to the project file, used only as a fallback when the absolute path no longer exists (the project and its media moved together). So a `.mediawall` file can be moved anywhere on its own (e.g. from `Pictures/Japan` to `Documents/mediawalls`) and every file is still found. Browser folders are saved as absolute paths only. Moving projects between machines or operating systems is not a goal for now (decision, 2026-09-26).
+
 ---
 
 ## 16.1 Missing media
@@ -1225,7 +1227,7 @@ Potential future properties:
 ### Implemented (2026-09-26)
 
 - Stacking has two groups: ordinary objects below, and browsers (workspace tools, `OVERLAY_TYPES` in `core/scene.py`) always above. Each group is ordered by `z`, and every z-order operation moves an object only within its own group, so "Bring to Front" on an image puts it at the top of the images, still below any browser. `Scene.is_at_front()` / `is_at_back()` answer per group; the right-click menu and the Layers panel use them.
-- The **Layers panel** is a flyout on the right edge (the "Layers" tab opens and closes it; it's hidden in Present). It lists every top-level object, top first, with a type badge and a name (`Scene.display_name`: the file name, `Container · <file>` or `Container (empty)`, `Browser · <folder>`). The selected object is highlighted and kept in view; clicking a row selects that object on the canvas. **Top / Up / Down / Bottom** buttons move the selected object. Visibility, locking, and drag-to-reorder are not done yet.
+- The **Layers panel** is a flyout on the right edge (the "Layers" tab opens and closes it; it's hidden in Present). It lists every top-level object, top first, with a type badge and a name (`Scene.display_name`: the file name, `Container · <file>` or `Container (empty)`, `Browser · <folder>`). The selected object is highlighted and kept in view; clicking a row selects that object on the canvas. **Top / Up / Down / Bottom** buttons move the selected object, and rows can be **dragged** up or down to reorder (a line shows where the row will land; dropping among the other group puts it at the nearest end of its own group, `Scene.move_to_layer_position`). Visibility and locking are not done yet.
 
 ---
 
@@ -1956,7 +1958,7 @@ Remaining: hiding the mouse cursor while idle (planned, if easy). Scaling the wa
 
 Done: z-order operations (grouped: browsers above everything), Layers panel with selection sync and Top/Up/Down/Bottom (section 23).
 
-Next: drag-to-reorder in the Layers panel. Later: the Inspector. Back burner: visibility and locking.
+Done: drag-to-reorder in the Layers panel. Later: the Inspector. Back burner: visibility and locking.
 
 Implement:
 
@@ -2279,7 +2281,7 @@ The prototype currently provides:
 - free images: scroll-wheel scaling around the pointer (when selected), and Crop / Zoom Inside, which wraps the image in a matching container
 - single selection; clicking empty canvas deselects
 - z-order and Delete through a right-click menu, plus shortcuts
-- a Layers panel (right-edge flyout): every object top first, selection linked both ways, Top/Up/Down/Bottom
+- a Layers panel (right-edge flyout): every object top first, selection linked both ways, Top/Up/Down/Bottom, drag to reorder
 - unit tests for `core/`
 
 ### How interactions reach the model
@@ -2294,7 +2296,7 @@ During a drag, resize, or rotate, QML moves the item directly so interaction sta
 - **Rotation has no angle snapping** yet (e.g. to 15° steps).
 - **No edge handles yet**, only corners; resizing one side on its own isn't possible.
 - **Resize has no modifier options** yet (e.g. resize from center, or free aspect on images).
-- **Browser folders are saved as absolute paths only**, so a browser's folder is not found automatically if the project is opened on a machine with a different folder layout.
+- **Browser folders are saved as absolute paths only** (by decision; section 16), so on a machine with a different folder layout a browser shows "Folder not found" until a folder is chosen again.
 - **Adjust mode shows no ghost for video**, only the orange bounds outline (a second copy of the video would play out of sync).
 - **Each video instance runs its own decoder.** Two instances of the same file play independently, not in sync. Many simultaneous videos will be limited by decoding performance.
 - **Hardware video decoding hasn't been verified** on the target machines. Qt prints "No HW decoder found" when it falls back to software decoding.
@@ -2307,18 +2309,16 @@ Reviewed 2026-09-26. Keep this list current; it replaces the phase notes as the 
 
 ### Next
 
-1. **Drag-to-reorder in the Layers panel.**
-2. **Edge resize handles:** thin bars along each side (unlike the square corner handles), resizing one side at a time.
-3. **Adjust-mode ghost for video:** show the part of a video outside the container's frame, as images already do.
-4. **Browser folders found on another machine:** save a browser's folder relative to the project file too, as media sources already are.
-5. **Hide the mouse cursor while idle in Present**, if it's easy.
+1. **Edge resize handles:** thin bars along each side (unlike the square corner handles), resizing one side at a time.
+2. **Adjust-mode ghost for video:** show the part of a video outside the container's frame, as images already do.
+3. **Hide the mouse cursor while idle in Present**, if it's easy.
+4. **Keep undo history between sessions** in a `.history` file next to the project (section 55).
 
-Done from this list: video as audio (section 14.2).
+Done from this list: video as audio (section 14.2), drag-to-reorder in the Layers panel.
 
 ### Soon
 
 - Arrow keys to nudge the selected object (Shift for bigger steps).
-- Keep undo history between sessions (open decision, section 55).
 
 ### Later (kept on the roadmap)
 
@@ -2342,6 +2342,7 @@ Done from this list: video as audio (section 14.2).
 - Contain/Cover/Free/Stretch display modes for free media (section 5.1).
 - Audio solo, and choosing between several audio streams in one file.
 - Scaling the wall to other screen sizes (Phase 10).
+- Browser folders relative to the project file (only useful for moving projects between machines, which isn't a goal).
 
 ---
 

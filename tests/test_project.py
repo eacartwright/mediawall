@@ -93,6 +93,31 @@ class ProjectTests(unittest.TestCase):
         self.assertTrue(source.missing)
         self.assertEqual(source.path, str(self.photo))  # path not discarded
 
+    def test_moving_only_the_project_file_keeps_media(self):
+        # Absolute paths are tried first, so the project file can be
+        # moved anywhere on its own (e.g. Pictures/Japan -> Documents).
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp = Path(tmp)
+            pictures = tmp / "Pictures" / "Japan"
+            pictures.mkdir(parents=True)
+            photo = pictures / "IMG_0142.jpg"
+            photo.write_bytes(b"x")
+
+            scene = Scene()
+            src = scene.add_source(str(photo), "image", 400, 300)
+            scene.add_media(src.id, 0, 0)
+            save_project(scene, pictures / "japan.mediawall")
+
+            elsewhere = tmp / "Documents" / "mediawalls"
+            elsewhere.mkdir(parents=True)
+            moved = elsewhere / "japan.mediawall"
+            (pictures / "japan.mediawall").replace(moved)
+
+            loaded, warnings = load_project(moved)
+            source = next(iter(loaded.sources.values()))
+            self.assertEqual(Path(source.path), photo)
+            self.assertFalse(source.missing)
+
     def test_relative_path_finds_moved_folder(self):
         scene, a, *_ = self.build_scene()
         save_project(scene, self.project)

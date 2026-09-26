@@ -108,6 +108,23 @@ class LayerTests(unittest.TestCase):
         self.assertTrue(s.is_at_front(self.b2.id))
         self.assertTrue(s.is_at_back(self.b1.id))
 
+    def test_move_to_layer_position(self):
+        s = self.scene
+        extra = s.add_object("container", 0, 0)
+        # top first: b2, b1, extra, c, a
+        self.assertTrue(s.move_to_layer_position(self.a.id, 2))
+        self.assertEqual(self.order(),
+                         [self.b2.id, self.b1.id, self.a.id, extra.id, self.c.id])
+        # Dragged among the browsers: clamped to the top of its group.
+        self.assertTrue(s.move_to_layer_position(self.c.id, 0))
+        self.assertEqual(self.order()[2], self.c.id)
+        # A browser dragged to the bottom stays the lowest browser.
+        self.assertTrue(s.move_to_layer_position(self.b2.id, 99))
+        self.assertEqual(self.order()[:2], [self.b1.id, self.b2.id])
+        # No change, no-op.
+        self.assertFalse(s.move_to_layer_position(self.b2.id, 1))
+        self.assertEqual(sorted(o.z for o in s.layer_order()), [1, 2, 3, 4, 5])
+
     def test_display_names(self):
         s = self.scene
         src = s.add_source(r"C:\pics\trip\beach.jpg", "image", 400, 200)

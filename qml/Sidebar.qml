@@ -131,18 +131,22 @@ Item {
 
                         clip: true
                         model: sceneModel.layers
+                        boundsBehavior: Flickable.StopAtBounds
 
                         ScrollBar.vertical: ScrollBar {}
 
                         delegate: Rectangle {
                             id: row
 
+                            required property int index
                             required property var modelData
                             readonly property bool isSelected:
                                 modelData.id === sceneModel.selectedId
 
                             width: ListView.view.width
-                            height: 30
+                            height: layerList.rowHeight
+
+                            opacity: layerList.dragId === modelData.id ? 0.5 : 1
 
                             color: isSelected ? "#3d7fc4"
                                    : rowArea.containsMouse ? "#333333"
@@ -195,12 +199,98 @@ Item {
                                 }
                             }
 
+                            // Press selects; dragging up or down reorders.
                             MouseArea {
                                 id: rowArea
                                 anchors.fill: parent
                                 hoverEnabled: true
-                                onClicked: sceneModel.select(row.modelData.id)
+
+                                property real pressY
+                                property bool dragging: false
+
+                                // Keep the list from taking the drag to scroll.
+                                preventStealing: true
+
+                                cursorShape: dragging ? Qt.ClosedHandCursor : Qt.ArrowCursor
+
+                                onPressed: function(mouse) {
+                                    pressY = mouse.y
+                                    dragging = false
+                                    sceneModel.select(row.modelData.id)
+                                }
+
+                                onPositionChanged: function(mouse) {
+                                    if (!pressed)
+                                        return
+                                    if (!dragging && Math.abs(mouse.y - pressY) > 6) {
+                                        dragging = true
+                                        layerList.startDrag(row.modelData.id, row.index)
+                                    }
+                                    if (dragging) {
+                                        var p = mapToItem(layerList.contentItem, mouse.x, mouse.y)
+                                        layerList.dropSlot = layerList.slotAt(p.y)
+                                    }
+                                }
+
+                                onReleased: {
+                                    if (dragging)
+                                        layerList.finishDrag()
+                                    dragging = false
+                                }
+
+                                onCanceled: {
+                                    layerList.cancelDrag()
+                                    dragging = false
+                                }
                             }
+                        }
+
+                        readonly property int rowHeight: 30
+
+                        // ---- Drag-to-reorder ----
+                        // dropSlot is the gap the row would go into:
+                        // 0 = above the first row, count = below the last.
+
+                        property string dragId: ""
+                        property int dragFrom: -1
+                        property int dropSlot: -1
+
+                        function slotAt(contentY) {
+                            return Math.max(0, Math.min(count, Math.round(contentY / rowHeight)))
+                        }
+
+                        function startDrag(id, from) {
+                            dragId = id
+                            dragFrom = from
+                            dropSlot = from
+                        }
+
+                        function finishDrag() {
+                            var position = dropSlot > dragFrom ? dropSlot - 1 : dropSlot
+                            if (dragId !== "" && position !== dragFrom)
+                                sceneModel.moveLayer(dragId, position)
+                            cancelDrag()
+                        }
+
+                        function cancelDrag() {
+                            dragId = ""
+                            dragFrom = -1
+                            dropSlot = -1
+                        }
+
+                        // Where the dragged row would land.
+                        Rectangle {
+                            parent: layerList.contentItem
+                            z: 10
+                            visible: layerList.dragId !== ""
+                                     && layerList.dropSlot !== layerList.dragFrom
+                                     && layerList.dropSlot !== layerList.dragFrom + 1
+                            x: 4
+                            width: layerList.width - 8
+                            y: Math.max(0, layerList.dropSlot * layerList.rowHeight - height / 2)
+                            height: 3
+                            radius: 1
+                            color: "#3d7fc4"
                         }
 
                         // Keep the selected row in view.

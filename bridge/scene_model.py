@@ -987,6 +987,13 @@ class SceneModel(QAbstractListModel):
             self._emit_all(Z_ROLES)
             self._changed()
 
+    @Slot(str, int)
+    def moveLayer(self, object_id, position):
+        """Drag-to-reorder in the Layers list (position 0 = top)."""
+        if self._scene.move_to_layer_position(object_id, position):
+            self._emit_all(Z_ROLES)
+            self._changed()
+
     @Slot(str)
     def sendToBack(self, object_id):
         if self._scene.send_to_back(object_id):
