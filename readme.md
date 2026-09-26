@@ -1830,7 +1830,7 @@ Implement:
 - video inside containers
 - video preview in Browser Object
 
-Done: all of the above, through the shared `MediaView` component, so video works in free objects, containers (including crops), and browser previews. Each video instance has its own playing, muted, volume, and loop state, saved with the project and undoable. Selected videos show an on-object control bar (play/pause/replay, seek, time, mute); the right-click menu has Pause/Play Video, Mute/Unmute, and Loop. Browser previews of video and audio play muted and looping, with the same control bar. Audio files are listed and previewed in browsers; placing them waits for the Audio Rack.
+Done: all of the above, through the shared `MediaView` component, so video works in free objects, containers (including crops), and browser previews. Each video instance has its own playing, muted, volume, and loop state, saved with the project and undoable. Selected videos show an on-object seek bar with the time; the right-click menu has Pause/Play Video (Replay Video once a non-looping video has ended), Mute/Unmute, and Loop. Browser previews of video and audio play muted and looping, with a control bar that also has play/pause/replay and mute buttons, since the preview has no right-click menu. Audio files are listed and previewed in browsers; placing them waits for the Audio Rack.
 
 ---
 
@@ -2169,7 +2169,7 @@ The prototype currently provides:
 - free media objects: move, aspect-locked resize, rotate
 - EXIF orientation applied to photos, on the canvas and in browser previews
 - animated GIF and WebP playback, on the canvas and in browser previews; each instance can be paused or played from its right-click menu
-- video on the canvas, in containers, and in browser previews, with per-instance play/pause, mute, and loop, and an on-object control bar when selected
+- video on the canvas, in containers, and in browser previews, with per-instance play/pause, mute, and loop (right-click menu), and an on-object seek bar when selected
 - audio previews in browsers
 - containers: move, resize, rotate; hold one clipped media instance with its own pan, zoom, and rotation (Adjust mode); fit/fill; locked or independent scaling; release/remove content
 - media can be dragged into empty containers, or added from a browser to a selected empty container

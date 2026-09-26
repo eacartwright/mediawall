@@ -25,6 +25,11 @@ Menu {
     readonly property bool targetVideo:
         target !== null && target.isVideo === true
 
+    // A non-looping video that has played to the end
+    readonly property bool targetEnded:
+        targetVideo && target.mediaView !== undefined &&
+        target.mediaView !== null && target.mediaView.ended
+
     readonly property bool isContainer:
         target !== null && target.isContainer === true
 
@@ -79,6 +84,8 @@ Menu {
 
     MenuItem {
         text: {
+            if (menu.targetEnded)
+                return "Replay Video"
             var what = menu.targetVideo ? "Video" : "Animation"
             return (menu.target && menu.target.objPlaying ? "Pause " : "Play ") + what
         }
@@ -86,9 +93,17 @@ Menu {
         visible: menu.targetAnimated || menu.targetVideo
         height: visible ? implicitHeight : 0
 
-        onTriggered: sceneModel.setPlaying(
-            menu.target.playbackId, !menu.target.objPlaying
-        )
+        onTriggered: {
+            if (menu.targetEnded) {
+                if (!menu.target.objPlaying)
+                    sceneModel.setPlaying(menu.target.playbackId, true)
+                menu.target.mediaView.replay()
+            } else {
+                sceneModel.setPlaying(
+                    menu.target.playbackId, !menu.target.objPlaying
+                )
+            }
+        }
     }
 
     MenuItem {

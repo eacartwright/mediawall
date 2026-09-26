@@ -4,6 +4,8 @@ import QtQuick.Layouts
 
 // Play/pause, seek, time, and mute for a MediaView that plays video or audio.
 // Editor UI: shown on selected objects and in browser previews.
+// Canvas objects show only the seek bar and time (showButtons: false);
+// their play/pause and mute are in the right-click menu.
 
 Rectangle {
     id: bar
@@ -14,6 +16,9 @@ Rectangle {
     // Current state, as the owner stores it.
     property bool playing: true
     property bool muted: true
+
+    // Show the Play/Pause and Mute buttons.
+    property bool showButtons: true
 
     signal togglePlay()
     signal toggleMute()
@@ -44,6 +49,8 @@ Rectangle {
 
         Button {
             Layout.preferredHeight: 26
+
+            visible: bar.showButtons
 
             text: bar.view && bar.view.ended ? "Replay"
                   : bar.playing ? "Pause" : "Play"
@@ -93,6 +100,8 @@ Rectangle {
 
         Button {
             Layout.preferredHeight: 26
+
+            visible: bar.showButtons
 
             text: bar.muted ? "Unmute" : "Mute"
 

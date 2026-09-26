@@ -45,6 +45,7 @@ Item {
     readonly property bool mediaLoop: objLoop
     readonly property string playbackId: objectId
     readonly property bool isFreeMedia: true
+    readonly property var mediaView: view
 
     x: posX
     y: posY
@@ -129,6 +130,9 @@ Item {
         visible: root.selected && view.isPlayer
 
         z: 25
+
+        // Play/pause and mute are in the right-click menu.
+        showButtons: false
 
         view: view
         playing: root.objPlaying

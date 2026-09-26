@@ -78,6 +78,7 @@ Item {
     readonly property bool isVideo: hasContent && contentSourceType === "video"
     readonly property bool mediaMuted: contentMuted
     readonly property bool mediaLoop: contentLoop
+    readonly property var mediaView: contentView
 
     x: posX
     y: posY
@@ -514,6 +515,9 @@ Item {
         visible: root.selected && !root.adjusting && contentView.isPlayer
 
         z: 25
+
+        // Play/pause and mute are in the right-click menu.
+        showButtons: false
 
         view: contentView
         playing: root.contentPlaying
