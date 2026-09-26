@@ -13,6 +13,7 @@ from PySide6.QtWidgets import QFileDialog, QMessageBox
 from core.history_file import load_history, save_history
 from core.layout import (
     LAYOUT_EXTENSION, count_layout_containers, load_layout, save_layout,
+    with_layout_extension,
 )
 from core.project import (
     FILE_EXTENSION, ProjectError, load_project, project_file_fingerprint,
@@ -23,16 +24,6 @@ from core.scene import Scene
 
 FILE_FILTER = f"MediaWall Project (*{FILE_EXTENSION});;All Files (*)"
 LAYOUT_FILTER = f"MediaWall Layout (*{LAYOUT_EXTENSION});;All Files (*)"
-
-
-def _with_layout_extension(path):
-    """Make sure a chosen file name ends in .mediawall.layout."""
-    if path.lower().endswith(LAYOUT_EXTENSION):
-        return path
-    for partial in (".layout", FILE_EXTENSION):
-        if path.lower().endswith(partial):
-            path = path[:-len(partial)]
-    return path + LAYOUT_EXTENSION
 
 # Warnings beyond this many are summarized as "...and N more".
 MAX_LISTED_WARNINGS = 8
@@ -115,7 +106,7 @@ class ProjectController(QObject):
         if not path:
             return
 
-        path = _with_layout_extension(path)
+        path = with_layout_extension(path)
         try:
             save_layout(scene, path)
         except OSError as exc:

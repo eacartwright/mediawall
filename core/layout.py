@@ -32,6 +32,25 @@ LAYOUT_VERSION = 1
 LAYOUT_EXTENSION = ".mediawall.layout"
 
 
+def with_layout_extension(path) -> str:
+    """
+    A chosen file name ending in exactly one ".mediawall.layout".
+    Save dialogs may add the extension again (Windows treats only
+    ".layout" as the extension, so it appends the filter's full one),
+    or the user may type part of it; extra endings are removed first.
+    """
+    path = str(path)
+    endings = (LAYOUT_EXTENSION, ".layout", ".mediawall")
+    trimmed = True
+    while trimmed:
+        trimmed = False
+        for ending in endings:
+            if path.lower().endswith(ending) and len(path) > len(ending):
+                path = path[:-len(ending)]
+                trimmed = True
+    return path + LAYOUT_EXTENSION
+
+
 def layout_to_dict(scene: Scene) -> dict:
     containers = [o for o in scene._by_z() if o.type == "container"]
     objects = []

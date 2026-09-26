@@ -286,13 +286,15 @@ class BrowsingContainerTests(unittest.TestCase):
     def test_showing_another_file_keeps_the_instance(self):
         content, _ = self.scene.add_media_to_container(self.wide.id, self.box.id)
         self.scene.set_playing(content.id, False)
+        self.scene.set_media_option(content.id, "volume", 0.3)
         self.scene.set_loop(content.id, 1000, 2000)
 
         self.assertTrue(self.scene.show_file_in_container(self.box.id, self.tall.id))
 
         self.assertIs(self.scene.content_of(self.box.id), content)
+        self.assertEqual(content.volume, 0.3)                      # settings kept
         self.assertEqual(content.source_id, self.tall.id)
-        self.assertFalse(content.playing)                          # settings kept
+        self.assertTrue(content.playing)                           # each file plays
         self.assertEqual((content.loop_a, content.loop_b), (-1.0, -1.0))
         # 1:2 into 360x260, cover (the default): width matches
         self.assertAlmostEqual(content.width, 360)

@@ -11,6 +11,7 @@ from pathlib import Path
 
 from core.layout import (
     LAYOUT_EXTENSION, add_layout_to_scene, load_layout, save_layout,
+    with_layout_extension,
 )
 from core.project import ProjectError, save_project
 from core.scene import FIT_CONTAIN, Scene
@@ -83,6 +84,16 @@ class LayoutTests(unittest.TestCase):
         self.assertEqual(order[1:3], [again[1].id, again[0].id])
         self.assertEqual(order[-1], existing.id)
         self.assertEqual(len(added), 2)
+
+    def test_file_name_gets_exactly_one_extension(self):
+        for chosen in ["halves", "halves.layout", "halves.mediawall",
+                       "halves.mediawall.layout",
+                       "Untitled.mediawall.layout.mediawall.layout",   # Windows dialog
+                       "halves.MediaWall.Layout"]:
+            self.assertEqual(Path(with_layout_extension(chosen)).name.lower(),
+                             ("untitled" if chosen.startswith("Untitled") else "halves")
+                             + LAYOUT_EXTENSION, chosen)
+        self.assertEqual(with_layout_extension("my.trip.layout"), "my.trip" + LAYOUT_EXTENSION)
 
     def test_project_file_is_not_a_layout(self):
         project = Path(self._tmp.name) / "wall.mediawall"

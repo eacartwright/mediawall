@@ -909,9 +909,10 @@ class Scene:
     def show_file_in_container(self, container_id, source_id) -> bool:
         """
         Show another file in a container (browsing): the content keeps
-        its id and playback settings, takes the new source, and is
-        framed with the container's Fit/Fill mode. A-B loop points
-        belonged to the old file, so they're cleared. An empty container
+        its id and playback settings (volume, mute, loop, speed), takes
+        the new source, starts playing, and is framed with the
+        container's Fit/Fill mode. A-B loop points belonged to the old
+        file, so they're cleared. An empty container
         gets new content.
         """
         container = self._container(container_id)
@@ -928,6 +929,7 @@ class Scene:
             return False
 
         content.source_id = source_id
+        content.playing = True           # every file starts playing, as in a browser
         content.loop_a = content.loop_b = -1.0
         content.pending_size = source.aspect <= 0
         self._frame_content(container, content, source.aspect, container.fit_mode)
