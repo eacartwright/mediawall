@@ -173,6 +173,25 @@ Menu {
                                          menu.target.mediaView.position)
     }
 
+    // Video as audio: the video leaves the canvas and its sound goes on
+    // as a track in the Audio tab, from the same position (undoable).
+    MenuItem {
+        text: "Convert to Audio Track"
+
+        visible: menu.targetVideo
+        height: visible ? implicitHeight : 0
+
+        onTriggered: {
+            // Read everything first: a free video's item is destroyed
+            // by the conversion.
+            var scene = menu.target.sceneItem
+            var position = menu.target.mediaView ? menu.target.mediaView.position : 0
+            var trackId = sceneModel.convertToAudioTrack(menu.target.playbackId)
+            if (trackId !== "" && scene)
+                scene.setPendingSeek(trackId, position)
+        }
+    }
+
     MenuItem {
         text: "Clear A–B Loop"
 

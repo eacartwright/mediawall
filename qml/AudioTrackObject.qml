@@ -47,6 +47,14 @@ Item {
         name: root.sourceName
         path: root.sourcePath
 
+        // Continue from a position handed over (e.g. by Convert to
+        // Audio Track).
+        onMediaLoaded: {
+            var ms = root.sceneItem ? root.sceneItem.takePendingSeek(root.objectId) : -1
+            if (ms > 0)
+                view.seek(ms)
+        }
+
         Component.onCompleted: if (root.sceneItem) root.sceneItem.registerView(root.objectId, view)
         Component.onDestruction: if (root.sceneItem) root.sceneItem.unregisterView(root.objectId, view)
     }

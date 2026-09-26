@@ -405,6 +405,51 @@ class Scene:
     def audio_tracks(self) -> list:
         return [o for o in self.objects if o.type == "audio"]
 
+    # ---- Video as audio (readme 14.2) ----
+    #
+    # Split in two so the Qt bridge can announce the row removal and the
+    # row insert separately; convert_to_audio_track() does both.
+
+    def can_convert_to_audio(self, media_id) -> bool:
+        media = self.get(media_id)
+        if media is None or media.type != "media":
+            return False
+        source = self.sources.get(media.source_id)
+        return source is not None and source.type == "video"
+
+    def audio_track_from(self, media_id) -> Optional[SceneObject]:
+        """
+        A new audio track (not yet in the scene) playing a video's sound
+        with the same playback settings, audible. It gets a new id, so
+        undoing the conversion cleanly brings the video back.
+        """
+        if not self.can_convert_to_audio(media_id):
+            return None
+        media = self.get(media_id)
+        width, height = DEFAULT_SIZES["audio"]
+        return replace(
+            media, id=new_id("audio"), type="audio", parent_id=None,
+            muted=False, x=0.0, y=0.0, width=width, height=height,
+            rotation=0.0, z=0, pending_size=False,
+        )
+
+    def convert_to_audio_track(self, media_id) -> Optional[SceneObject]:
+        """Replace a video (free, or a container's content) with an audio track."""
+        track = self.audio_track_from(media_id)
+        if track is None:
+            return None
+        media = self.get(media_id)
+        if media.parent_id is not None:
+            self.remove_content(media.parent_id)
+        else:
+            self.remove_object(media_id)
+        return self.insert_audio_track(track)
+
+    def insert_audio_track(self, track) -> SceneObject:
+        """Add a track made by audio_track_from() to the scene."""
+        self.objects.append(track)
+        return track
+
     def duplicate_object(self, object_id, offset=20.0) -> Optional[SceneObject]:
         """
         Duplicate a top-level object, slightly offset, on top of the stack.

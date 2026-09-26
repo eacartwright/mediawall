@@ -244,11 +244,19 @@ Rectangle {
         )
     }
 
+    // An audio file, or a video used only for its sound, becomes a track
+    // in the Audio tab.
+    function addCurrentToAudio() {
+        if (!currentIsAudio && !(currentEntry && currentEntry.type === "video"))
+            return
+        sceneModel.addAudioTrack(currentEntry.path, currentEntry.type)
+        previewPlaying = false      // don't play it twice
+    }
+
     // Images and videos go on the canvas; audio becomes a track.
     function addCurrentToCanvas() {
         if (currentIsAudio) {
-            sceneModel.addAudioTrack(currentEntry.path)
-            previewPlaying = false      // don't play it twice
+            addCurrentToAudio()
             return
         }
 
@@ -613,6 +621,7 @@ Rectangle {
 
                     Button {
                         Layout.preferredHeight: 26
+                        Layout.preferredWidth: 36     // leave room for the Add buttons
                         text: "◀"
                         enabled: root.mediaFiles.length > 0
                         onClicked: root.previousMedia()
@@ -620,6 +629,7 @@ Rectangle {
 
                     Button {
                         Layout.preferredHeight: 26
+                        Layout.preferredWidth: 36     // leave room for the Add buttons
                         text: "▶"
                         enabled: root.mediaFiles.length > 0
                         onClicked: root.nextMedia()
@@ -630,6 +640,14 @@ Rectangle {
                         text: root.currentIsAudio ? "Add to Audio" : "Add to Canvas"
                         enabled: root.canAdd
                         onClicked: root.addCurrentToCanvas()
+                    }
+
+                    // Video as audio: the sound only, as a track.
+                    Button {
+                        Layout.preferredHeight: 26
+                        text: "Add to Audio"
+                        visible: root.currentEntry !== null && root.currentEntry.type === "video"
+                        onClicked: root.addCurrentToAudio()
                     }
 
                     // Only while a container is selected (readme 9.3).

@@ -101,6 +101,9 @@ Item {
     // Emitted once the media's natural size is known.
     signal ready(real naturalWidth, real naturalHeight)
 
+    // Emitted when a player has loaded its media (a good moment to seek).
+    signal mediaLoaded()
+
 
     Loader {
         id: loader
@@ -177,7 +180,9 @@ Item {
 
                 source: view._url
 
-                videoOutput: videoOutput
+                // Audio (including a video used only for its sound) gets
+                // no video output, so its picture is never decoded.
+                videoOutput: view._type === "audio" ? null : videoOutput
                 audioOutput: AudioOutput {
                     muted: view.muted
                     volume: view.volume
@@ -189,6 +194,11 @@ Item {
                 pitchCompensation: view.preservePitch
 
                 onErrorOccurred: playerItem.failed = true
+
+                onMediaStatusChanged: {
+                    if (mediaPlayer.mediaStatus === MediaPlayer.LoadedMedia)
+                        view.mediaLoaded()
+                }
 
                 // A-B loop: jump back to A on reaching B (or if playback
                 // has got past it, e.g. B was just moved earlier). The

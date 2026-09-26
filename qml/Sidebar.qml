@@ -351,6 +351,7 @@ Item {
                                 Text {
                                     Layout.fillWidth: true
                                     text: card.name + (card.inContainer ? "  (in container)" : "")
+                                          + (card.isTrack && card.kind === "video" ? "  (audio only)" : "")
                                           + (card.missing ? "  — missing" : "")
                                     color: card.missing ? "#e08080" : "#eeeeee"
                                     font.pixelSize: 12

@@ -380,6 +380,20 @@ ApplicationWindow {
                 return mediaViews[mediaId] || null
             }
 
+            // Where a new player should start (e.g. a video converted to
+            // an audio track continues from where it was), by media id.
+            property var pendingSeeks: ({})
+
+            function setPendingSeek(mediaId, ms) {
+                pendingSeeks[mediaId] = ms
+            }
+
+            function takePendingSeek(mediaId) {
+                var ms = pendingSeeks[mediaId]
+                delete pendingSeeks[mediaId]
+                return ms === undefined ? -1 : ms
+            }
+
 
             // Clicking empty canvas clears the selection.
             // Right-clicking it opens the canvas menu.
