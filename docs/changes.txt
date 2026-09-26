@@ -1,4 +1,5 @@
 ERRORS:
+
 - [FIXED 2026-09-26] Cause: the Browser changes a file's url and type one at a time, so the player was created with the previous image's url, and play() was lost when the real video loaded. MediaView now applies url/type together and re-syncs play/pause on a source change.
   Getting errors like the following on mp4 media when first encountered, where media doesn not display, however, clicking the pause button (sometimes "play") allows the media to load (still frame) and then clicking play allows it to play normally:
 [image2 @ 0x70f9240bb780] Could not find codec parameters for stream 0 (Video: mjpeg, none(bt470bg/unknown/unknown)): unspecified size
@@ -46,27 +47,39 @@ Input #0, mov,mp4,m4a,3gp,3g2,mj2, from '/home/user/Downloads/35b8fcf0e9c392472a
 
 
 CHANGES:
-- Make Browser always on top.
 
-- Make the dark gray Browser window behind the media being viewed almost fully transparent, like 90%.
+- [DONE 2026-09-26] Browsers draw above all other objects; they still stack among themselves.
+  Make Browser always on top.
 
-- Do not allow media to be added to existing containers that already contain media unless media is removed from that container. Perhaps by default containers become "locked" once media is added and then must be unlocked before allowing drag and drop.
+- [DONE 2026-09-26] The preview background is about 90% transparent.
+  Make the dark gray Browser window behind the media being viewed almost fully transparent, like 90%.
 
-- Make media inside Browser zoomable with mouse button 1 down+mousewheel.
+- [DONE 2026-09-26] A full container is no longer a drop target, and Add to Container is disabled for it; release or remove its content first. (No lock toggle.)
+  Do not allow media to be added to existing containers that already contain media unless media is removed from that container. Perhaps by default containers become "locked" once media is added and then must be unlocked before allowing drag and drop.
 
-- When "adjusting content" within containers, do not lock the options (zoom, fit, fill, done buttons) to the rotation of the media as these can end up upside down, at odd angles, or off the screen. Additionally, the words "Drag to pan - scroll to zoom", along with the zoom "-" and "+" buttons, can be removed. Also, pressing the Enter or Space key should act as clicking the "Done" button to exit the adjust content mode.
+- [DONE 2026-09-26] Left button + wheel zooms the preview around the pointer; left-drag pans; resets on the next file. Only the header drags the Browser now.
+  Make media inside Browser zoomable with mouse button 1 down+mousewheel.
 
-- Would anti-aliasing being possible on the edges of media and containers? For example, rotating an image (both free and contained) causes the edges to be jagged/sharp.
+- [DONE 2026-09-26] The toolbar stays upright, sits below the container (above if no room), and stays on screen; hint text and -/+ removed; Enter/Space = Done.
+  When "adjusting content" within containers, do not lock the options (zoom, fit, fill, done buttons) to the rotation of the media as these can end up upside down, at odd angles, or off the screen. Additionally, the words "Drag to pan - scroll to zoom", along with the zoom "-" and "+" buttons, can be removed. Also, pressing the Enter or Space key should act as clicking the "Done" button to exit the adjust content mode.
 
-- Make containers zoomable with mousewheel just like a free image. This should work both with and without media in it and, if media is in it, it should scale correctly along with the container, ideally not changing coordinates of the contained image (adjusted to fit or not) from what's currently displayed within the viewport.
+- [DONE 2026-09-26] 4x multisample anti-aliasing for the whole window. Check it on Linux too.
+  Would anti-aliasing being possible on the edges of media and containers? For example, rotating an image (both free and contained) causes the edges to be jagged/sharp.
 
-- Add a "Close" or "X" button for the Browser window.
+- [DONE 2026-09-26] A selected container scales around the pointer; its content scales with it, so the view inside doesn't change (empty or full, locked or not).
+  Make containers zoomable with mousewheel just like a free image. This should work both with and without media in it and, if media is in it, it should scale correctly along with the container, ideally not changing coordinates of the contained image (adjusted to fit or not) from what's currently displayed within the viewport.
 
-- Refine zooming steps to be slightly more granular.
+- [DONE 2026-09-26] X button in the Browser header (undoable).
+  Add a "Close" or "X" button for the Browser window.
 
-- Remove Pause and Unmute buttons from video file but leave in context menu, leaving only the tracking bar visible overlaid on the media when selected.
+- [DONE 2026-09-26] 5% per wheel notch (was 10%), smooth on trackpads; same step for all wheel zoom.
+  Refine zooming steps to be slightly more granular.
 
-- Thinking of trying to make the Browser UI as compact as possible:
+- [DONE 2026-09-26] Canvas videos show only the seek bar. The right-click menu also offers Replay Video once a non-looping video ends. The Browser keeps its buttons (it has no menu).
+  Remove Pause and Unmute buttons from video file but leave in context menu, leaving only the tracking bar visible overlaid on the media when selected.
+
+- [DONE 2026-09-26] Filename moved to the header; buttons and count overlaid on the bottom of the preview (bottom bar removed); double-click adds to canvas.
+  Thinking of trying to make the Browser UI as compact as possible:
 -- Maybe move the filename to the "title bar" of the Browser window to reduce weight at the bottom of this window so that it ends just after the previous image/next image/Add to Canvas/Add to Container and image count (out of total images).
 -- Wonder if it's possible to overlay UI elements over the media such that things like the "Add to Container" is a button at the very bottom of the image it self but actually overlaid.
 -- Make double-clicking the media in the Browser automatically add it to the canvas.
