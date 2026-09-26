@@ -11,6 +11,9 @@ from PySide6.QtCore import Property, QObject, Signal, Slot
 from PySide6.QtWidgets import QFileDialog, QMessageBox
 
 from core.history_file import load_history, save_history
+from core.layout import (
+    LAYOUT_EXTENSION, count_layout_containers, load_layout, save_layout,
+)
 from core.project import (
     FILE_EXTENSION, ProjectError, load_project, project_file_fingerprint,
     save_project,
@@ -19,6 +22,17 @@ from core.scene import Scene
 
 
 FILE_FILTER = f"MediaWall Project (*{FILE_EXTENSION});;All Files (*)"
+LAYOUT_FILTER = f"MediaWall Layout (*{LAYOUT_EXTENSION});;All Files (*)"
+
+
+def _with_layout_extension(path):
+    """Make sure a chosen file name ends in .mediawall.layout."""
+    if path.lower().endswith(LAYOUT_EXTENSION):
+        return path
+    for partial in (".layout", FILE_EXTENSION):
+        if path.lower().endswith(partial):
+            path = path[:-len(partial)]
+    return path + LAYOUT_EXTENSION
 
 # Warnings beyond this many are summarized as "...and N more".
 MAX_LISTED_WARNINGS = 8
@@ -81,6 +95,66 @@ class ProjectController(QObject):
         self._model.setScene(Scene())
         self._set_path("")
         self._set_dirty(False)
+
+    # ---- Layouts (containers only; readme Phase 5) ----
+
+    @Slot()
+    def saveLayout(self):
+        """Save just the containers, for reuse. The wall is unchanged."""
+        scene = self._model.scene
+        if count_layout_containers(scene) == 0:
+            QMessageBox.information(
+                None, "Save Layout",
+                "This wall has no containers to save as a layout."
+            )
+            return
+
+        stem = Path(self._path).name[:-len(FILE_EXTENSION)] if self._path else "Untitled"
+        start = str(Path(self._last_dir) / (stem + LAYOUT_EXTENSION))
+        path, _ = QFileDialog.getSaveFileName(None, "Save Layout", start, LAYOUT_FILTER)
+        if not path:
+            return
+
+        path = _with_layout_extension(path)
+        try:
+            save_layout(scene, path)
+        except OSError as exc:
+            QMessageBox.critical(
+                None, "Couldn't Save Layout",
+                f"The layout could not be saved to:\n{path}\n\n{exc.strerror or exc}"
+            )
+
+    def _choose_layout(self, title):
+        path, _ = QFileDialog.getOpenFileName(None, title, self._last_dir, LAYOUT_FILTER)
+        if not path:
+            return None
+        try:
+            layout, warnings = load_layout(path)
+        except ProjectError as exc:
+            QMessageBox.critical(None, "Couldn't Open Layout", str(exc))
+            return None
+        for warning in warnings:
+            print(f"Layout {Path(path).name}: {warning}")
+        return layout
+
+    @Slot()
+    def newFromLayout(self):
+        """Start a new, untitled wall from a layout."""
+        if not self._confirm_discard():
+            return
+        layout = self._choose_layout("New Wall from Layout")
+        if layout is None:
+            return
+        self._model.setScene(layout)
+        self._set_path("")
+        self._set_dirty(False)
+
+    @Slot()
+    def addLayoutToWall(self):
+        """Add a layout's containers to the current wall (undoable)."""
+        layout = self._choose_layout("Add Layout to Wall")
+        if layout is not None:
+            self._model.addLayout(layout)
 
     @Slot()
     def openProject(self):

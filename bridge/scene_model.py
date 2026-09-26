@@ -29,6 +29,7 @@ from PySide6.QtWidgets import QFileDialog, QMessageBox
 
 from bridge.audio_model import AudioModel
 from core.history import History, snapshot
+from core.layout import add_layout_to_scene
 from core.media_browser import (
     AUDIO_EXTENSIONS, IMAGE_EXTENSIONS, VIDEO_EXTENSIONS, is_animatable,
 )
@@ -692,6 +693,20 @@ class SceneModel(QAbstractListModel):
         track_id = self._insert(lambda: self._scene.insert_audio_track(track))
         self.audioTrackAdded.emit(track_id)
         return track_id
+
+    def addLayout(self, layout):
+        """Add a layout's containers to the wall (one undo step)."""
+        count = sum(1 for o in layout.top_level() if o.type == "container")
+        if count == 0:
+            return 0
+        start = len(self._rows())
+        self.beginInsertRows(QModelIndex(), start, start + count - 1)
+        added = add_layout_to_scene(self._scene, layout)
+        self.endInsertRows()
+        self._emit_all(Z_ROLES)
+        self.countChanged.emit()
+        self._changed()
+        return len(added)
 
     @Slot(str, result=str)
     def duplicate(self, object_id):

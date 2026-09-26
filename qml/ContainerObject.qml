@@ -371,8 +371,9 @@ Item {
 
             visible: !root.hasContent && !root.isDropTarget
 
-            text: "Empty container\n\nDrag an image or video onto it, or select\n"
-                  + "it and use a browser's Add to Container"
+            text: "Empty container\n\nDrag an image or video onto it, select it and\n"
+                  + "use a browser's Add to Container, or right-click >\n"
+                  + "Browse This Folder"
 
             color: "#777777"
             font.pixelSize: 13

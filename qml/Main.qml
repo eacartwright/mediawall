@@ -258,6 +258,30 @@ ApplicationWindow {
                     onClicked: projectController.saveAs()
                 }
 
+                // Layouts: a wall's containers only, saved for reuse.
+                Button {
+                    id: layoutButton
+                    text: "Layout ▾"
+                    onClicked: layoutMenu.popup(layoutButton, 0, layoutButton.height)
+
+                    Menu {
+                        id: layoutMenu
+
+                        MenuItem {
+                            text: "Save Layout…"
+                            onTriggered: projectController.saveLayout()
+                        }
+                        MenuItem {
+                            text: "New from Layout…"
+                            onTriggered: projectController.newFromLayout()
+                        }
+                        MenuItem {
+                            text: "Add Layout to Wall…"
+                            onTriggered: projectController.addLayoutToWall()
+                        }
+                    }
+                }
+
                 // Divider
                 Rectangle {
                     Layout.preferredWidth: 1

@@ -1003,6 +1003,15 @@ The user can:
 
 Layouts therefore remain reusable.
 
+### Implemented (2026-09-26)
+
+- **Layout ▾ → Save Layout…** writes the wall's **containers only** to a `<name>.mediawall.layout` file (`core/layout.py`): position, size, rotation, stacking, lock, Fit/Fill, and browse mode. Their content, free media, browsers, and audio tracks are left out, and a browsing container's folder is cleared (it belonged to the old media). The wall itself is not changed.
+- **New from Layout…** starts a new, untitled wall of the layout's (empty) containers.
+- **Add Layout to Wall…** adds its containers to the current wall with new ids (so one layout can be added more than once), stacked above the existing objects and below browsers; one undo step.
+- Opening a layout with Open, or a project as a layout, is refused with a message saying which it is.
+
+A typical use: two containers splitting the screen, each switched to **Browse This Folder** (section 6.4) once media is added, saved as a layout, and reused for any pair of folders.
+
 ---
 
 # 18. Project Versus Layout
@@ -1724,6 +1733,7 @@ mediawall/
 │   ├── project.py          project save/load (JSON)
 │   ├── history.py          undo/redo history (scene snapshots)
 │   ├── history_file.py     undo history saved next to the project
+│   ├── layout.py           layouts: containers only, saved for reuse
 │   └── media_browser.py    folder scanning, media type detection
 │
 ├── bridge/                 Qt glue between core and QML
@@ -1761,6 +1771,7 @@ mediawall/
     ├── test_containers.py
     ├── test_history.py
     ├── test_history_file.py
+    ├── test_layout.py
     └── test_video.py
 ```
 
@@ -1784,12 +1795,9 @@ Every folder of importable Python modules contains an `__init__.py`, normally em
 
 ```text
 core/
-├── layout.py
-├── collections.py
-└── audio.py
+└── collections.py
 
-qml/
-└── Slideshow.qml
+(Slideshows became browsing containers; audio lives in `core/scene.py` and `bridge/audio_model.py`.)
 ```
 
 Example `projects/` and `layouts/` folders may be used during development; the application does not force users to store files there.
@@ -1872,7 +1880,7 @@ Done: JSON project files (`.mediawall`) with a format name and version number; s
 
 ---
 
-## Phase 5 — Layouts — **Not started** (kept on the roadmap; section 51)
+## Phase 5 — Layouts — **Done** (section 17)
 
 Implement:
 
@@ -2285,6 +2293,7 @@ The prototype currently provides:
 - audio tracks added from a browser (double-click or Add to Audio), controlled in the Audio tab
 - video as audio: Convert to Audio Track (right-click a video), or Add to Audio for a video in a browser (section 14.2)
 - browsing containers: step through a folder's media with the mouse wheel, also in Present (section 6.4); containers remember Fit/Fill
+- layouts: Save Layout (containers only), New from Layout, Add Layout to Wall (section 17)
 - audio previews in browsers
 - containers: move, resize, rotate; hold one clipped media instance with its own pan, zoom, and rotation (Adjust mode); fit/fill; locked or independent scaling; release/remove content
 - media can be dragged into empty containers, or added from a browser to a selected empty container
@@ -2317,9 +2326,9 @@ Reviewed 2026-09-26. Keep this list current; it replaces the phase notes as the 
 
 ### Next
 
-1. **Layouts** (Phase 5): Save Layout… writes only the containers (no media, browsers, or audio) to a `.mediawall.layout` file; New from Layout… and Add Layout to Wall use one.
+Nothing queued. Pick the next items from Soon or Later.
 
-Done from the last list: video as audio (section 14.2), drag-to-reorder in the Layers panel, edge resize handles, the Adjust-mode ghost for video, hiding the idle pointer in Present, and undo history kept between sessions (section 47).
+Done since the review: browsing containers (section 6.4), layouts (section 17), video as audio (section 14.2), drag-to-reorder in the Layers panel, edge resize handles, the Adjust-mode ghost for video, hiding the idle pointer in Present, and undo history kept between sessions (section 47).
 
 ### Soon
 
@@ -2534,6 +2543,7 @@ The following design decisions are currently established:
 - Audio tracks are objects of type `audio` with no canvas presence; they start audible and looping (2026-09-26).
 - Video as audio converts the video into a track (it leaves the canvas) rather than adding a second, unsynchronized copy (2026-09-26).
 - Slideshows are replaced by browsing containers; browsing is workspace state, not undone (2026-09-26).
+- Layouts are `.mediawall.layout` files holding only containers; they can start a new wall or be added to the current one (2026-09-26).
 - Phone videos stored sideways with a rotation flag get their displayed (upright) size: MediaView reports the stored size in the orientation actually drawn, once it has settled; a size report that is the old one turned sideways re-sizes (fits within its box) and re-frames everything already placed, which also repairs older walls (2026-09-26).
 - Speed changes pitch by default (Keep pitch off), as in Celluloid (2026-09-26).
 - The application's name is written **MediaWall** (one word) everywhere (2026-09-26).

@@ -200,6 +200,9 @@ def _resolve_source_path(entry, project_dir):
 def scene_from_dict(data, project_path=None):
     """Return (scene, warnings). Raises ProjectError if data isn't a project."""
     if not isinstance(data, dict) or data.get("format") != FORMAT:
+        if isinstance(data, dict) and data.get("format") == "mediawall-layout":
+            raise ProjectError("This is a MediaWall layout, not a project. "
+                               "Use Layout > New from Layout… to start a wall from it.")
         raise ProjectError("This file is not a MediaWall project.")
 
     version = data.get("version")
