@@ -1,0 +1,81 @@
+ERRORS:
+- Getting errors like the following on mp4 media when first encountered, where media doesn not display, however, clicking the pause button (sometimes "play") allows the media to load (still frame) and then clicking play allows it to play normally:
+[image2 @ 0x70f9240bb780] Could not find codec parameters for stream 0 (Video: mjpeg, none(bt470bg/unknown/unknown)): unspecified size
+Consider increasing the value for the 'analyzeduration' (0) and 'probesize' (5000000) options
+Input #0, image2, from '/home/user/Downloads/000033_by_thelastvikingprince_dhoio5f-pre.jpg':
+  Duration: 00:00:00.04, start: 0.000000, bitrate: 24114 kb/s
+  Stream #0:0: Video: mjpeg, none(bt470bg/unknown/unknown), 25 fps, 25 tbr, 25 tbn
+Input #0, mov,mp4,m4a,3gp,3g2,mj2, from '/home/user/Downloads/32f975f1-ab9d-11f0-8015-4ba0dd79014c.mp4':
+  Metadata:
+    major_brand     : isom
+    minor_version   : 512
+    compatible_brands: isomiso2avc1mp41
+    encoder         : Lavf61.1.100
+  Duration: 00:01:23.46, start: 0.000000, bitrate: 901 kb/s
+  Stream #0:0[0x1](und): Video: h264 (High) (avc1 / 0x31637661), yuv420p(tv, bt709, progressive), 432x784, 897 kb/s, 24 fps, 24 tbr, 12288 tbn (default)
+      Metadata:
+        handler_name    : VideoHandler
+        vendor_id       : [0][0][0][0]
+
+- Another error that repeats in the terminal, that I believe is due to specific media added:
+[aac @ 0x30146780] Could not update timestamps for skipped samples.
+
+- Another error when scrolling through media in the Browser:
+file:///home/user/python-projects/mediawall/qml/MediaView.qml:53: TypeError: Cannot read property 'mediaStatus' of undefined
+Input #0, image2, from '/home/user/Downloads/000035_dhp108c.jpg':
+  Duration: 00:00:00.04, start: 0.000000, bitrate: 22499 kb/s
+  Stream #0:0: Video: mjpeg (Progressive), yuvj444p(pc, bt470bg/unknown/unknown), 894x894, 25 fps, 25 tbr, 25 tbn
+Input #0, mov,mp4,m4a,3gp,3g2,mj2, from '/home/user/Downloads/35b8fcf0e9c392472a86483c85264176_720w.mp4':
+  Metadata:
+    major_brand     : isom
+    minor_version   : 512
+    compatible_brands: isomiso2avc1mp41
+    encoder         : Lavf61.1.100
+  Duration: 00:00:06.07, start: 0.000000, bitrate: 500 kb/s
+  Stream #0:0[0x1](eng): Video: h264 (High) (avc1 / 0x31637661), yuv420p(tv, smpte170m/bt470bg/smpte170m, progressive), 720x960, 496 kb/s, 30 fps, 30 tbr, 15360 tbn (default)
+      Metadata:
+        handler_name    : VideoHandle
+        vendor_id       : [0][0][0][0]
+        encoder         : Lavc61.3.100 libwz264
+
+- GIF playing within the Browser initially works as expected but can sometimes randomly stop working. No errors in the terminal so I may have to try to find a pattern/causal event. I thought it occurred when I scrolled through multiple GIFs fast but it doesn't seem to be the case always.
+
+
+CHANGES:
+- Make Browser always on top.
+
+- Make the dark gray Browser window behind the media being viewed almost fully transparent, like 90%.
+
+- Do not allow media to be added to existing containers that already contain media unless media is removed from that container. Perhaps by default containers become "locked" once media is added and then must be unlocked before allowing drag and drop.
+
+- Make media inside Browser zoomable with mouse button 1 down+mousewheel.
+
+- When "adjusting content" within containers, do not lock the options (zoom, fit, fill, done buttons) to the rotation of the media as these can end up upside down, at odd angles, or off the screen. Additionally, the words "Drag to pan - scroll to zoom", along with the zoom "-" and "+" buttons, can be removed. Also, pressing the Enter or Space key should act as clicking the "Done" button to exit the adjust content mode.
+
+- Would anti-aliasing being possible on the edges of media and containers? For example, rotating an image (both free and contained) causes the edges to be jagged/sharp.
+
+- Make containers zoomable with mousewheel just like a free image. This should work both with and without media in it and, if media is in it, it should scale correctly along with the container, ideally not changing coordinates of the contained image (adjusted to fit or not) from what's currently displayed within the viewport.
+
+- Add a "Close" or "X" button for the Browser window.
+
+- Refine zooming steps to be slightly more granular.
+
+- Remove Pause and Unmute buttons from video file but leave in context menu, leaving only the tracking bar visible overlaid on the media when selected.
+
+- Thinking of trying to make the Browser UI as compact as possible:
+-- Maybe move the filename to the "title bar" of the Browser window to reduce weight at the bottom of this window so that it ends just after the previous image/next image/Add to Canvas/Add to Container and image count (out of total images).
+-- Wonder if it's possible to overlay UI elements over the media such that things like the "Add to Container" is a button at the very bottom of the image it self but actually overlaid.
+-- Make double-clicking the media in the Browser automatically add it to the canvas.
+
+
+NEW FEATURES:
+
+- Add A-B looping for videos.
+
+- Add a compact sidebar flyout (or something similar) that shows the total layers in canvas and if a container or free media is selected it highlights it in this list so you know where to move it up and down. Likewise, if you select something in the list it highlights it in the canvas.
+
+- Add a flyout/sidebar option to control audio. So this would be probably a combination of the layer window idea, where I could click a video file either on the canvas and have it selected in this list and adjust it's volume (and speed+pitch) and probably also things like pause and A+B loop.
+
+- For adding strictly audio files (MP3, M4A, etc.) I'm thinking I still would want to do this with the Browser. For that, I'm thinking a similar workflow. It plays the audio on repeat like a video, if I double click (some kind of compact placeholder for audio files) the browser it adds the audio track to the media control sidebar where it can be further adjusted (volume, speed+pitch, maybe also A+B looping).
+
+- A true full screen mode, perhaps a button near the top, that "removes" the top of the program and possibly also obscures the taskbar. I'm not sure if this will have to be different logic for Windows and Linux. Also it would be nice if there was an easy way to exit this mode that didn't require a keystroke, so perhaps a double-click anywhere on the canvas or a small "X" button overlaid in the top-right.
