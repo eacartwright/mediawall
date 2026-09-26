@@ -1451,6 +1451,8 @@ Video/audio decoding is delegated to QtMultimedia.
 
 This is important for maintaining smooth performance.
 
+The window renders with 4x multisample anti-aliasing (`QSurfaceFormat` samples, set in `main.py`), so the edges of rotated media and containers are smooth. Per-item `antialiasing` wasn't enough: it can't smooth the clip of a rotated container. If MSAA ever costs too much on a weaker GPU, lowering the sample count is the one place to change it.
+
 ---
 
 # 31. Why Python Is Appropriate
@@ -2410,6 +2412,7 @@ The following design decisions are currently established:
 - EXIF orientation is always applied; object sizes use the displayed (rotated) dimensions.
 - GIF and WebP are treated as potentially animated and displayed with an animated image element. Playback state is per instance, stored in the scene model.
 - Qt Quick Controls use the Fusion style everywhere, with a fixed dark palette, so the app looks the same on every platform and OS theme (2026-09-26).
+- The window uses 4x MSAA so rotated edges are smooth (2026-09-26).
 
 ### Open decisions
 

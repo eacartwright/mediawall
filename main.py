@@ -9,6 +9,7 @@ from pathlib import Path
 os.environ.setdefault("QML_DISABLE_DISK_CACHE", "1")
 
 from PySide6.QtCore import QObject, QUrl, Slot
+from PySide6.QtGui import QSurfaceFormat
 from PySide6.QtQml import QQmlApplicationEngine
 from PySide6.QtQuickControls2 import QQuickStyle
 from PySide6.QtWidgets import QApplication, QFileDialog
@@ -47,6 +48,14 @@ class BrowserBackend(QObject):
 
 
 def main():
+    # 4x multisample anti-aliasing, so the edges of rotated media and
+    # containers are smooth instead of jagged. (Per-item antialiasing
+    # can't smooth a rotated container's clip.) Must be set before the
+    # window is created.
+    surface_format = QSurfaceFormat()
+    surface_format.setSamples(4)
+    QSurfaceFormat.setDefaultFormat(surface_format)
+
     app = QApplication(sys.argv)
 
     # One Qt Quick Controls style on every platform, so Windows and Linux
