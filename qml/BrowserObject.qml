@@ -487,8 +487,9 @@ Rectangle {
         anchors.rightMargin: 1
         anchors.bottomMargin: 1
 
-        // About 90% transparent.
-        color: "#1a202020"
+        // About 60% transparent: #AARRGGBB, where AA is the opacity
+        // (00 = clear, ff = solid; 66 = 40% opaque) and 202020 the gray.
+        color: "#66202020"
 
         clip: true
 
