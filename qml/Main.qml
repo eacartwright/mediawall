@@ -13,6 +13,31 @@ ApplicationWindow {
 
     color: "#181818"
 
+    // A fixed dark palette for the Fusion style (set in main.py), so
+    // controls look the same on every machine whatever the OS theme.
+    palette.window: "#1e1e1e"
+    palette.windowText: "#ffffff"
+    palette.base: "#2d2d2d"
+    palette.alternateBase: "#353535"
+    palette.text: "#ffffff"
+    palette.button: "#3c3c3c"
+    palette.buttonText: "#ffffff"
+    palette.brightText: "#ffffff"
+    palette.highlight: "#3d7fc4"
+    palette.highlightedText: "#ffffff"
+    palette.light: "#787878"
+    palette.midlight: "#5a5a5a"
+    palette.mid: "#282828"
+    palette.dark: "#1e1e1e"
+    palette.shadow: "#000000"
+    palette.placeholderText: "#80ffffff"
+    palette.toolTipBase: "#3c3c3c"
+    palette.toolTipText: "#d4d4d4"
+    palette.link: "#6aa6e8"
+    palette.disabled.buttonText: "#9d9d9d"
+    palette.disabled.windowText: "#9d9d9d"
+    palette.disabled.text: "#9d9d9d"
+
     // Ask about unsaved changes before closing.
     onClosing: function(close) {
         close.accepted = projectController.confirmClose()

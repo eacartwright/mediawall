@@ -10,6 +10,7 @@ os.environ.setdefault("QML_DISABLE_DISK_CACHE", "1")
 
 from PySide6.QtCore import QObject, QUrl, Slot
 from PySide6.QtQml import QQmlApplicationEngine
+from PySide6.QtQuickControls2 import QQuickStyle
 from PySide6.QtWidgets import QApplication, QFileDialog
 
 from bridge.project_controller import ProjectController
@@ -47,6 +48,11 @@ class BrowserBackend(QObject):
 
 def main():
     app = QApplication(sys.argv)
+
+    # One Qt Quick Controls style on every platform, so Windows and Linux
+    # look and behave the same. (The native Windows style also drew the
+    # last button of a row with white text on a light face.)
+    QQuickStyle.setStyle("Fusion")
 
     browser_backend = BrowserBackend()
     scene_model = SceneModel()

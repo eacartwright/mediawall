@@ -1561,7 +1561,7 @@ Rules that keep the code cross-platform:
 - Match filename capitalization exactly. Windows ignores case; Linux does not, so `main.qml` versus `Main.qml` works on one and fails on the other.
 - Avoid platform-specific APIs unless they are isolated behind a small, clearly named module.
 
-Expected visual difference: Qt Quick Controls use a native-looking style on Windows and Fusion on Linux, so buttons and checkboxes look different. Behavior is identical. A single style can be set explicitly later if consistency matters.
+Qt Quick Controls use the Fusion style on every platform (set in `main.py`), with a fixed dark palette in `Main.qml`, so buttons and checkboxes look the same on Windows and Linux whatever the OS theme. The native Windows style was dropped because it looked different and, in PySide6 6.11.2, drew the last button of a row with white text on a light face.
 
 ---
 
@@ -2386,6 +2386,7 @@ The following design decisions are currently established:
 - All media display goes through one QML component (`MediaView`), so video support added there applies to free media, container content, and previews at once.
 - EXIF orientation is always applied; object sizes use the displayed (rotated) dimensions.
 - GIF and WebP are treated as potentially animated and displayed with an animated image element. Playback state is per instance, stored in the scene model.
+- Qt Quick Controls use the Fusion style everywhere, with a fixed dark palette, so the app looks the same on every platform and OS theme (2026-09-26).
 
 ### Open decisions
 
