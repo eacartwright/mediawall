@@ -209,25 +209,26 @@ Item {
     // Drawn below the frame, so only the part outside the frame shows.
     // -------------------------------------------------
 
-    MediaView {
+    // Drawn from the content itself (a live texture of contentView,
+    // which the frame's clip doesn't affect), so videos and GIFs get a
+    // ghost that is always in sync, and nothing is loaded twice.
+    ShaderEffectSource {
         x: cg.cx - cg.w / 2
         y: cg.cy - cg.h / 2
         width: cg.w
         height: cg.h
         rotation: cg.rot
 
-        visible: root.adjusting
+        visible: root.adjusting && root.hasContent
         opacity: 0.35
 
-        // Only load while adjusting. Videos get no ghost (a second copy
-        // would play out of sync); the orange outline still shows bounds.
-        url: root.adjusting && root.contentSourceType === "image"
-             ? root.contentSourceUrl : ""
-        type: "image"
-        animatable: root.contentSourceAnimatable
-        missing: root.contentSourceMissing
-        playing: root.contentPlaying
-        showErrorState: false
+        sourceItem: root.adjusting ? contentView : null
+        live: true
+        hideSource: false
+
+        // It's faint: no need for full resolution when zoomed far in.
+        readonly property real scaleDown: Math.min(1, 1024 / Math.max(1, width, height))
+        textureSize: Qt.size(Math.ceil(width * scaleDown), Math.ceil(height * scaleDown))
     }
 
 

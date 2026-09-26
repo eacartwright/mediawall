@@ -429,7 +429,7 @@ This should be a property of the media/container relationship.
 - Moving media into or out of a container re-parents that same instance, so its state (e.g. paused) carries over.
 - Media gets into a container by dragging a free image onto it (the container highlights; holding Shift places the image on top instead), or by selecting the container and using a browser's **Add to Container** button. Only an empty container accepts media: a full one doesn't highlight as a drop target (the media lands on the canvas instead), and Add to Container is disabled for it. To change what a container holds, release or remove its content first.
 - New content is framed to fill the container (cover). **Fit Content** and **Fill Container** re-frame it and reset its rotation.
-- **Adjust mode** (double-click, or right-click → Adjust Content) turns dragging into panning, the mouse wheel into zoom around the pointer, and the rotation knob into content rotation. The part of the content outside the frame shows as a faint ghost, and a small toolbar offers Fit, Fill, and Done. The toolbar stays upright whatever the rotation, sits below the container (or above it when there's no room), and stays inside the visible canvas. Enter or Space also finishes adjusting, as do clicking elsewhere and Escape.
+- **Adjust mode** (double-click, or right-click → Adjust Content) turns dragging into panning, the mouse wheel into zoom around the pointer, and the rotation knob into content rotation. The part of the content outside the frame shows as a faint ghost (a live texture of the content itself, so video and GIF ghosts stay in sync and nothing is loaded twice), and a small toolbar offers Fit, Fill, and Done. The toolbar stays upright whatever the rotation, sits below the container (or above it when there's no room), and stays inside the visible canvas. Enter or Space also finishes adjusting, as do clicking elsewhere and Escape.
 - The mouse wheel over a *selected* container (outside Adjust mode) scales the whole container around the pointer, content included, so the view inside the frame doesn't change. This happens whether or not "Scale Content with Container" is on; that setting only affects the resize handles.
 - **Release Content** turns the content back into a free object at the position, size, and rotation it currently appears on the canvas. **Remove Content** deletes it. Deleting a container deletes its content.
 - Only top-level objects take part in z-order; content has none of its own.
@@ -2296,7 +2296,6 @@ During a drag, resize, or rotate, QML moves the item directly so interaction sta
 - **Rotation has no angle snapping** yet (e.g. to 15° steps).
 - **Resize has no modifier options** yet (e.g. resize from center, or free aspect on images).
 - **Browser folders are saved as absolute paths only** (by decision; section 16), so on a machine with a different folder layout a browser shows "Folder not found" until a folder is chosen again.
-- **Adjust mode shows no ghost for video**, only the orange bounds outline (a second copy of the video would play out of sync).
 - **Each video instance runs its own decoder.** Two instances of the same file play independently, not in sync. Many simultaneous videos will be limited by decoding performance.
 - **Hardware video decoding hasn't been verified** on the target machines. Qt prints "No HW decoder found" when it falls back to software decoding.
 
@@ -2308,11 +2307,10 @@ Reviewed 2026-09-26. Keep this list current; it replaces the phase notes as the 
 
 ### Next
 
-1. **Adjust-mode ghost for video:** show the part of a video outside the container's frame, as images already do.
-2. **Hide the mouse cursor while idle in Present**, if it's easy.
-3. **Keep undo history between sessions** in a `.history` file next to the project (section 55).
+1. **Hide the mouse cursor while idle in Present**, if it's easy.
+2. **Keep undo history between sessions** in a `.history` file next to the project (section 55).
 
-Done from this list: video as audio (section 14.2), drag-to-reorder in the Layers panel, edge resize handles.
+Done from this list: video as audio (section 14.2), drag-to-reorder in the Layers panel, edge resize handles, the Adjust-mode ghost for video.
 
 ### Soon
 
