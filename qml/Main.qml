@@ -503,8 +503,35 @@ ApplicationWindow {
         // moves, fades out after a moment unless hovered.
         // -------------------------------------------------
 
+        // Qt also re-sends hover updates without any movement (e.g. each
+        // frame while something animates), so only a real change of
+        // position counts as the mouse moving.
         HoverHandler {
-            onPointChanged: if (window.fullScreen) exitButton.reveal()
+            property point lastPosition: Qt.point(-1, -1)
+
+            onPointChanged: {
+                var p = point.scenePosition
+                if (Math.abs(p.x - lastPosition.x) < 1 && Math.abs(p.y - lastPosition.y) < 1)
+                    return
+                lastPosition = p
+                if (window.fullScreen)
+                    exitButton.reveal()
+            }
+        }
+
+        // Present: hide the mouse pointer once it has been still long
+        // enough for the exit button to fade; moving it brings both back.
+        // (A MouseArea, not a HoverHandler: its cursor change applies at
+        // once, while the pointer is still. It takes no buttons, so
+        // clicks go through to what's underneath.)
+        MouseArea {
+            anchors.fill: parent
+            z: 2900000              // below only the exit button
+
+            visible: window.presenting
+            acceptedButtons: Qt.NoButton
+
+            cursorShape: exitButton.opacity < 0.01 ? Qt.BlankCursor : Qt.ArrowCursor
         }
 
         Rectangle {

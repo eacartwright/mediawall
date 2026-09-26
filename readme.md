@@ -908,7 +908,7 @@ There are two full-screen modes, both window state only (not saved):
 - **Full Screen** (toolbar button or F11): the editor fills the screen, covering the taskbar, with the toolbar hidden. Everything else works as usual.
 - **Present** (toolbar button or F5): full screen, and the canvas becomes view-only. Media and containers can't be selected, moved, or right-clicked, and no outlines, handles, or video bars show. Editing shortcuts are off. **Browsers stay visible and working** (browse, zoom, Add to Canvas) but show no selection chrome; hiding them was deliberately not done, so a live browsing wall is possible.
 
-Leaving: Esc (in Full Screen, Esc first deselects), F11 / F5 again, double-clicking the canvas (in Present, anywhere except a browser), or the ✕ in the top-right corner, which appears when the mouse moves and fades after about two seconds. Leaving Present returns to where you were (window or Full Screen).
+Leaving: Esc (in Full Screen, Esc first deselects), F11 / F5 again, double-clicking the canvas (in Present, anywhere except a browser), or the ✕ in the top-right corner, which appears when the mouse moves and fades after about two seconds. In Present, the mouse pointer hides along with it and comes back when the mouse moves. (Only a real change of position counts as movement: Qt also re-sends hover updates every frame while something animates.) Leaving Present returns to where you were (window or Full Screen).
 
 The toolbar overlays the canvas instead of pushing it down, so objects keep exactly the same screen positions when entering or leaving full screen: what you arrange is what you present.
 
@@ -1950,7 +1950,7 @@ Implement:
 
 Done: Full Screen and Present modes, hidden editor UI, view-only canvas, keyboard shortcuts and a mouse-only exit (section 15). Browsers stay visible in Present by choice.
 
-Remaining: hiding the mouse cursor while idle (planned, if easy). Scaling the wall to other screen sizes is not planned: positions are in screen units from the top-left, so a wall made on a 1080p screen opens at the same size on a 4K screen, top-left, with more canvas around it; a wall spanning two monitors is better done as a separate MediaWall window/instance per screen.
+Done also: the mouse pointer hides while idle in Present. Scaling the wall to other screen sizes is not planned: positions are in screen units from the top-left, so a wall made on a 1080p screen opens at the same size on a 4K screen, top-left, with more canvas around it; a wall spanning two monitors is better done as a separate MediaWall window/instance per screen.
 
 ---
 
@@ -2307,10 +2307,9 @@ Reviewed 2026-09-26. Keep this list current; it replaces the phase notes as the 
 
 ### Next
 
-1. **Hide the mouse cursor while idle in Present**, if it's easy.
-2. **Keep undo history between sessions** in a `.history` file next to the project (section 55).
+1. **Keep undo history between sessions** in a `.history` file next to the project (section 55).
 
-Done from this list: video as audio (section 14.2), drag-to-reorder in the Layers panel, edge resize handles, the Adjust-mode ghost for video.
+Done from this list: video as audio (section 14.2), drag-to-reorder in the Layers panel, edge resize handles, the Adjust-mode ghost for video, hiding the idle pointer in Present.
 
 ### Soon
 
