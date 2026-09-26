@@ -63,3 +63,18 @@ Projects are `.mediawall` JSON files. Media is stored as paths, never as bytes. 
 - Match filename case exactly (`Main.qml`, not `main.qml`). Development happens on both Windows and Linux (Linux is primary), and Linux file names are case-sensitive.
 - Keep platform-specific code isolated. Every Python package folder needs an `__init__.py` (unittest discovery depends on it).
 - Guiding rule (readme section 56): keep the architectural boundaries, and build the smallest working version of the current feature rather than adding speculative complexity.
+
+## Development environments
+- Developed on both Windows and Linux Mint. Linux Mint is the primary target; every change must keep working there.
+- Never write Windows-only or Linux-only commands or paths without noting the other platform's equivalent.
+- The venv is at `venv/` on each machine (not committed).
+  - Windows: `venv\Scripts\python.exe`
+  - Linux: `venv/bin/python`
+- Run the app from the project root: `python main.py` (venv activated).
+- Linux filesystems are case-sensitive: file names and QML imports must match exactly in case.
+- Qt Multimedia uses the FFmpeg backend on both platforms.
+
+## Working context
+- Architecture rules and decisions: see `readme.md`.
+- Current errors, changes and planned features: see `docs/changes.txt`.
+- Propose a plan before making large or multi-file changes.
