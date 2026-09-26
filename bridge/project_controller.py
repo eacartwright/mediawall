@@ -100,8 +100,12 @@ class ProjectController(QObject):
             )
             return
 
+        # Suggest the name without the extension: the Windows dialog adds
+        # the filter's ".mediawall.layout" itself, and would add it a
+        # second time to a name that already has it (it sees only
+        # ".layout" as the extension).
         stem = Path(self._path).name[:-len(FILE_EXTENSION)] if self._path else "Untitled"
-        start = str(Path(self._last_dir) / (stem + LAYOUT_EXTENSION))
+        start = str(Path(self._last_dir) / stem)
         path, _ = QFileDialog.getSaveFileName(None, "Save Layout", start, LAYOUT_FILTER)
         if not path:
             return
