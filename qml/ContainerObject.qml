@@ -631,7 +631,7 @@ Item {
 
 
     // -------------------------------------------------
-    // Browsing badge (selected): position in the folder and file name
+    // Browsing badge (selected): position in the folder
     // -------------------------------------------------
 
     Rectangle {
@@ -655,7 +655,6 @@ Item {
             text: root.browseFiles.length === 0
                   ? "Browsing · no media found"
                   : "⇅ " + (root.browseIndex + 1) + " / " + root.browseFiles.length
-                    + (root.browseIndex >= 0 ? " · " + root.browseFiles[root.browseIndex].relpath : "")
             color: "#dddddd"
             font.pixelSize: 11
         }
