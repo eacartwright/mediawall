@@ -19,6 +19,7 @@ Design rules (readme sections 16, 42, 45, 46):
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import tempfile
@@ -108,11 +109,9 @@ def scene_to_dict(scene: Scene, project_path=None) -> dict:
     }
 
 
-def save_project(scene: Scene, path) -> None:
+def write_json_atomic(path, data) -> None:
+    """Write to a temp file in the same folder, then replace atomically."""
     path = Path(path)
-    data = scene_to_dict(scene, path)
-
-    # Write to a temp file in the same folder, then replace atomically.
     fd, tmp_name = tempfile.mkstemp(
         prefix=path.name + ".", suffix=".tmp", dir=path.parent
     )
@@ -127,6 +126,28 @@ def save_project(scene: Scene, path) -> None:
         except OSError:
             pass
         raise
+
+
+def fingerprint(data) -> str:
+    """A hash of a project's saved content (for matching its undo history)."""
+    text = json.dumps(data, sort_keys=True, ensure_ascii=False, separators=(",", ":"))
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+def save_project(scene: Scene, path) -> str:
+    """Save the project; returns the saved content's fingerprint."""
+    data = scene_to_dict(scene, path)
+    write_json_atomic(path, data)
+    return fingerprint(data)
+
+
+def project_file_fingerprint(path):
+    """The fingerprint of a project file as it is on disk, or None."""
+    try:
+        with open(path, encoding="utf-8") as f:
+            return fingerprint(json.load(f))
+    except (OSError, ValueError):
+        return None
 
 
 # -------------------------------------------------

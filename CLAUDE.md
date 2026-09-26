@@ -53,7 +53,7 @@ Model rows are **top-level objects only**. Container content is not a row. It is
 
 - During a drag, resize, or rotate, QML moves the item directly. On release it sends the final values once (`commitGeometry`) and re-binds to the model, so later changes from Python (load, undo) reach the canvas.
 - Every change to saved state in `SceneModel` must end with `_changed()`. It records the previous snapshot in `History` and emits `modified`. Browser fields are saved but excluded from undo (`_changed(workspace_only=True)`), and selection is neither saved nor undone.
-- Undo stores whole-scene deep-copy snapshots (`core/history.py`), so new actions become undoable without extra code. For rapid repeated changes such as wheel zoom, call `sceneModel.setMergeKey("zoom:" + id)` before the change so they merge into one step.
+- Undo stores whole-scene deep-copy snapshots (`core/history.py`), so new actions become undoable without extra code. The history is also saved next to the project as `<project>.history` (`core/history_file.py`), matched to the saved project by a content fingerprint. For rapid repeated changes such as wheel zoom, call `sceneModel.setMergeKey("zoom:" + id)` before the change so they merge into one step.
 - `_apply_state` diffs the target snapshot against the live scene and inserts or removes only the rows that changed. Untouched delegates survive, so browsers don't rescan and videos and GIFs keep playing. Keep that behavior when changing undo or reset code.
 
 ### Persistence (`core/project.py`)

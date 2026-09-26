@@ -206,6 +206,16 @@ class SceneModel(QAbstractListModel):
     def scene(self):
         return self._scene
 
+    @property
+    def history(self):
+        return self._history
+
+    def setHistory(self, history):
+        """Use a history loaded from disk (after setScene for the same project)."""
+        self._history = history
+        self._merge_key = None
+        self.historyChanged.emit()
+
     def _get_audio_items(self):
         return self._audio_model
 

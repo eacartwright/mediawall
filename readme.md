@@ -1718,6 +1718,7 @@ mediawall/
 │   ├── scene.py            MediaSource, SceneObject, Scene
 │   ├── project.py          project save/load (JSON)
 │   ├── history.py          undo/redo history (scene snapshots)
+│   ├── history_file.py     undo history saved next to the project
 │   └── media_browser.py    folder scanning, media type detection
 │
 ├── bridge/                 Qt glue between core and QML
@@ -1754,6 +1755,7 @@ mediawall/
     ├── test_project.py
     ├── test_containers.py
     ├── test_history.py
+    ├── test_history_file.py
     └── test_video.py
 ```
 
@@ -2184,7 +2186,8 @@ The application should degrade gracefully.
 - Browser state (folder, position, subfolders setting) is workspace state: saved with the project, but not recorded as undo steps and not rewound by undo. Browsing through 50 photos doesn't fill the history.
 - Applying an undo announces only the rows that actually appear or disappear, so untouched objects keep their on-screen state: browsers don't rescan and GIFs keep playing.
 - Selection is not part of undo.
-- History is cleared on New and Open, and is not saved.
+- History is cleared on New.
+- **History is kept between sessions** in a file next to the project, `<project>.history` (e.g. `japan.mediawall.history`; `core/history_file.py`), written whenever the project is saved and read when it is opened. It holds the last 50 undo steps (and up to 50 redo steps), each a whole scene in the same form as a project file. The file records a fingerprint (SHA-256) of the project as saved; if the project doesn't match when opened (it was edited elsewhere, or saved without its history), the history is ignored and the Log says why. It's kept out of the project file on purpose: the project stays small and readable, and a lost or damaged history can't affect it. If there's nothing to undo or redo when saving, a leftover history file is removed.
 
 ---
 
@@ -2292,7 +2295,6 @@ During a drag, resize, or rotate, QML moves the item directly so interaction sta
 
 - **Folder scanning runs on the UI thread.** Normal folders scan effectively instantly, but a very large tree or a slow network drive will freeze the app until the scan finishes. Background scanning can be added if this becomes a real problem.
 - **Containers are rectangular only**, and hold one item.
-- **Undo history isn't saved** with the project; it starts fresh each time a project is opened.
 - **Rotation has no angle snapping** yet (e.g. to 15° steps).
 - **Resize has no modifier options** yet (e.g. resize from center, or free aspect on images).
 - **Browser folders are saved as absolute paths only** (by decision; section 16), so on a machine with a different folder layout a browser shows "Folder not found" until a folder is chosen again.
@@ -2307,9 +2309,9 @@ Reviewed 2026-09-26. Keep this list current; it replaces the phase notes as the 
 
 ### Next
 
-1. **Keep undo history between sessions** in a `.history` file next to the project (section 55).
+Nothing queued. Pick the next items from Soon or Later.
 
-Done from this list: video as audio (section 14.2), drag-to-reorder in the Layers panel, edge resize handles, the Adjust-mode ghost for video, hiding the idle pointer in Present.
+Done from the last list: video as audio (section 14.2), drag-to-reorder in the Layers panel, edge resize handles, the Adjust-mode ghost for video, hiding the idle pointer in Present, and undo history kept between sessions (section 47).
 
 ### Soon
 
@@ -2526,6 +2528,7 @@ The following design decisions are currently established:
 - Video as audio converts the video into a track (it leaves the canvas) rather than adding a second, unsynchronized copy (2026-09-26).
 - Speed changes pitch by default (Keep pitch off), as in Celluloid (2026-09-26).
 - The application's name is written **MediaWall** (one word) everywhere (2026-09-26).
+- Undo history is kept between sessions in a separate `<project>.history` file (last 50 steps), matched to the project by fingerprint, not inside the project file (2026-09-26).
 - Free media always keeps its aspect ratio; no Contain/Cover/Free/Stretch modes for it (2026-09-26).
 - No audio solo, and no choosing between audio streams in one file (2026-09-26).
 - The wall is not scaled to the screen: a larger screen shows more canvas, with the wall at the same size in the top-left; multi-monitor walls use one MediaWall instance per screen (2026-09-26).
@@ -2533,7 +2536,7 @@ The following design decisions are currently established:
 
 ### Open decisions
 
-- **Undo history between sessions:** where to keep it. The suggestion is a separate file next to the project (e.g. `japan.mediawall.history`), capped at about 50 steps, rather than inside the `.mediawall` file: each step is a whole-scene snapshot, a lost or damaged history file can't affect the project, and the project file stays small and readable.
+None currently.
 
 ---
 
