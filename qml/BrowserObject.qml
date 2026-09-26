@@ -263,12 +263,49 @@ Rectangle {
         if (!canPlace)
             return
 
-        sceneModel.addMedia(
-            currentEntry.path,
-            currentEntry.type,
-            80 + Math.random() * 180,
-            80 + Math.random() * 180
-        )
+        var p = placementBeside(newMediaWidth)
+        sceneModel.addMedia(currentEntry.path, currentEntry.type, p.x, p.y)
+    }
+
+    // ---- Where new media goes: beside the browser ----
+    //
+    // To the right of a browser in the left half of the canvas, to the
+    // left of one in the right half (switching sides if that side has
+    // too little room and the other has more), level with its top.
+    // Repeated adds step down and outward so they don't pile up exactly.
+
+    readonly property real newMediaWidth: 300     // core DEFAULT_MEDIA_WIDTH
+    property int placeCount: 0                     // this session
+
+    function placementBeside(w) {
+        var sceneW = sceneItem ? sceneItem.width : 1280
+        var sceneH = sceneItem ? sceneItem.height : 800
+        var gap = 16
+
+        // On-screen bounds (a browser may be rotated about its center).
+        var r = rotation * Math.PI / 180
+        var halfW = Math.abs(width / 2 * Math.cos(r)) + Math.abs(height / 2 * Math.sin(r))
+        var halfH = Math.abs(width / 2 * Math.sin(r)) + Math.abs(height / 2 * Math.cos(r))
+        var cx = x + width / 2
+        var cy = y + height / 2
+
+        var roomRight = sceneW - (cx + halfW) - gap
+        var roomLeft = (cx - halfW) - gap
+
+        var right = cx < sceneW / 2
+        if (right && roomRight < w && roomLeft > roomRight)
+            right = false
+        else if (!right && roomLeft < w && roomRight > roomLeft)
+            right = true
+
+        var step = (placeCount % 8) * 24
+        placeCount++
+
+        var px = right ? cx + halfW + gap + step : cx - halfW - gap - w - step
+        var py = cy - halfH + step
+
+        return Qt.point(Math.max(0, Math.min(sceneW - w, px)),
+                        Math.max(0, Math.min(sceneH - 60, py)))
     }
 
 

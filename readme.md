@@ -1382,6 +1382,7 @@ The browser is kept compact, with the media as large as possible:
 - The preview background is about 90% transparent, so the canvas shows around the media.
 - Browsers always draw above other canvas objects (they are workspace tools). Among themselves they keep their normal stacking order, and z-order operations move them only among browsers (section 23).
 - Over the preview: the wheel moves to the previous/next file; holding the left button while scrolling zooms around the pointer, and left-drag then pans. The zoom is temporary and resets when the file changes. Double-clicking adds the current file to the canvas.
+- New media from **Add to Canvas** (or double-click) is placed **beside the browser**, level with its top: to the right of a browser in the left half of the canvas, to the left of one in the right half (switching sides when that side has too little room and the other has more), kept inside the visible canvas. Repeated adds step 24 px down and outward so they don't pile up exactly.
 
 ---
 
