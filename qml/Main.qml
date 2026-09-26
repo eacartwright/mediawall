@@ -44,6 +44,12 @@ ApplicationWindow {
     }
 
 
+    LogWindow {
+        id: logWindow
+        palette: window.palette
+    }
+
+
     // -------------------------------------------------
     // Keyboard shortcuts
     // -------------------------------------------------
@@ -219,6 +225,16 @@ ApplicationWindow {
 
                 Item {
                     Layout.fillWidth: true
+                }
+
+                // Messages the app would print to a terminal.
+                Button {
+                    text: "Log"
+                    onClicked: {
+                        logWindow.show()
+                        logWindow.raise()
+                        logWindow.requestActivate()
+                    }
                 }
 
                 Label {

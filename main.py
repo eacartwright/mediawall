@@ -9,11 +9,12 @@ from pathlib import Path
 os.environ.setdefault("QML_DISABLE_DISK_CACHE", "1")
 
 from PySide6.QtCore import QObject, QUrl, Slot
-from PySide6.QtGui import QSurfaceFormat
+from PySide6.QtGui import QFontDatabase, QSurfaceFormat
 from PySide6.QtQml import QQmlApplicationEngine
 from PySide6.QtQuickControls2 import QQuickStyle
 from PySide6.QtWidgets import QApplication, QFileDialog
 
+from bridge.log_capture import LogCapture
 from bridge.project_controller import ProjectController
 from bridge.scene_model import SceneModel
 from core.media_browser import MediaBrowser
@@ -23,6 +24,7 @@ from core.media_browser import MediaBrowser
 # no matter which directory it is launched from.
 APP_DIR = Path(__file__).resolve().parent
 MAIN_QML = APP_DIR / "qml" / "Main.qml"
+LOG_PATH = APP_DIR / "logs" / "mediawall.log"
 
 
 class BrowserBackend(QObject):
@@ -48,6 +50,10 @@ class BrowserBackend(QObject):
 
 
 def main():
+    # First, so startup messages are captured too: terminal output
+    # (FFmpeg, Qt, Python) goes to the in-app Log window and LOG_PATH.
+    log_capture = LogCapture(LOG_PATH)
+
     # 4x multisample anti-aliasing, so the edges of rotated media and
     # containers are smooth instead of jagged. (Per-item antialiasing
     # can't smooth a rotated container's clip.) Must be set before the
@@ -72,6 +78,11 @@ def main():
     context.setContextProperty("browserBackend", browser_backend)
     context.setContextProperty("sceneModel", scene_model)
     context.setContextProperty("projectController", project_controller)
+    context.setContextProperty("appLog", log_capture.model)
+    context.setContextProperty(
+        "fixedFontFamily",
+        QFontDatabase.systemFont(QFontDatabase.FixedFont).family(),
+    )
 
     engine.load(QUrl.fromLocalFile(str(MAIN_QML)))
 

@@ -1624,6 +1624,24 @@ If PowerShell refuses to run `Activate.ps1`, use Command Prompt with `venv\Scrip
 
 If pip finds no PySide6 wheel, the installed Python is newer than PySide6 supports. Install a supported version and create the venv with it, e.g. `py -3.12 -m venv venv`.
 
+### Launchers (double-click to start)
+
+After creating the venv, run once on each machine:
+
+```text
+Windows:  venv\Scripts\python.exe tools\create_launchers.py [--desktop] [--start-menu]
+Linux:    venv/bin/python tools/create_launchers.py [--desktop]
+```
+
+- **Windows** gets `Media Wall.lnk` (no terminal window) and `Media Wall (debug).lnk` (terminal stays open after exit) in the project folder, and optionally on the Desktop / in the Start Menu. The shortcuts are machine-specific and not committed. `Media Wall.lnk` runs `launcher.pyw`, which starts `main.py` with a *hidden* console rather than none, because on Windows FFmpeg's output can only be captured when the process has a console.
+- **Linux** gets "Media Wall" and "Media Wall (debug)" in the application menu (`~/.local/share/applications`), and optionally on the Desktop. The debug entry runs `tools/run_debug.sh` in a terminal.
+
+### Log window
+
+Everything the app would print to a terminal (FFmpeg, Qt warnings and QML errors, Python output and uncaught exceptions) is captured by `bridge/log_capture.py` and shown in the **Log** window (toolbar button), with Copy All and Clear. It is also written to `logs/mediawall.log` (the previous run is kept as `mediawall.previous.log`), so a start that fails before the window appears still leaves a trace. When the app is started from a terminal, the output appears there too.
+
+The capture works by redirecting file descriptors 1 and 2 into a pipe, since FFmpeg writes to stderr directly.
+
 ### QML disk cache
 
 `main.py` turns off Qt's compiled-QML disk cache (`QML_DISABLE_DISK_CACHE=1`). With QML files changing often, a stale cache can make the app fail to start with errors like "Type MediaObject unavailable" or "Cannot assign to non-existent property". The cache saves almost no time for a project this size. It can be re-enabled for a release build.
@@ -1649,6 +1667,7 @@ Current structure:
 ```text
 mediawall/
 ├── main.py                 entry point: creates the app, engine, and models
+├── launcher.pyw            starts main.py without a terminal window
 ├── requirements.txt
 ├── readme.md
 │
@@ -1661,6 +1680,7 @@ mediawall/
 │
 ├── bridge/                 Qt glue between core and QML
 │   ├── __init__.py
+│   ├── log_capture.py      terminal output -> Log window and logs/
 │   ├── scene_model.py      exposes Scene to QML as a list model
 │   └── project_controller.py  New/Open/Save dialogs, title, unsaved prompts
 │
@@ -1675,7 +1695,12 @@ mediawall/
 │   ├── RotationHandle.qml  shared rotation knob
 │   ├── ResizeHandles.qml   shared four-corner resize handles
 │   ├── ObjectContextMenu.qml  shared right-click menu
+│   ├── LogWindow.qml       the Log window
 │   └── Zoom.js             shared mouse-wheel zoom step
+│
+├── tools/
+│   ├── create_launchers.py shortcuts / menu entries for this machine
+│   └── run_debug.sh        Linux debug launcher (keeps the terminal open)
 │
 └── tests/
     ├── __init__.py
