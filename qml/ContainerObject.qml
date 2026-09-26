@@ -520,12 +520,53 @@ Item {
 
     // -------------------------------------------------
     // Adjust-mode toolbar
+    //
+    // Lives in scene coordinates rather than inside the (rotated)
+    // container, so it stays upright and readable. It sits below the
+    // container's on-screen bounds, or above them if there's no room,
+    // and is kept inside the visible canvas.
     // -------------------------------------------------
 
+    // Enter / Space finish adjusting, like Done.
+    Shortcut {
+        enabled: root.adjusting
+        sequences: ["Return", "Enter", "Space"]
+        onActivated: root.adjusting = false
+    }
+
     Rectangle {
-        anchors.top: parent.bottom
-        anchors.topMargin: 10
-        anchors.horizontalCenter: parent.horizontalCenter
+        id: adjustBar
+
+        parent: root.sceneItem
+
+        // Axis-aligned bounds of the rotated container, in scene
+        // coordinates (rotation is about the container's center).
+        readonly property real rad: root.rotation * Math.PI / 180
+        readonly property real halfW:
+            Math.abs(root.width / 2 * Math.cos(rad)) + Math.abs(root.height / 2 * Math.sin(rad))
+        readonly property real halfH:
+            Math.abs(root.width / 2 * Math.sin(rad)) + Math.abs(root.height / 2 * Math.cos(rad))
+        readonly property real centerX: root.x + root.width / 2
+        readonly property real centerY: root.y + root.height / 2
+
+        readonly property real gap: 10
+        readonly property real edge: 4
+        readonly property real sceneW: parent ? parent.width : 0
+        readonly property real sceneH: parent ? parent.height : 0
+
+        x: Math.max(edge, Math.min(sceneW - width - edge, centerX - width / 2))
+        y: {
+            var below = centerY + halfH + gap
+            if (below + height <= sceneH - edge)
+                return below
+
+            var above = centerY - halfH - gap - height
+            if (above >= edge)
+                return above
+
+            // Neither fits (container fills the view): pin to the bottom.
+            return Math.max(edge, sceneH - height - edge)
+        }
 
         width: toolRow.implicitWidth + 12
         height: toolRow.implicitHeight + 10
@@ -536,7 +577,8 @@ Item {
         border.color: "#e0a84c"
         radius: 4
 
-        z: 30
+        // Above every object on the canvas.
+        z: 2000000
 
         // Absorb clicks between buttons so they don't deselect.
         MouseArea {
@@ -549,26 +591,6 @@ Item {
             anchors.centerIn: parent
 
             spacing: 4
-
-            Text {
-                anchors.verticalCenter: parent.verticalCenter
-                rightPadding: 6
-
-                text: "Drag to pan · scroll to zoom"
-
-                color: "#cccccc"
-                font.pixelSize: 11
-            }
-
-            Button {
-                text: "−"
-                onClicked: root.zoomAt(root.width / 2, root.height / 2, 1 / 1.2)
-            }
-
-            Button {
-                text: "+"
-                onClicked: root.zoomAt(root.width / 2, root.height / 2, 1.2)
-            }
 
             Button {
                 text: "Fit"

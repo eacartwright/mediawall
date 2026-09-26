@@ -427,7 +427,7 @@ This should be a property of the media/container relationship.
 - Moving media into or out of a container re-parents that same instance, so its state (e.g. paused) carries over.
 - Media gets into a container by dragging a free image onto it (the container highlights; holding Shift places the image on top instead), or by selecting the container and using a browser's **Add to Container** button. Replacing content releases the old content as a free object rather than deleting it.
 - New content is framed to fill the container (cover). **Fit Content** and **Fill Container** re-frame it and reset its rotation.
-- **Adjust mode** (double-click, or right-click → Adjust Content) turns dragging into panning, the mouse wheel into zoom around the pointer, and the rotation knob into content rotation. The part of the content outside the frame shows as a faint ghost, and a small toolbar offers −, +, Fit, Fill, and Done. Clicking elsewhere or pressing Escape also leaves Adjust mode.
+- **Adjust mode** (double-click, or right-click → Adjust Content) turns dragging into panning, the mouse wheel into zoom around the pointer, and the rotation knob into content rotation. The part of the content outside the frame shows as a faint ghost, and a small toolbar offers Fit, Fill, and Done. The toolbar stays upright whatever the rotation, sits below the container (or above it when there's no room), and stays inside the visible canvas. Enter or Space also finishes adjusting, as do clicking elsewhere and Escape.
 - **Release Content** turns the content back into a free object at the position, size, and rotation it currently appears on the canvas. **Remove Content** deletes it. Deleting a container deletes its content.
 - Only top-level objects take part in z-order; content has none of its own.
 - Clipping is rectangular (`clip_shape: "rect"`, stored per container). Other shapes will replace the rectangular clip with a mask without changing the object model.
@@ -2125,6 +2125,7 @@ Ctrl+S            save
 Ctrl+Shift+S      save as
 Delete            remove selected object
 Escape            deselect (also leaves a container's Adjust mode)
+Enter / Space     finish adjusting (in a container's Adjust mode)
 Ctrl+Shift+Up     bring to front
 Ctrl+Up           bring forward
 Ctrl+Down         send backward
@@ -2183,7 +2184,6 @@ During a drag, resize, or rotate, QML moves the item directly so interaction sta
 
 - **Folder scanning runs on the UI thread.** Normal folders scan effectively instantly, but a very large tree or a slow network drive will freeze the app until the scan finishes. Background scanning can be added if this becomes a real problem.
 - **Containers are rectangular only**, and hold one item.
-- **The Adjust toolbar sits below the container and rotates with it**, which can look awkward on a steeply rotated container.
 - **Undo history isn't saved** with the project; it starts fresh each time a project is opened.
 - **Rotation has no angle snapping** yet (e.g. to 15° steps).
 - **No edge handles yet**, only corners; resizing one side on its own isn't possible.
