@@ -1,5 +1,6 @@
 ERRORS:
-- Getting errors like the following on mp4 media when first encountered, where media doesn not display, however, clicking the pause button (sometimes "play") allows the media to load (still frame) and then clicking play allows it to play normally:
+- [FIXED 2026-09-26] Cause: the Browser changes a file's url and type one at a time, so the player was created with the previous image's url, and play() was lost when the real video loaded. MediaView now applies url/type together and re-syncs play/pause on a source change.
+  Getting errors like the following on mp4 media when first encountered, where media doesn not display, however, clicking the pause button (sometimes "play") allows the media to load (still frame) and then clicking play allows it to play normally:
 [image2 @ 0x70f9240bb780] Could not find codec parameters for stream 0 (Video: mjpeg, none(bt470bg/unknown/unknown)): unspecified size
 Consider increasing the value for the 'analyzeduration' (0) and 'probesize' (5000000) options
 Input #0, image2, from '/home/user/Downloads/000033_by_thelastvikingprince_dhoio5f-pre.jpg':
@@ -17,10 +18,12 @@ Input #0, mov,mp4,m4a,3gp,3g2,mj2, from '/home/user/Downloads/32f975f1-ab9d-11f0
         handler_name    : VideoHandler
         vendor_id       : [0][0][0][0]
 
-- Another error that repeats in the terminal, that I believe is due to specific media added:
+- [NOT A BUG 2026-09-26] Harmless FFmpeg warning from specific AAC files (encoder start-up delay samples being trimmed); playback is unaffected. Could be silenced by lowering FFmpeg's log level if the noise bothers me.
+  Another error that repeats in the terminal, that I believe is due to specific media added:
 [aac @ 0x30146780] Could not update timestamps for skipped samples.
 
-- Another error when scrolling through media in the Browser:
+- [FIXED 2026-09-26] Same cause as the first error: while switching to a video, MediaView's player was briefly undefined instead of null.
+  Another error when scrolling through media in the Browser:
 file:///home/user/python-projects/mediawall/qml/MediaView.qml:53: TypeError: Cannot read property 'mediaStatus' of undefined
 Input #0, image2, from '/home/user/Downloads/000035_dhp108c.jpg':
   Duration: 00:00:00.04, start: 0.000000, bitrate: 22499 kb/s
@@ -38,7 +41,8 @@ Input #0, mov,mp4,m4a,3gp,3g2,mj2, from '/home/user/Downloads/35b8fcf0e9c392472a
         vendor_id       : [0][0][0][0]
         encoder         : Lavc61.3.100 libwz264
 
-- GIF playing within the Browser initially works as expected but can sometimes randomly stop working. No errors in the terminal so I may have to try to find a pattern/causal event. I thought it occurred when I scrolled through multiple GIFs fast but it doesn't seem to be the case always.
+- [FIXED, VERIFY 2026-09-26] Likely cause (not reproduced): the Browser shared one play/pause state, so pausing a video left later GIFs frozen with no button to restart them. Every file now starts playing when you move to it. Watch whether it still happens.
+  GIF playing within the Browser initially works as expected but can sometimes randomly stop working. No errors in the terminal so I may have to try to find a pattern/causal event. I thought it occurred when I scrolled through multiple GIFs fast but it doesn't seem to be the case always.
 
 
 CHANGES:
@@ -79,3 +83,5 @@ NEW FEATURES:
 - For adding strictly audio files (MP3, M4A, etc.) I'm thinking I still would want to do this with the Browser. For that, I'm thinking a similar workflow. It plays the audio on repeat like a video, if I double click (some kind of compact placeholder for audio files) the browser it adds the audio track to the media control sidebar where it can be further adjusted (volume, speed+pitch, maybe also A+B looping).
 
 - A true full screen mode, perhaps a button near the top, that "removes" the top of the program and possibly also obscures the taskbar. I'm not sure if this will have to be different logic for Windows and Linux. Also it would be nice if there was an easy way to exit this mode that didn't require a keystroke, so perhaps a double-click anywhere on the canvas or a small "X" button overlaid in the top-right.
+
+- Create a way to start the application from a single file. Eventually perhaps an option to hide the terminal or a debug option to view it for development purposes. Or perhap a button in the app itself to hide or reveal it.

@@ -77,6 +77,13 @@ Rectangle {
     property bool previewPlaying: true
     property bool previewMuted: true
 
+    // Every file starts playing when you move to it. Otherwise pausing
+    // a video would leave later GIFs frozen, with no button to restart
+    // them. Mute carries over. Keyed on the path so a rescan that keeps
+    // the same file doesn't restart it.
+    readonly property string currentPath: currentEntry ? currentEntry.path : ""
+    onCurrentPathChanged: previewPlaying = true
+
     // Relative path, so you can see which subfolder a file is in.
     readonly property string currentFileName:
         currentEntry ? currentEntry.relpath : ""

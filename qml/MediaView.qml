@@ -26,12 +26,39 @@ Item {
     // Show the red "Missing / Can't display" box inside this view.
     property bool showErrorState: true
 
-    readonly property bool isPlayer: type === "video" || type === "audio"
-    readonly property bool isVideo: type === "video"
+    // url, type, and animatable often change together but through
+    // separate bindings (e.g. the browser moving to the next file), so
+    // they update one at a time. Apply them as one change on the next
+    // event-loop turn, so the loader never builds a video player for an
+    // image's url, or an Image for a video's.
+    property string _url: ""
+    property string _type: "image"
+    property bool _animatable: false
+
+    function _applySource() {
+        // Switching kinds (e.g. image -> video): unload the old item
+        // first, so it never sees the new url before it is replaced.
+        if (type !== _type || animatable !== _animatable)
+            _url = ""
+
+        _type = type
+        _animatable = animatable
+        _url = url
+    }
+
+    onUrlChanged: Qt.callLater(_applySource)
+    onTypeChanged: Qt.callLater(_applySource)
+    onAnimatableChanged: Qt.callLater(_applySource)
+    Component.onCompleted: _applySource()
+
+    readonly property bool isPlayer: _type === "video" || _type === "audio"
+    readonly property bool isVideo: _type === "video"
 
     // The QtMultimedia player, for videos and audio (null otherwise).
+    // While the loader is switching components, loader.item can briefly
+    // be the previous Image, which has no player: normalize to null.
     readonly property var player:
-        isPlayer && loader.item ? loader.item.player : null
+        isPlayer && loader.item && loader.item.player ? loader.item.player : null
 
     // True only for images that actually have more than one frame.
     readonly property bool isAnimated:
@@ -74,10 +101,10 @@ Item {
         anchors.fill: parent
 
         // Don't try to load a file we already know is missing.
-        active: !view.missing && view.url !== ""
+        active: !view.missing && view._url !== ""
 
         sourceComponent: view.isPlayer ? playerComponent
-                         : view.animatable ? animatedComponent
+                         : view._animatable ? animatedComponent
                          : stillComponent
     }
 
@@ -85,7 +112,7 @@ Item {
         id: stillComponent
 
         Image {
-            source: view.url
+            source: view._url
 
             fillMode: Image.PreserveAspectFit
             autoTransform: true         // EXIF orientation
@@ -105,7 +132,7 @@ Item {
         id: animatedComponent
 
         AnimatedImage {
-            source: view.url
+            source: view._url
 
             fillMode: Image.PreserveAspectFit
             autoTransform: true
@@ -141,7 +168,7 @@ Item {
             MediaPlayer {
                 id: mediaPlayer
 
-                source: view.url
+                source: view._url
 
                 videoOutput: videoOutput
                 audioOutput: AudioOutput {
@@ -152,6 +179,13 @@ Item {
                 loops: view.loop ? MediaPlayer.Infinite : 1
 
                 onErrorOccurred: playerItem.failed = true
+
+                // A new source resets the player to StoppedState, which
+                // would drop the play() requested for the previous one.
+                onSourceChanged: {
+                    playerItem.failed = false
+                    playerItem.sync()
+                }
             }
 
             VideoOutput {
@@ -171,7 +205,7 @@ Item {
             Rectangle {
                 anchors.fill: parent
 
-                visible: view.type === "audio"
+                visible: view._type === "audio"
 
                 color: "#262a33"
 
