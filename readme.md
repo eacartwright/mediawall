@@ -1,4 +1,4 @@
-# Media Wall — Complete Project Design Document
+# MediaWall — Complete Project Design Document
 
 **Last updated:** 2026-09-22 20:54 EDT  
 **Project status:** Working prototype: scene model, browsing, images, GIFs, video, containers, save/load, undo/redo  
@@ -15,7 +15,7 @@
 
 ## 1.1 Concept
 
-Media Wall is a local desktop application for creating interactive multimedia walls, digital scrapbooks, visual installations, presentations, and live media compositions.
+MediaWall is a local desktop application for creating interactive multimedia walls, digital scrapbooks, visual installations, presentations, and live media compositions.
 
 The central concept is a large visual canvas on which the user can arrange media and viewports rather than a conventional document editor.
 
@@ -314,6 +314,8 @@ Independent width/height transformations are permitted.
 The source is deliberately stretched to fill the object's dimensions.
 
 The default should be aspect-ratio preserving.
+
+**Decision (2026-09-26):** free media always keeps its aspect ratio; the other display modes are not planned. Contain and Cover exist where they matter, as a container's Fit Content / Fill Container, and cropping is done with Crop / Zoom Inside (section 5.2).
 
 ---
 
@@ -845,7 +847,7 @@ Panels find a video's player (for its position) through a registry on the scene 
 
 **Audio tracks** (MP3, M4A, and other audio files) are added from a Browser: double-click the preview, or use **Add to Audio** (the Add to Canvas button's label for audio files). A track is an object of type `audio` with a source and the same playback settings as a video, saved and undoable like any other object, but with no place on the canvas: no geometry, no stacking, not in the Layers list (`NON_VISUAL_TYPES` in `core/scene.py`). On the QML side it is a row of `sceneModel` whose delegate (`AudioTrackObject.qml`) draws nothing and only hosts a player. Tracks start **audible and looping** (canvas videos start muted). They are listed first in the Audio tab, with a ✕ to remove them and, if the file is missing, **Locate…**. Adding a track opens the Audio tab and pauses the browser's preview of that file, so it isn't heard twice. Audio previews in a browser are audible by default, with their own mute state separate from video previews.
 
-Not yet: video-as-audio, solo, per-track audio stream selection, mouse-wheel volume over a whole row (the wheel works over the volume slider; elsewhere it scrolls the list).
+Not yet: video-as-audio (next). The mouse wheel changes volume only over a card's volume slider; elsewhere it scrolls the list. Solo and audio stream selection were dropped.
 
 ---
 
@@ -1665,8 +1667,8 @@ Windows:  venv\Scripts\python.exe tools\create_launchers.py [--desktop] [--start
 Linux:    venv/bin/python tools/create_launchers.py [--desktop]
 ```
 
-- **Windows** gets `Media Wall.lnk` (no terminal window) and `Media Wall (debug).lnk` (terminal stays open after exit) in the project folder, and optionally on the Desktop / in the Start Menu. The shortcuts are machine-specific and not committed. `Media Wall.lnk` runs `launcher.pyw`, which starts `main.py` with a *hidden* console rather than none, because on Windows FFmpeg's output can only be captured when the process has a console.
-- **Linux** gets "Media Wall" and "Media Wall (debug)" in the application menu (`~/.local/share/applications`), and optionally on the Desktop. The debug entry runs `tools/run_debug.sh` in a terminal.
+- **Windows** gets `MediaWall.lnk` (no terminal window) and `MediaWall (debug).lnk` (terminal stays open after exit) in the project folder, and optionally on the Desktop / in the Start Menu. The shortcuts are machine-specific and not committed. `MediaWall.lnk` runs `launcher.pyw`, which starts `main.py` with a *hidden* console rather than none, because on Windows FFmpeg's output can only be captured when the process has a console.
+- **Linux** gets "MediaWall" and "MediaWall (debug)" in the application menu (`~/.local/share/applications`), and optionally on the Desktop. The debug entry runs `tools/run_debug.sh` in a terminal.
 
 ### Log window
 
@@ -1688,7 +1690,7 @@ python -m unittest
 
 The tests cover `core/` only and need no display or Qt, so they run in milliseconds. Run them after any change to `core/`.
 
-Do not depend on any other project's virtual environment (for example ComfyUI's). Media Wall has its own environment and dependency set.
+Do not depend on any other project's virtual environment (for example ComfyUI's). MediaWall has its own environment and dependency set.
 
 ---
 
@@ -1805,7 +1807,7 @@ All of the above exist. Object state lives in a Python scene model (`core/scene.
 
 ---
 
-## Phase 2 — Real media — **Partial**
+## Phase 2 — Real media — **Done**
 
 Implement:
 
@@ -1818,7 +1820,7 @@ Implement:
 - cloning
 - missing-file handling
 
-Done: image loading, image objects, filesystem paths, aspect-preserving scaling, rotation, EXIF orientation (phone photos appear upright, and objects are sized to the rotated dimensions), animated GIF/WebP playback with per-instance pause/play, and one shared `MediaSource` per file (the basis for cloning). Remaining: contain/cover modes, a Clone command, missing-file handling.
+Done: image loading, image objects, filesystem paths, aspect-preserving scaling, rotation, EXIF orientation (phone photos appear upright, and objects are sized to the rotated dimensions), animated GIF/WebP playback with per-instance pause/play, one shared `MediaSource` per file, cloning (Duplicate / Ctrl+D makes a new instance of the same source), and missing-file handling (Missing file box, Locate Missing File). Contain/cover display modes for free media were dropped (section 5.1).
 
 ---
 
@@ -1855,7 +1857,7 @@ Done: JSON project files (`.mediawall`) with a format name and version number; s
 
 ---
 
-## Phase 5 — Layouts — **Not started**
+## Phase 5 — Layouts — **Not started** (kept on the roadmap; section 51)
 
 Implement:
 
@@ -1882,11 +1884,11 @@ Implement:
 - Make Container
 - Add as Slideshow
 
-Done: folder selection, file discovery with optional subfolders, supported-media filtering, current item, previous/next (buttons and mouse wheel), image preview, Add to Canvas, and browser state stored in the scene model. Remaining: video preview, Add to Selected Container, Make Container, Add as Slideshow.
+Done: folder selection, file discovery with optional subfolders, supported-media filtering, current item, previous/next (buttons and mouse wheel), image, GIF, video, and audio preview, preview zoom, Add to Canvas (or double-click), Add to Container (for the selected empty container), Add to Audio for audio files, and browser state stored in the scene model. Remaining (back burner, with slideshows): Make Container, Add as Slideshow.
 
 ---
 
-## Phase 7 — Collections — **Not started**
+## Phase 7 — Collections — **Not started** (back burner)
 
 Implement:
 
@@ -1921,7 +1923,7 @@ Done: all of the above, through the shared `MediaView` component, so video works
 
 Done: audio tracks (MP3/M4A etc., added from a browser), audio preview, and per-video / per-track volume, mute, loop, speed, pitch behavior, and A-B loop, in the sidebar's Audio tab (section 14.5).
 
-Remaining: video-as-audio, solo, audio stream selection.
+Remaining: video-as-audio (next). Solo and choosing between several audio streams in one file were dropped (section 55).
 
 Implement:
 
@@ -1942,13 +1944,15 @@ Implement:
 
 Done: Full Screen and Present modes, hidden editor UI, view-only canvas, keyboard shortcuts and a mouse-only exit (section 15). Browsers stay visible in Present by choice.
 
-Remaining: hiding the mouse cursor while idle, scaling the wall to screens of a different size.
+Remaining: hiding the mouse cursor while idle (planned, if easy). Scaling the wall to other screen sizes is not planned: positions are in screen units from the top-left, so a wall made on a 1080p screen opens at the same size on a 4K screen, top-left, with more canvas around it; a wall spanning two monitors is better done as a separate MediaWall window/instance per screen.
 
 ---
 
 ## Phase 11 — Layers / Inspector — **Partial** (z-order operations and Layers panel)
 
 Done: z-order operations (grouped: browsers above everything), Layers panel with selection sync and Top/Up/Down/Bottom (section 23).
+
+Next: drag-to-reorder in the Layers panel. Later: the Inspector. Back burner: visibility and locking.
 
 Implement:
 
@@ -1961,7 +1965,7 @@ Implement:
 
 ---
 
-## Phase 12 — Advanced presentation features — **Not started**
+## Phase 12 — Advanced presentation features — **Not started** (back burner)
 
 Potential additions:
 
@@ -2292,12 +2296,46 @@ During a drag, resize, or rotate, QML moves the item directly so interaction sta
 
 ---
 
-# 51. Immediate Next Development Step
+# 51. Development Backlog
 
-Suggested order:
+Reviewed 2026-09-26. Keep this list current; it replaces the phase notes as the answer to "what next?".
 
-1. **Audio Rack (Phase 9).** Tracks, volume, mute, solo, loop, speed, pitch compensation, video-as-audio with audio-track selection. Design check first.
-2. **Presentation mode (Phase 10).**
+### Next
+
+1. **Video as audio** (section 14.2): use a video's sound as an audio track without showing its picture.
+2. **Drag-to-reorder in the Layers panel.**
+3. **Edge resize handles:** thin bars along each side (unlike the square corner handles), resizing one side at a time.
+4. **Adjust-mode ghost for video:** show the part of a video outside the container's frame, as images already do.
+5. **Browser folders found on another machine:** save a browser's folder relative to the project file too, as media sources already are.
+6. **Hide the mouse cursor while idle in Present**, if it's easy.
+
+### Soon
+
+- Arrow keys to nudge the selected object (Shift for bigger steps).
+- Keep undo history between sessions (open decision, section 55).
+
+### Later (kept on the roadmap)
+
+- **Layouts** (Phase 5): reusable canvas arrangements.
+- **Inspector** (Phase 11): exact position, size, and rotation.
+
+### Back burner
+
+- Collections (Phase 7).
+- Slideshows (section 13), with the browser's Make Container / Add as Slideshow; containers holding more than one item.
+- Advanced presentation features (Phase 12), including non-rectangular containers.
+- Layers: visibility and locking.
+- Rotation snapping (e.g. 15° steps).
+- Resize modifiers (e.g. Alt to resize around the center).
+- Background folder scanning (scanning is fast enough so far; revisit if large folders or network drives freeze the app).
+- Duplicate videos playing in sync / sharing one decoder (each instance decodes separately today).
+- Checking hardware video decoding on the target machines (the Log window shows Qt's "No HW decoder found" when it falls back to software).
+
+### Dropped
+
+- Contain/Cover/Free/Stretch display modes for free media (section 5.1).
+- Audio solo, and choosing between several audio streams in one file.
+- Scaling the wall to other screen sizes (Phase 10).
 
 ---
 
@@ -2349,7 +2387,7 @@ without duplicating files or creating conflicting state.
 The intended long-term architecture can be summarized as:
 
 ```text
-                         MEDIA WALL
+                         MEDIAWALL
                              │
                     ┌────────┴────────┐
                     │                 │
@@ -2416,7 +2454,7 @@ QML       Audio Rack
 
 # 54. Design Philosophy in One Sentence
 
-**Media Wall should let the user treat their filesystem as a huge media collection, browse and experiment with that collection directly on a visual canvas, arrange media into independent viewports and compositions, and then turn that workspace into a fullscreen multimedia presentation without copying or unnecessarily converting the original media.**
+**MediaWall should let the user treat their filesystem as a huge media collection, browse and experiment with that collection directly on a visual canvas, arrange media into independent viewports and compositions, and then turn that workspace into a fullscreen multimedia presentation without copying or unnecessarily converting the original media.**
 
 ---
 
@@ -2484,11 +2522,15 @@ The following design decisions are currently established:
 - Present mode keeps Browsers visible and usable; the rest of the canvas is view-only (2026-09-26).
 - Audio tracks are objects of type `audio` with no canvas presence; they start audible and looping (2026-09-26).
 - Speed changes pitch by default (Keep pitch off), as in Celluloid (2026-09-26).
+- The application's name is written **MediaWall** (one word) everywhere (2026-09-26).
+- Free media always keeps its aspect ratio; no Contain/Cover/Free/Stretch modes for it (2026-09-26).
+- No audio solo, and no choosing between audio streams in one file (2026-09-26).
+- The wall is not scaled to the screen: a larger screen shows more canvas, with the wall at the same size in the top-left; multi-monitor walls use one MediaWall instance per screen (2026-09-26).
 - The window uses 4x MSAA so rotated edges are smooth (2026-09-26).
 
 ### Open decisions
 
-None currently.
+- **Undo history between sessions:** where to keep it. The suggestion is a separate file next to the project (e.g. `japan.mediawall.history`), capped at about 50 steps, rather than inside the `.mediawall` file: each step is a whole-scene snapshot, a lost or damaged history file can't affect the project, and the project file stays small and readable.
 
 ---
 

@@ -329,7 +329,7 @@ ApplicationWindow {
                 }
 
                 Label {
-                    text: "Media Wall"
+                    text: "MediaWall"
                     color: "#dddddd"
                     font.pixelSize: 16
                 }

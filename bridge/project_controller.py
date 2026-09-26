@@ -14,7 +14,7 @@ from core.project import FILE_EXTENSION, ProjectError, load_project, save_projec
 from core.scene import Scene
 
 
-FILE_FILTER = f"Media Wall Project (*{FILE_EXTENSION});;All Files (*)"
+FILE_FILTER = f"MediaWall Project (*{FILE_EXTENSION});;All Files (*)"
 
 # Warnings beyond this many are summarized as "...and N more".
 MAX_LISTED_WARNINGS = 8
@@ -41,7 +41,7 @@ class ProjectController(QObject):
     def _get_title(self):
         name = Path(self._path).stem if self._path else "Untitled"
         star = "*" if self._dirty else ""
-        return f"{name}{star} — Media Wall"
+        return f"{name}{star} — MediaWall"
 
     title = Property(str, _get_title, notify=titleChanged)
 

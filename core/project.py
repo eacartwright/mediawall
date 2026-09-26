@@ -177,12 +177,12 @@ def _resolve_source_path(entry, project_dir):
 def scene_from_dict(data, project_path=None):
     """Return (scene, warnings). Raises ProjectError if data isn't a project."""
     if not isinstance(data, dict) or data.get("format") != FORMAT:
-        raise ProjectError("This file is not a Media Wall project.")
+        raise ProjectError("This file is not a MediaWall project.")
 
     version = data.get("version")
     if not isinstance(version, int) or version > VERSION:
         raise ProjectError(
-            f"This project was saved by a newer version of Media Wall "
+            f"This project was saved by a newer version of MediaWall "
             f"(format version {version!r})."
         )
 
@@ -313,6 +313,6 @@ def load_project(path):
     except OSError as exc:
         raise ProjectError(f"Couldn't open the file: {exc.strerror or exc}")
     except (json.JSONDecodeError, UnicodeDecodeError):
-        raise ProjectError("The file is damaged or not a Media Wall project.")
+        raise ProjectError("The file is damaged or not a MediaWall project.")
 
     return scene_from_dict(data, path)

@@ -8,7 +8,7 @@ import QtQuick.Layouts
 ApplicationWindow {
     id: logWindow
 
-    title: "Media Wall — Log"
+    title: "MediaWall — Log"
 
     width: 900
     height: 480
