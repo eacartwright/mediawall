@@ -12,7 +12,8 @@ Menu {
     property Item target: null
 
     readonly property string targetId: target ? target.objectId : ""
-    readonly property int targetZ: target ? target.z : 0
+    // The model's stacking position (browsers add a display offset to z).
+    readonly property int targetZ: target ? target.objZ : 0
 
     readonly property bool atFront: targetZ >= sceneModel.count
     readonly property bool atBack: targetZ <= 1

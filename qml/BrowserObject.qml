@@ -1,11 +1,16 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
+import "Zoom.js" as Zoom
 
 // Browse Object: a workspace object for browsing a folder on the canvas.
 //
 // The model stores the folder and current index (so browsing state can
 // be restored). The file list itself is rescanned from the folder.
+//
+// Layout: a header (drag it to move the browser) above a see-through
+// preview, with the navigation buttons overlaid on the preview's bottom
+// edge. Browsers always draw above other canvas objects.
 
 Rectangle {
     id: root
@@ -34,9 +39,13 @@ Rectangle {
     width: objWidth
     height: objHeight
     rotation: objRotation
-    z: objZ
 
-    color: "#292929"
+    // Always above other objects (they use z 1..count). Browsers still
+    // stack among themselves by objZ. Adjust-mode toolbars sit higher.
+    z: 1000000 + objZ
+
+    // Mostly see-through behind the media, so the canvas shows.
+    color: "transparent"
 
     border.color: selected ? "#5da9ff" : "#555555"
     border.width: selected ? 2 : 1
@@ -82,7 +91,10 @@ Rectangle {
     // them. Mute carries over. Keyed on the path so a rescan that keeps
     // the same file doesn't restart it.
     readonly property string currentPath: currentEntry ? currentEntry.path : ""
-    onCurrentPathChanged: previewPlaying = true
+    onCurrentPathChanged: {
+        previewPlaying = true
+        resetZoom()
+    }
 
     // Relative path, so you can see which subfolder a file is in.
     readonly property string currentFileName:
@@ -94,6 +106,44 @@ Rectangle {
 
         var parts = folder.split(/[\\/]/).filter(function(p) { return p !== "" })
         return parts.length > 0 ? parts[parts.length - 1] : folder
+    }
+
+    // -------------------------------------------------
+    // Preview zoom (transient; resets when the file changes)
+    //
+    // The media box is the preview's inset area scaled by previewZoom,
+    // with its center moved by (panX, panY).
+    // -------------------------------------------------
+
+    property real previewZoom: 1
+    property real panX: 0
+    property real panY: 0
+
+    readonly property real maxPreviewZoom: 20
+
+    function resetZoom() {
+        previewZoom = 1
+        panX = 0
+        panY = 0
+    }
+
+    // Zoom by factor f around (px, py) in preview coordinates.
+    function zoomPreviewAt(px, py, f) {
+        var newZoom = Math.max(1, Math.min(maxPreviewZoom, previewZoom * f))
+        if (newZoom === 1) {
+            resetZoom()
+            return
+        }
+
+        var k = newZoom / previewZoom
+        var baseCX = previewFrame.width / 2
+        var baseCY = previewFrame.height / 2
+        var cx = baseCX + panX
+        var cy = baseCY + panY
+
+        panX = px + (cx - px) * k - baseCX
+        panY = py + (cy - py) * k - baseCY
+        previewZoom = newZoom
     }
 
     readonly property string positionText:
@@ -185,13 +235,13 @@ Rectangle {
 
 
     // -------------------------------------------------
-    // Dragging (below all browser content)
+    // Dragging: by the header only (below its controls)
     // -------------------------------------------------
 
     MouseArea {
         id: dragArea
 
-        anchors.fill: parent
+        anchors.fill: header
 
         z: -1
 
@@ -261,13 +311,30 @@ Rectangle {
             spacing: 4
 
             Text {
+                Layout.maximumWidth: implicitWidth
+
+                // Shrinks (elides) before the filename does.
                 Layout.fillWidth: true
+                Layout.horizontalStretchFactor: 1
 
                 text: root.folderName
 
                 color: "#eeeeee"
                 font.pixelSize: 14
                 elide: Text.ElideRight
+            }
+
+            // Relative path, so you can see which subfolder a file is in.
+            Text {
+                Layout.fillWidth: true
+                Layout.horizontalStretchFactor: 3
+
+                visible: text !== ""
+                text: root.currentFileName
+
+                color: "#999999"
+                font.pixelSize: 12
+                elide: Text.ElideMiddle
             }
 
             // Indicator-only checkbox plus our own label, so the text
@@ -313,31 +380,55 @@ Rectangle {
                         root.loadFolder(chosen)
                 }
             }
+
+            // Close = delete (a browser is a workspace object; undoable).
+            Button {
+                Layout.preferredWidth: 26
+                Layout.preferredHeight: 26
+
+                text: "✕"
+
+                onClicked: sceneModel.removeObject(root.objectId)
+            }
         }
     }
 
 
     // -------------------------------------------------
     // Preview
+    //
+    // Wheel: previous/next file. Left button + wheel: zoom around the
+    // pointer; left-drag pans while zoomed. Double-click: add to canvas.
     // -------------------------------------------------
 
     Rectangle {
-        id: previewArea
+        id: previewFrame
 
         anchors.top: header.bottom
         anchors.left: parent.left
         anchors.right: parent.right
-        anchors.bottom: controls.top
+        anchors.bottom: parent.bottom
         anchors.leftMargin: 1
         anchors.rightMargin: 1
+        anchors.bottomMargin: 1
 
-        color: "#202020"
+        // About 90% transparent.
+        color: "#1a202020"
+
+        clip: true
+
+        // The inset area the media fits into at zoom 1.
+        readonly property real inset: 8
+        readonly property real baseW: width - 2 * inset
+        readonly property real baseH: height - 2 * inset
 
         MediaView {
             id: previewView
 
-            anchors.fill: parent
-            anchors.margins: 8
+            width: previewFrame.baseW * root.previewZoom
+            height: previewFrame.baseH * root.previewZoom
+            x: previewFrame.width / 2 + root.panX - width / 2
+            y: previewFrame.height / 2 + root.panY - height / 2
 
             visible: root.currentEntry !== null
 
@@ -352,9 +443,22 @@ Rectangle {
             loop: true
         }
 
+        // Backing for the message, since the preview is see-through.
+        Rectangle {
+            anchors.fill: emptyText
+            anchors.margins: -12
+
+            visible: emptyText.visible
+
+            color: "#cc202020"
+            radius: 4
+        }
+
         Text {
+            id: emptyText
+
             anchors.centerIn: parent
-            width: parent.width - 24
+            width: parent.width - 48
 
             visible: root.currentEntry === null
 
@@ -374,131 +478,160 @@ Rectangle {
 
             horizontalAlignment: Text.AlignHCenter
 
-            color: "#888888"
+            color: "#aaaaaa"
             font.pixelSize: 15
         }
 
-        // Mouse wheel navigation
         MouseArea {
+            id: previewArea
+
             anchors.fill: parent
 
-            acceptedButtons: Qt.NoButton
+            acceptedButtons: Qt.LeftButton | Qt.RightButton
+
+            property point startMouse
+            property point startPan
+
+            onPressed: function(mouse) {
+                sceneModel.select(root.objectId)
+
+                if (mouse.button === Qt.RightButton) {
+                    if (root.contextMenu)
+                        root.contextMenu.openFor(root)
+                    return
+                }
+
+                startMouse = Qt.point(mouse.x, mouse.y)
+                startPan = Qt.point(root.panX, root.panY)
+            }
+
+            onPositionChanged: function(mouse) {
+                if (!(pressedButtons & Qt.LeftButton) || root.previewZoom === 1)
+                    return
+
+                root.panX = startPan.x + (mouse.x - startMouse.x)
+                root.panY = startPan.y + (mouse.y - startMouse.y)
+            }
+
+            onDoubleClicked: function(mouse) {
+                if (mouse.button === Qt.LeftButton)
+                    root.addCurrentToCanvas()
+            }
 
             onWheel: function(wheel) {
-                if (wheel.angleDelta.y > 0)
+                if (wheel.angleDelta.y === 0)
+                    return
+
+                if (wheel.buttons & Qt.LeftButton) {
+                    root.zoomPreviewAt(wheel.x, wheel.y,
+                                       Zoom.wheelFactor(wheel.angleDelta.y))
+                } else if (wheel.angleDelta.y > 0) {
                     root.previousMedia()
-                else if (wheel.angleDelta.y < 0)
+                } else {
                     root.nextMedia()
+                }
             }
         }
 
-        VideoControls {
+
+        // ---- Overlays on the preview's bottom edge ----
+
+        Column {
             anchors.left: parent.left
             anchors.right: parent.right
             anchors.bottom: parent.bottom
-            anchors.margins: 6
-
-            visible: root.currentIsPlayer
-
-            view: previewView
-            playing: root.previewPlaying
-            muted: root.previewMuted
-
-            onTogglePlay: root.previewPlaying = !root.previewPlaying
-            onToggleMute: root.previewMuted = !root.previewMuted
-        }
-    }
-
-
-    // -------------------------------------------------
-    // Controls
-    // -------------------------------------------------
-
-    Rectangle {
-        id: controls
-
-        anchors.left: parent.left
-        anchors.right: parent.right
-        anchors.bottom: parent.bottom
-        anchors.margins: 1
-
-        height: 64
-
-        color: "#303030"
-
-        RowLayout {
-            anchors.left: parent.left
-            anchors.right: parent.right
-            anchors.top: parent.top
-
-            anchors.leftMargin: 20
+            anchors.leftMargin: 20       // clear of the corner handles
             anchors.rightMargin: 20
-            anchors.topMargin: 5
+            anchors.bottomMargin: 6
 
-            spacing: 6
+            spacing: 4
 
-            Button {
-                text: "◀"
-                enabled: root.mediaFiles.length > 0
-                onClicked: root.previousMedia()
+            VideoControls {
+                width: parent.width
+
+                visible: root.currentIsPlayer
+
+                view: previewView
+                playing: root.previewPlaying
+                muted: root.previewMuted
+
+                onTogglePlay: root.previewPlaying = !root.previewPlaying
+                onToggleMute: root.previewMuted = !root.previewMuted
             }
 
-            Button {
-                text: "▶"
-                enabled: root.mediaFiles.length > 0
-                onClicked: root.nextMedia()
+            Rectangle {
+                width: parent.width
+                height: navRow.implicitHeight + 8
+
+                color: "#dd202020"
+                radius: 4
+
+                // Absorb clicks between the buttons (so they don't pan
+                // or add to canvas); the wheel still navigates.
+                MouseArea {
+                    anchors.fill: parent
+                }
+
+                RowLayout {
+                    id: navRow
+
+                    anchors.fill: parent
+                    anchors.leftMargin: 4
+                    anchors.rightMargin: 8
+
+                    spacing: 4
+
+                    Button {
+                        Layout.preferredHeight: 26
+                        text: "◀"
+                        enabled: root.mediaFiles.length > 0
+                        onClicked: root.previousMedia()
+                    }
+
+                    Button {
+                        Layout.preferredHeight: 26
+                        text: "▶"
+                        enabled: root.mediaFiles.length > 0
+                        onClicked: root.nextMedia()
+                    }
+
+                    Button {
+                        Layout.preferredHeight: 26
+                        text: "Add to Canvas"
+                        enabled: root.canPlace
+                        onClicked: root.addCurrentToCanvas()
+                    }
+
+                    // Only while a container is selected (readme 9.3).
+                    Button {
+                        Layout.preferredHeight: 26
+
+                        text: "Add to Container"
+
+                        visible: sceneModel.selectedType === "container"
+
+                        // A full container must be emptied first.
+                        enabled: root.canPlace && !sceneModel.selectedHasContent
+
+                        onClicked: sceneModel.addMediaToContainer(
+                            root.currentEntry.path,
+                            root.currentEntry.type,
+                            sceneModel.selectedId
+                        )
+                    }
+
+                    Label {
+                        Layout.fillWidth: true
+
+                        text: root.positionText
+
+                        color: "#cccccc"
+
+                        horizontalAlignment: Text.AlignRight
+                        elide: Text.ElideLeft
+                    }
+                }
             }
-
-            Button {
-                text: "Add to Canvas"
-                enabled: root.canPlace
-                onClicked: root.addCurrentToCanvas()
-            }
-
-            // Only while a container is selected (readme 9.3).
-            Button {
-                text: "Add to Container"
-
-                visible: sceneModel.selectedType === "container"
-
-                // A full container must be emptied first.
-                enabled: root.canPlace && !sceneModel.selectedHasContent
-
-                onClicked: sceneModel.addMediaToContainer(
-                    root.currentEntry.path,
-                    root.currentEntry.type,
-                    sceneModel.selectedId
-                )
-            }
-
-            Label {
-                Layout.fillWidth: true
-
-                text: root.positionText
-
-                color: "#cccccc"
-
-                horizontalAlignment: Text.AlignHCenter
-                elide: Text.ElideMiddle
-            }
-        }
-
-        Text {
-            anchors.left: parent.left
-            anchors.right: parent.right
-            anchors.bottom: parent.bottom
-
-            anchors.leftMargin: 20
-            anchors.rightMargin: 20
-            anchors.bottomMargin: 5
-
-            text: root.currentFileName
-
-            color: "#999999"
-            font.pixelSize: 11
-
-            horizontalAlignment: Text.AlignHCenter
-            elide: Text.ElideMiddle
         }
     }
 

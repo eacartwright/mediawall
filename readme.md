@@ -1306,6 +1306,27 @@ Potential controls:
 - use as audio
 - keep browser
 
+### Current layout (2026-09-26)
+
+The browser is kept compact, with the media as large as possible:
+
+```text
+┌─────────────────────────────────────────────┐
+│ Tokyo  street/IMG_0142.jpg  ☑ Subfolders [Choose Folder] [✕] │  ← header: drag here to move
+├─────────────────────────────────────────────┤
+│                                             │
+│        MEDIA PREVIEW (see-through)          │
+│                                             │
+│  [Pause] ───●────────── 0:12 / 1:40 [Mute]  │  ← videos/audio only
+│  [◀] [▶] [Add to Canvas] [Add to Container]  37 / 142 │  ← overlaid
+└─────────────────────────────────────────────┘
+```
+
+- The header shows the folder name and the current file's path relative to it. Only the header moves the browser; the ✕ closes (deletes) it, which can be undone.
+- The preview background is about 90% transparent, so the canvas shows around the media.
+- Browsers always draw above other canvas objects (they are workspace tools). Among themselves they keep their normal stacking order.
+- Over the preview: the wheel moves to the previous/next file; holding the left button while scrolling zooms around the pointer, and left-drag then pans. The zoom is temporary and resets when the file changes. Double-clicking adds the current file to the canvas.
+
 ---
 
 # 27. Browser as Temporary Workspace Object
@@ -2133,9 +2154,11 @@ Ctrl+Up           bring forward
 Ctrl+Down         send backward
 Ctrl+Shift+Down   send to back
 Mouse wheel       previous/next item (over a browser preview);
+Left button+wheel zoom a browser preview (then left-drag pans);
                   scale a selected free image or container around the pointer;
                   zoom content (over a container in Adjust mode)
 Double-click      enter Adjust mode (on a container with content);
+                  add the current file to the canvas (on a browser preview);
                   reset rotation to 0° (on the orange rotation knob)
 ```
 
@@ -2165,7 +2188,7 @@ The prototype currently provides:
 - a Python scene model that owns all object state; QML renders it
 - one `MediaSource` per file, referenced by media objects through `source_id`
 - random object IDs, so importing a layout can never cause ID collisions
-- Browse Objects: choose folder, optional subfolders, previous/next, image preview, Add to Canvas
+- Browse Objects: choose folder, optional subfolders, previous/next, preview with temporary zoom/pan, Add to Canvas (or double-click), close button; always drawn above other objects, with a see-through preview (section 26)
 - free media objects: move, aspect-locked resize, rotate
 - EXIF orientation applied to photos, on the canvas and in browser previews
 - animated GIF and WebP playback, on the canvas and in browser previews; each instance can be paused or played from its right-click menu
