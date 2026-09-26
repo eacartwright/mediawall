@@ -55,6 +55,10 @@ CLIP_SHAPES = {"rect"}      # future: "rounded", "ellipse", "path", ...
 FIT_CONTAIN = "contain"     # whole image visible inside the container
 FIT_COVER = "cover"         # container completely filled, edges cropped
 
+# Uniform scaling (wheel zoom) stops at these sizes.
+SCALE_MIN_SIDE = 20.0       # the shorter side
+SCALE_MAX_SIDE = 20000.0    # the longer side
+
 
 def new_id(prefix: str) -> str:
     # Random rather than sequential, so importing a layout into an
@@ -414,6 +418,49 @@ class Scene:
                 self._keep_content_in_place(obj, *new)
 
         obj.x, obj.y, obj.width, obj.height, obj.rotation = new
+        return True
+
+    def scale_object(self, object_id, px, py, factor) -> bool:
+        """
+        Scale a top-level object uniformly by `factor` around the scene
+        point (px, py), as wheel zoom does. Scaling about a point doesn't
+        depend on rotation, so only the center and size change.
+
+        A container's content scales with it whatever lock_content says,
+        so the view inside the frame stays exactly the same.
+        """
+        obj = self.get(object_id)
+        if obj is None or obj.parent_id is not None or factor <= 0:
+            return False
+
+        shorter = min(obj.width, obj.height)
+        longer = max(obj.width, obj.height)
+        if shorter <= 0:
+            return False
+
+        # Clamp only in the direction of change, so an object that is
+        # already past a limit can still be scaled back.
+        if factor < 1:
+            factor = max(factor, min(1.0, SCALE_MIN_SIDE / shorter))
+        else:
+            factor = min(factor, max(1.0, SCALE_MAX_SIDE / longer))
+
+        if factor == 1.0:
+            return False
+
+        cx, cy = obj.center
+        obj.width *= factor
+        obj.height *= factor
+        obj.x = px + (cx - px) * factor - obj.width / 2
+        obj.y = py + (cy - py) * factor - obj.height / 2
+
+        content = self.content_of(obj.id) if obj.type == "container" else None
+        if content is not None:
+            content.x *= factor
+            content.y *= factor
+            content.width *= factor
+            content.height *= factor
+
         return True
 
     def set_browser_state(self, object_id, folder, current_index) -> bool:

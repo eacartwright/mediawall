@@ -319,7 +319,7 @@ The default should be aspect-ratio preserving.
 
 ## 5.2 Zoom and crop (implemented)
 
-- **Scaling:** the mouse wheel over a *selected* free image scales it around the pointer, keeping its aspect ratio. This is an accelerator for the resize handle. Unselected objects ignore the wheel, so scrolling over the canvas never resizes things by accident.
+- **Scaling:** the mouse wheel over a *selected* free image scales it around the pointer, keeping its aspect ratio (5% per wheel notch, proportional for trackpads; the same step is used for all wheel zoom). This is an accelerator for the resize handle. Unselected objects ignore the wheel, so scrolling over the canvas never resizes things by accident.
 - **Cropping / zooming inside:** right-click → **Crop / Zoom Inside…** replaces the image with a container of exactly the same box, rotation, and stacking position, holding the image, and opens it in Adjust mode. Nothing visibly changes until you zoom or pan. Cropping is container behavior, so there is only one implementation of pan/zoom/crop.
 - Containers made this way start with **Scale Content with Container off**, so dragging the frame's corner crops the image instead of scaling it. **Release Content** turns it back into a plain free image.
 
@@ -425,9 +425,10 @@ This should be a property of the media/container relationship.
 
 - A container holds at most one media instance. The instance is an ordinary media object whose `parent_id` is the container, with its geometry in the container's local, unrotated coordinates (0, 0 = the container's top-left).
 - Moving media into or out of a container re-parents that same instance, so its state (e.g. paused) carries over.
-- Media gets into a container by dragging a free image onto it (the container highlights; holding Shift places the image on top instead), or by selecting the container and using a browser's **Add to Container** button. Replacing content releases the old content as a free object rather than deleting it.
+- Media gets into a container by dragging a free image onto it (the container highlights; holding Shift places the image on top instead), or by selecting the container and using a browser's **Add to Container** button. Only an empty container accepts media: a full one doesn't highlight as a drop target (the media lands on the canvas instead), and Add to Container is disabled for it. To change what a container holds, release or remove its content first.
 - New content is framed to fill the container (cover). **Fit Content** and **Fill Container** re-frame it and reset its rotation.
 - **Adjust mode** (double-click, or right-click → Adjust Content) turns dragging into panning, the mouse wheel into zoom around the pointer, and the rotation knob into content rotation. The part of the content outside the frame shows as a faint ghost, and a small toolbar offers Fit, Fill, and Done. The toolbar stays upright whatever the rotation, sits below the container (or above it when there's no room), and stays inside the visible canvas. Enter or Space also finishes adjusting, as do clicking elsewhere and Escape.
+- The mouse wheel over a *selected* container (outside Adjust mode) scales the whole container around the pointer, content included, so the view inside the frame doesn't change. This happens whether or not "Scale Content with Container" is on; that setting only affects the resize handles.
 - **Release Content** turns the content back into a free object at the position, size, and rotation it currently appears on the canvas. **Remove Content** deletes it. Deleting a container deletes its content.
 - Only top-level objects take part in z-order; content has none of its own.
 - Clipping is rectangular (`clip_shape: "rect"`, stored per container). Other shapes will replace the rectangular clip with a mask without changing the object model.
@@ -1650,7 +1651,8 @@ mediawall/
 │   ├── MediaErrorBox.qml   "Missing file" / "Can't display file" box
 │   ├── RotationHandle.qml  shared rotation knob
 │   ├── ResizeHandles.qml   shared four-corner resize handles
-│   └── ObjectContextMenu.qml  shared right-click menu
+│   ├── ObjectContextMenu.qml  shared right-click menu
+│   └── Zoom.js             shared mouse-wheel zoom step
 │
 └── tests/
     ├── __init__.py
@@ -2131,7 +2133,7 @@ Ctrl+Up           bring forward
 Ctrl+Down         send backward
 Ctrl+Shift+Down   send to back
 Mouse wheel       previous/next item (over a browser preview);
-                  scale a selected free image around the pointer;
+                  scale a selected free image or container around the pointer;
                   zoom content (over a container in Adjust mode)
 Double-click      enter Adjust mode (on a container with content);
                   reset rotation to 0° (on the orange rotation knob)
@@ -2170,7 +2172,8 @@ The prototype currently provides:
 - video on the canvas, in containers, and in browser previews, with per-instance play/pause, mute, and loop, and an on-object control bar when selected
 - audio previews in browsers
 - containers: move, resize, rotate; hold one clipped media instance with its own pan, zoom, and rotation (Adjust mode); fit/fill; locked or independent scaling; release/remove content
-- media can be dragged into containers, or added from a browser to a selected container
+- media can be dragged into empty containers, or added from a browser to a selected empty container
+- containers: scroll-wheel scaling around the pointer (when selected), content included
 - free images: scroll-wheel scaling around the pointer (when selected), and Crop / Zoom Inside, which wraps the image in a matching container
 - single selection; clicking empty canvas deselects
 - z-order and Delete through a right-click menu, plus shortcuts
@@ -2370,7 +2373,7 @@ The following design decisions are currently established:
 - Undo/redo uses whole-scene snapshots; browser state is excluded from undo.
 - Selection is not saved and does not mark the project as modified. A click that doesn't move anything also doesn't.
 - A container's content is a media instance with `parent_id` set to the container; its geometry is in container-local coordinates. Containers never store filenames.
-- A container holds at most one media instance. Replacing content releases the old instance as a free object.
+- A container holds at most one media instance, and a full container doesn't accept new media; its content must be released or removed first (2026-09-26). (`Scene.add_media_to_container` can still replace, releasing the old instance as a free object, but the UI never asks it to.)
 - New container content is framed to fill (cover).
 - "Scale Content with Container" (locked scaling) is on by default.
 - Only top-level objects take part in z-order.

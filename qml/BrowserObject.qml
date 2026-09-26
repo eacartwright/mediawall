@@ -460,7 +460,9 @@ Rectangle {
                 text: "Add to Container"
 
                 visible: sceneModel.selectedType === "container"
-                enabled: root.canPlace
+
+                // A full container must be emptied first.
+                enabled: root.canPlace && !sceneModel.selectedHasContent
 
                 onClicked: sceneModel.addMediaToContainer(
                     root.currentEntry.path,

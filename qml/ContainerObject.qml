@@ -1,5 +1,6 @@
 import QtQuick
 import QtQuick.Controls
+import "Zoom.js" as Zoom
 
 // Container: a viewport holding one media instance, clipped to its shape.
 //
@@ -304,9 +305,7 @@ Item {
                 anchors.centerIn: parent
                 width: parent.width - 24
 
-                text: root.hasContent
-                      ? "Release to replace content\n(hold Shift to place on top)"
-                      : "Release to place in container\n(hold Shift to place on top)"
+                text: "Release to place in container\n(hold Shift to place on top)"
 
                 color: "#dff5df"
                 font.pixelSize: 13
@@ -421,16 +420,23 @@ Item {
                 root.adjusting = true
         }
 
+        // Adjusting: zoom the content. Otherwise, when selected, scale
+        // the whole container (content included) like a free image.
         onWheel: function(wheel) {
-            if (!root.adjusting) {
+            if (wheel.angleDelta.y === 0 || !(root.adjusting || root.selected)) {
                 wheel.accepted = false
                 return
             }
 
-            if (wheel.angleDelta.y > 0)
-                root.zoomAt(wheel.x, wheel.y, 1.1)
-            else if (wheel.angleDelta.y < 0)
-                root.zoomAt(wheel.x, wheel.y, 1 / 1.1)
+            var f = Zoom.wheelFactor(wheel.angleDelta.y)
+
+            if (root.adjusting) {
+                root.zoomAt(wheel.x, wheel.y, f)
+            } else {
+                var p = area.mapToItem(root.sceneItem, wheel.x, wheel.y)
+                sceneModel.setMergeKey("scale:" + root.objectId)
+                sceneModel.scaleObject(root.objectId, p.x, p.y, f)
+            }
         }
     }
 

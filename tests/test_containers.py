@@ -253,5 +253,49 @@ class ContainerProjectTests(unittest.TestCase):
         self.assertEqual(len(warnings), 1)
 
 
+class ScaleObjectTests(unittest.TestCase):
+
+    def setUp(self):
+        self.scene = Scene()
+        self.src = self.scene.add_source("/pics/wide.jpg", "image", 400, 200)
+        self.box = self.scene.add_object("container", 100, 100)   # 360 x 260
+
+    def test_scales_around_point(self):
+        # Around the top-left corner: that corner stays put.
+        self.assertTrue(self.scene.scale_object(self.box.id, 100, 100, 2.0))
+        b = self.box
+        self.assertEqual((b.x, b.y, b.width, b.height), (100, 100, 720, 520))
+
+    def test_rotation_does_not_change_the_center_math(self):
+        self.box.rotation = 30
+        cx, cy = self.box.center
+        self.scene.scale_object(self.box.id, cx, cy, 0.5)
+        self.assertEqual(self.box.center, (cx, cy))
+        self.assertEqual(self.box.rotation, 30)
+
+    def test_content_scales_with_container_even_unlocked(self):
+        content, _ = self.scene.add_media_to_container(self.src.id, self.box.id)
+        self.scene.set_lock_content(self.box.id, False)
+        self.scene.set_content_geometry(self.box.id, -40, 10, 520, 260, 15)
+
+        self.scene.scale_object(self.box.id, 0, 0, 1.5)
+
+        self.assertEqual(
+            (content.x, content.y, content.width, content.height, content.rotation),
+            (-60, 15, 780, 390, 15))
+
+    def test_limits(self):
+        # 260 is the shorter side; it can't go below SCALE_MIN_SIDE.
+        self.scene.scale_object(self.box.id, 0, 0, 0.001)
+        self.assertAlmostEqual(self.box.height, 20)
+        self.assertFalse(self.scene.scale_object(self.box.id, 0, 0, 0.5))
+        # ...but can always grow back.
+        self.assertTrue(self.scene.scale_object(self.box.id, 0, 0, 2.0))
+
+    def test_content_cannot_be_scaled_directly(self):
+        content, _ = self.scene.add_media_to_container(self.src.id, self.box.id)
+        self.assertFalse(self.scene.scale_object(content.id, 0, 0, 2.0))
+
+
 if __name__ == "__main__":
     unittest.main()

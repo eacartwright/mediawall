@@ -171,6 +171,9 @@ class SceneModel(QAbstractListModel):
 
     historyChanged = Signal()
 
+    # The selected object's content changed (or the selection did).
+    selectedHasContentChanged = Signal()
+
     def __init__(self, scene=None, parent=None):
         super().__init__(parent)
         self._scene = scene if scene is not None else Scene()
@@ -317,6 +320,7 @@ class SceneModel(QAbstractListModel):
         self._current = snapshot(self._scene)
         self.modified.emit()
         self.historyChanged.emit()
+        self.selectedHasContentChanged.emit()
 
     @Slot(str)
     def setMergeKey(self, key):
@@ -415,6 +419,7 @@ class SceneModel(QAbstractListModel):
         self._current = snapshot(cur)
         self.countChanged.emit()
         self.selectedIdChanged.emit()
+        self.selectedHasContentChanged.emit()
         self.modified.emit()
         self.historyChanged.emit()
 
@@ -450,6 +455,14 @@ class SceneModel(QAbstractListModel):
 
     selectedType = Property(str, _get_selected_type, notify=selectedIdChanged)
 
+    def _get_selected_has_content(self):
+        selected = self._scene.selected_id
+        return bool(selected) and self._scene.content_of(selected) is not None
+
+    # True when the selected object is a container holding media.
+    selectedHasContent = Property(bool, _get_selected_has_content,
+                                  notify=selectedHasContentChanged)
+
     @Slot(str)
     def select(self, object_id):
         new = object_id or None
@@ -457,6 +470,7 @@ class SceneModel(QAbstractListModel):
             return
         if self._scene.select(new):
             self.selectedIdChanged.emit()
+            self.selectedHasContentChanged.emit()
 
     # -------------------------------------------------
     # Drop target (container highlighted while dragging media over it)
@@ -476,8 +490,15 @@ class SceneModel(QAbstractListModel):
 
     @Slot(float, float, str, result=str)
     def containerAt(self, x, y, exclude_id):
+        """
+        The empty container under a scene point, for dropping media.
+        A full container on top blocks the drop rather than letting it
+        reach one underneath: content is never replaced by dropping.
+        """
         obj = self._scene.container_at(x, y, exclude_id or None)
-        return obj.id if obj else ""
+        if obj is None or self._scene.content_of(obj.id) is not None:
+            return ""
+        return obj.id
 
     # -------------------------------------------------
     # Adding / removing
@@ -601,15 +622,12 @@ class SceneModel(QAbstractListModel):
 
     @Slot(str, str, str, result=str)
     def addMediaToContainer(self, path, media_type, container_id):
-        if self._row_of(container_id) < 0:
+        # A full container must be emptied first (release or remove).
+        if (self._row_of(container_id) < 0
+                or self._scene.content_of(container_id) is not None):
             return ""
 
         source = self._register_source(path, media_type)
-        previous = self._scene.content_of(container_id)
-
-        if previous is not None:
-            self._release_with_row(container_id, record=False)
-
         content, _ = self._scene.add_media_to_container(source.id, container_id)
         if content is None:
             return ""
@@ -623,11 +641,9 @@ class SceneModel(QAbstractListModel):
     def moveIntoContainer(self, media_id, container_id):
         media = self._scene.get(media_id)
         if (media is None or media.parent_id is not None
-                or self._row_of(container_id) < 0):
+                or self._row_of(container_id) < 0
+                or self._scene.content_of(container_id) is not None):
             return
-
-        if self._scene.content_of(container_id) is not None:
-            self._release_with_row(container_id, record=False)
 
         was_selected = self._scene.selected_id == media_id
 
@@ -647,7 +663,7 @@ class SceneModel(QAbstractListModel):
         if was_selected:
             self.selectedIdChanged.emit()
 
-    def _release_with_row(self, container_id, record=True):
+    def _release_with_row(self, container_id):
         content = self._scene.content_of(container_id)
         if content is None:
             return ""
@@ -659,8 +675,7 @@ class SceneModel(QAbstractListModel):
 
         self._emit_row(container_id, CONTENT_ROLES)
         self.countChanged.emit()
-        if record:
-            self._changed()
+        self._changed()
         return content.id
 
     @Slot(str, result=str)
@@ -735,6 +750,13 @@ class SceneModel(QAbstractListModel):
     def commitGeometry(self, object_id, x, y, width, height, rotation):
         if self._scene.set_geometry(object_id, x, y, width, height, rotation):
             # Resizing a locked container also rescales its content.
+            self._emit_row(object_id, GEOMETRY_ROLES + CONTENT_ROLES)
+            self._changed()
+
+    @Slot(str, float, float, float)
+    def scaleObject(self, object_id, px, py, factor):
+        """Wheel zoom: scale around a scene point (content included)."""
+        if self._scene.scale_object(object_id, px, py, factor):
             self._emit_row(object_id, GEOMETRY_ROLES + CONTENT_ROLES)
             self._changed()
 

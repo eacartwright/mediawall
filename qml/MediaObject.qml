@@ -1,4 +1,5 @@
 import QtQuick
+import "Zoom.js" as Zoom
 
 // A free media instance on the canvas.
 // State comes from sceneModel; interactions commit back on release.
@@ -77,25 +78,10 @@ Item {
 
 
     // Scale by factor f around a point in scene coordinates.
-    // Works for rotated objects too: scaling about a point doesn't
-    // depend on rotation, so only the center and size change.
     function scaleAround(px, py, f) {
-        var newWidth = Math.max(40, Math.min(20000, width * f))
-        var k = newWidth / width
-
-        var cx = x + width / 2
-        var cy = y + height / 2
-        var newCX = px + (cx - px) * k
-        var newCY = py + (cy - py) * k
-
-        width = width * k
-        height = height * k
-        x = newCX - width / 2
-        y = newCY - height / 2
-
         // A whole scroll becomes one undo step.
         sceneModel.setMergeKey("scale:" + objectId)
-        commit()
+        sceneModel.scaleObject(objectId, px, py, f)
     }
 
 
@@ -265,9 +251,8 @@ Item {
                 return
             }
 
-            var f = wheel.angleDelta.y > 0 ? 1.1 : 1 / 1.1
             var p = moveArea.mapToItem(root.sceneItem, wheel.x, wheel.y)
-            root.scaleAround(p.x, p.y, f)
+            root.scaleAround(p.x, p.y, Zoom.wheelFactor(wheel.angleDelta.y))
         }
 
         onCanceled: {
