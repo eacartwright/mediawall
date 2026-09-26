@@ -355,6 +355,31 @@ ApplicationWindow {
             // view-only and show no selection; browsers keep working.
             readonly property bool presenting: window.presenting
 
+            // Media players by media instance id, so panels and menus
+            // can read a player's position (e.g. to set A-B loop points).
+            // mediaViewsVersion changes whenever the set changes, so
+            // bindings that look views up re-evaluate.
+            property var mediaViews: ({})
+            property int mediaViewsVersion: 0
+
+            function registerView(mediaId, view) {
+                if (!mediaId)
+                    return
+                mediaViews[mediaId] = view
+                mediaViewsVersion++
+            }
+
+            function unregisterView(mediaId, view) {
+                if (mediaId && mediaViews[mediaId] === view) {
+                    delete mediaViews[mediaId]
+                    mediaViewsVersion++
+                }
+            }
+
+            function viewFor(mediaId) {
+                return mediaViews[mediaId] || null
+            }
+
 
             // Clicking empty canvas clears the selection.
             // Right-clicking it opens the canvas menu.
@@ -441,6 +466,8 @@ ApplicationWindow {
         // -------------------------------------------------
 
         Sidebar {
+            sceneItem: scene
+
             anchors.top: toolbar.visible ? toolbar.bottom : parent.top
             anchors.bottom: parent.bottom
             anchors.right: parent.right

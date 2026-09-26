@@ -25,7 +25,8 @@ import tempfile
 from pathlib import Path
 
 from core.scene import (
-    CLIP_SHAPES, OBJECT_TYPES, MediaSource, Scene, SceneObject, new_id,
+    CLIP_SHAPES, OBJECT_TYPES, MediaSource, Scene, SceneObject,
+    clamp_speed, new_id, normalized_loop,
 )
 
 
@@ -37,7 +38,8 @@ FILE_EXTENSION = ".mediawall"
 COMMON_FIELDS = ["id", "type", "x", "y", "width", "height", "rotation", "z"]
 
 TYPE_FIELDS = {
-    "media": ["source_id", "playing", "parent_id", "muted", "volume", "loop"],
+    "media": ["source_id", "playing", "parent_id", "muted", "volume", "loop",
+              "speed", "preserve_pitch", "loop_a", "loop_b"],
     "browser": ["folder", "current_index", "include_subfolders"],
     "container": ["lock_content", "clip_shape"],
 }
@@ -248,6 +250,14 @@ def scene_from_dict(data, project_path=None):
         if object_type == "media" and obj.source_id not in scene.sources:
             warnings.append("Skipped a media object whose source is unknown.")
             continue
+
+        if object_type == "media":
+            obj.volume = min(1.0, max(0.0, obj.volume))
+            obj.speed = clamp_speed(obj.speed)
+            obj.loop_a, obj.loop_b = normalized_loop(obj.loop_a, obj.loop_b)
+            if obj.loop_a is None:
+                warnings.append("Ignored an A-B loop with points too close together.")
+                obj.loop_a = obj.loop_b = -1.0
 
         if object_type == "container" and obj.clip_shape not in CLIP_SHAPES:
             warnings.append(

@@ -20,6 +20,10 @@ Item {
     required property bool objMuted
     required property real objVolume
     required property bool objLoop
+    required property real objSpeed
+    required property bool objPreservePitch
+    required property real objLoopA
+    required property real objLoopB
     required property string sourceId
     required property string sourceType
     required property string sourceUrl
@@ -49,6 +53,8 @@ Item {
     readonly property bool isVideo: sourceType === "video"
     readonly property bool mediaMuted: objMuted
     readonly property bool mediaLoop: objLoop
+    readonly property real mediaLoopA: objLoopA
+    readonly property real mediaLoopB: objLoopB
     readonly property string playbackId: objectId
     readonly property bool isFreeMedia: true
     readonly property var mediaView: view
@@ -109,8 +115,15 @@ Item {
         muted: root.objMuted
         volume: root.objVolume
         loop: root.objLoop
+        speed: root.objSpeed
+        preservePitch: root.objPreservePitch
+        loopA: root.objLoopA
+        loopB: root.objLoopB
         name: root.sourceName
         path: root.sourcePath
+
+        Component.onCompleted: if (root.sceneItem) root.sceneItem.registerView(root.objectId, view)
+        Component.onDestruction: if (root.sceneItem) root.sceneItem.unregisterView(root.objectId, view)
 
         // Videos (and images whose size couldn't be read up front)
         // report their real size here; Python resizes placeholders.

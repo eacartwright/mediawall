@@ -61,6 +61,52 @@ class VideoSceneTests(unittest.TestCase):
         self.assertEqual(media.volume, 1.0)                     # clamped
         self.assertFalse(self.scene.set_media_option(media.id, "rotation", 5))
 
+    def test_speed_and_pitch(self):
+        media = self.scene.add_media(self.src.id, 0, 0)
+        self.assertEqual((media.speed, media.preserve_pitch), (1.0, False))
+        self.scene.set_media_option(media.id, "speed", 10)
+        self.assertEqual(media.speed, 4.0)                      # clamped
+        self.scene.set_media_option(media.id, "speed", 0.1)
+        self.assertEqual(media.speed, 0.25)
+        self.assertTrue(self.scene.set_media_option(media.id, "preserve_pitch", True))
+
+    def test_loop_points(self):
+        media = self.scene.add_media(self.src.id, 0, 0)
+        self.assertEqual((media.loop_a, media.loop_b), (-1.0, -1.0))
+
+        self.assertTrue(self.scene.set_loop(media.id, 5000, -1))    # A only
+        self.assertEqual((media.loop_a, media.loop_b), (5000, -1))
+
+        self.assertTrue(self.scene.set_loop(media.id, 5000, 2000))  # B before A
+        self.assertEqual((media.loop_a, media.loop_b), (2000, 5000))
+
+        self.assertFalse(self.scene.set_loop(media.id, 2000, 2050)) # too close
+        self.assertEqual((media.loop_a, media.loop_b), (2000, 5000))
+
+        self.assertTrue(self.scene.set_loop(media.id, -1, -1))      # clear
+        self.assertEqual((media.loop_a, media.loop_b), (-1.0, -1.0))
+
+    def test_playback_options_saved_and_sanitized(self):
+        from core.project import scene_from_dict, scene_to_dict
+
+        media = self.scene.add_media(self.src.id, 0, 0)
+        self.scene.set_media_option(media.id, "speed", 1.5)
+        self.scene.set_media_option(media.id, "preserve_pitch", True)
+        self.scene.set_loop(media.id, 1000, 3000)
+
+        data = scene_to_dict(self.scene)
+        loaded, warnings = scene_from_dict(data)
+        m = loaded.get(media.id)
+        self.assertEqual((m.speed, m.preserve_pitch, m.loop_a, m.loop_b),
+                         (1.5, True, 1000, 3000))
+        self.assertEqual(warnings, [])
+
+        # Hand-edited nonsense is repaired on load.
+        raw = next(o for o in data["objects"] if o["id"] == media.id)
+        raw.update(speed=99.0, loop_a=3000.0, loop_b=3010.0)
+        m = scene_from_dict(data)[0].get(media.id)
+        self.assertEqual((m.speed, m.loop_a, m.loop_b), (4.0, -1.0, -1.0))
+
 
 if __name__ == "__main__":
     unittest.main()

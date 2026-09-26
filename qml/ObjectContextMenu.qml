@@ -137,6 +137,51 @@ Menu {
         }
     }
 
+    // ---- A-B loop (video): points are set at the current position ----
+
+    readonly property bool targetHasLoopPoints:
+        targetVideo && (target.mediaLoopA >= 0 || target.mediaLoopB >= 0)
+
+    function formatMs(ms) {
+        var t = Math.max(0, ms) / 1000
+        var m = Math.floor(t / 60)
+        var sec = (t - m * 60).toFixed(1)
+        return m + ":" + (sec < 10 ? "0" : "") + sec
+    }
+
+    MenuItem {
+        text: "Set Loop Start (A) Here"
+              + (menu.targetVideo && menu.target.mediaLoopA >= 0
+                 ? "   [" + menu.formatMs(menu.target.mediaLoopA) + "]" : "")
+
+        visible: menu.targetVideo
+        height: visible ? implicitHeight : 0
+
+        onTriggered: sceneModel.setLoopA(menu.target.playbackId,
+                                         menu.target.mediaView.position)
+    }
+
+    MenuItem {
+        text: "Set Loop End (B) Here"
+              + (menu.targetVideo && menu.target.mediaLoopB >= 0
+                 ? "   [" + menu.formatMs(menu.target.mediaLoopB) + "]" : "")
+
+        visible: menu.targetVideo
+        height: visible ? implicitHeight : 0
+
+        onTriggered: sceneModel.setLoopB(menu.target.playbackId,
+                                         menu.target.mediaView.position)
+    }
+
+    MenuItem {
+        text: "Clear A–B Loop"
+
+        visible: menu.targetHasLoopPoints
+        height: visible ? implicitHeight : 0
+
+        onTriggered: sceneModel.clearLoop(menu.target.playbackId)
+    }
+
     MenuSeparator {
         visible: menu.targetAnimated || menu.targetVideo
         height: visible ? implicitHeight : 0

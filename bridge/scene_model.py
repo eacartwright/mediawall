@@ -15,6 +15,7 @@ from pathlib import Path
 
 from PySide6.QtCore import (
     Property,
+    QObject,
     QAbstractListModel,
     QByteArray,
     QModelIndex,
@@ -25,6 +26,7 @@ from PySide6.QtCore import (
 from PySide6.QtGui import QImageIOHandler, QImageReader
 from PySide6.QtWidgets import QFileDialog, QMessageBox
 
+from bridge.audio_model import AudioModel
 from core.history import History, snapshot
 from core.media_browser import (
     AUDIO_EXTENSIONS, IMAGE_EXTENSIONS, VIDEO_EXTENSIONS, is_animatable,
@@ -59,6 +61,10 @@ OBJECT_ROLE_NAMES = [
     "objMuted",
     "objVolume",
     "objLoop",
+    "objSpeed",
+    "objPreservePitch",
+    "objLoopA",
+    "objLoopB",
     "folder",
     "currentIndex",
     "includeSubfolders",
@@ -75,7 +81,8 @@ SOURCE_FIELDS = ["Id", "Type", "Path", "Url", "Width", "Height", "Animatable",
 CONTENT_ROLE_NAMES = (
     ["contentId", "contentX", "contentY", "contentWidth", "contentHeight",
      "contentRotation", "contentPlaying", "contentMuted", "contentVolume",
-     "contentLoop"]
+     "contentLoop", "contentSpeed", "contentPreservePitch", "contentLoopA",
+     "contentLoopB"]
     + ["contentSource" + f for f in SOURCE_FIELDS]
 )
 
@@ -93,7 +100,8 @@ BROWSER_ROLES = [ROLES[n] for n in
                  ("folder", "currentIndex", "includeSubfolders")]
 Z_ROLES = [ROLES["objZ"]]
 PLAYBACK_ROLES = [ROLES[n] for n in
-                  ("objPlaying", "objMuted", "objVolume", "objLoop")]
+                  ("objPlaying", "objMuted", "objVolume", "objLoop",
+                   "objSpeed", "objPreservePitch", "objLoopA", "objLoopB")]
 SOURCE_ROLES = [ROLES["source" + f] for f in SOURCE_FIELDS]
 CONTAINER_ROLES = [ROLES["lockContent"], ROLES["clipShape"]]
 CONTENT_ROLES = [ROLES[n] for n in CONTENT_ROLE_NAMES]
@@ -188,9 +196,18 @@ class SceneModel(QAbstractListModel):
         self._current = snapshot(self._scene)
         self._merge_key = None
 
+        self._audio_model = AudioModel(self)
+        self._audio_model.refresh()
+
     @property
     def scene(self):
         return self._scene
+
+    def _get_audio_items(self):
+        return self._audio_model
+
+    # Every video/audio instance, for the sidebar's Audio tab.
+    audioItems = Property(QObject, _get_audio_items, constant=True)
 
     # -------------------------------------------------
     # Rows = top-level objects
@@ -253,7 +270,9 @@ class SceneModel(QAbstractListModel):
             if content is None:
                 return {"contentId": "", "contentPlaying": True,
                         "contentMuted": True, "contentLoop": True,
-                        "contentVolume": 1.0}.get(name, 0.0)
+                        "contentVolume": 1.0, "contentSpeed": 1.0,
+                        "contentPreservePitch": False, "contentLoopA": -1.0,
+                        "contentLoopB": -1.0}.get(name, 0.0)
             return {
                 "contentId": content.id,
                 "contentX": content.x,
@@ -265,6 +284,10 @@ class SceneModel(QAbstractListModel):
                 "contentMuted": content.muted,
                 "contentVolume": content.volume,
                 "contentLoop": content.loop,
+                "contentSpeed": content.speed,
+                "contentPreservePitch": content.preserve_pitch,
+                "contentLoopA": content.loop_a,
+                "contentLoopB": content.loop_b,
             }[name]
 
         if name.startswith("source"):
@@ -284,6 +307,10 @@ class SceneModel(QAbstractListModel):
             "objMuted": obj.muted,
             "objVolume": obj.volume,
             "objLoop": obj.loop,
+            "objSpeed": obj.speed,
+            "objPreservePitch": obj.preserve_pitch,
+            "objLoopA": obj.loop_a,
+            "objLoopB": obj.loop_b,
             "folder": obj.folder,
             "currentIndex": obj.current_index,
             "includeSubfolders": obj.include_subfolders,
@@ -309,6 +336,7 @@ class SceneModel(QAbstractListModel):
         self.selectedIdChanged.emit()
         self.selectionStateChanged.emit()
         self.layersChanged.emit()
+        self._audio_model.refresh()
 
     # -------------------------------------------------
     # Change recording (undo history + "modified")
@@ -328,6 +356,7 @@ class SceneModel(QAbstractListModel):
         self.historyChanged.emit()
         self.selectionStateChanged.emit()
         self.layersChanged.emit()
+        self._audio_model.refresh()
 
     @Slot(str)
     def setMergeKey(self, key):
@@ -428,6 +457,7 @@ class SceneModel(QAbstractListModel):
         self.selectedIdChanged.emit()
         self.selectionStateChanged.emit()
         self.layersChanged.emit()
+        self._audio_model.refresh()
         self.modified.emit()
         self.historyChanged.emit()
 
@@ -842,6 +872,37 @@ class SceneModel(QAbstractListModel):
         # A whole slider drag becomes one undo step.
         self._merge_key = "volume:" + object_id
         self._set_media_option(object_id, "volume", volume)
+
+    @Slot(str, float)
+    def setSpeed(self, object_id, speed):
+        # A whole slider drag becomes one undo step.
+        self._merge_key = "speed:" + object_id
+        self._set_media_option(object_id, "speed", speed)
+
+    @Slot(str, bool)
+    def setPreservePitch(self, object_id, preserve):
+        self._set_media_option(object_id, "preserve_pitch", preserve)
+
+    @Slot(str, float)
+    def setLoopA(self, object_id, ms):
+        obj = self._scene.get(object_id)
+        if obj is not None:
+            self._set_loop(object_id, ms, obj.loop_b)
+
+    @Slot(str, float)
+    def setLoopB(self, object_id, ms):
+        obj = self._scene.get(object_id)
+        if obj is not None:
+            self._set_loop(object_id, obj.loop_a, ms)
+
+    @Slot(str)
+    def clearLoop(self, object_id):
+        self._set_loop(object_id, -1, -1)
+
+    def _set_loop(self, object_id, loop_a, loop_b):
+        if self._scene.set_loop(object_id, loop_a, loop_b):
+            self._emit_for(object_id, PLAYBACK_ROLES)
+            self._changed()
 
     def _set_media_option(self, object_id, name, value):
         """object_id may be a free media object or a container's content."""

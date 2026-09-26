@@ -831,6 +831,20 @@ This should be exposed as a setting rather than hard-coded.
 
 Implementation: QtMultimedia's `playbackRate` sets speed, and `pitchCompensation` switches between the two behaviors above (off = pitch follows speed, as in Celluloid; on = pitch preserved). Check `pitchCompensationAvailability` at runtime and hide or disable the setting if the backend reports it unavailable.
 
+## 14.5 Implemented so far (2026-09-26)
+
+Every video instance (free, or a container's content) has its own, saved and undoable:
+
+- **volume**, **mute**, **play/pause**, **loop** (as before)
+- **speed**, 0.25x to 4x (`speed`), and **Keep pitch** (`preserve_pitch`, off by default so pitch follows speed). `pitchCompensation` was confirmed available on Windows with PySide6 6.11.2.
+- an **A-B loop** (`loop_a` / `loop_b`, milliseconds, -1 = not set). Looping between them happens only when both are set; the points are kept in order, and points less than 0.1 s apart are rejected. Set them at the current position from the right-click menu (Set Loop Start (A) Here / Set Loop End (B) Here / Clear A–B Loop) or the Audio tab. The seek bar shows A and B markers and the looped span. Reaching B seeks back to A (deferred to the next event-loop turn: the FFmpeg backend ignores a seek made inside `positionChanged`).
+
+The sidebar's **Audio** tab (next to Layers) lists every video instance, top first, each with Play/Pause, Mute, a volume slider (the mouse wheel over it changes the volume), a speed slider on a log scale (1x in the middle; double-click the value to reset), Keep pitch, Loop, and A/B buttons. Clicking a card selects the video (or the container holding it). The list is a real list model (`bridge/audio_model.py`) that updates rows in place, so sliders aren't recreated while being dragged.
+
+Panels find a video's player (for its position) through a registry on the scene item (`registerView` / `viewFor` in `Main.qml`), keyed by media instance id.
+
+Not yet: audio tracks from the Browser, video-as-audio, solo, per-track audio stream selection.
+
 ---
 
 # 15. Presentation Mode
@@ -1697,6 +1711,7 @@ mediawall/
 ├── bridge/                 Qt glue between core and QML
 │   ├── __init__.py
 │   ├── log_capture.py      terminal output -> Log window and logs/
+│   ├── audio_model.py      video/audio instances for the Audio tab
 │   ├── scene_model.py      exposes Scene to QML as a list model
 │   └── project_controller.py  New/Open/Save dialogs, title, unsaved prompts
 │
@@ -1712,7 +1727,7 @@ mediawall/
 │   ├── ResizeHandles.qml   shared four-corner resize handles
 │   ├── ObjectContextMenu.qml  shared right-click menu
 │   ├── LogWindow.qml       the Log window
-│   ├── Sidebar.qml         right-edge flyout: Layers panel
+│   ├── Sidebar.qml         right-edge flyout: Layers and Audio tabs
 │   └── Zoom.js             shared mouse-wheel zoom step
 │
 ├── tools/
@@ -1899,7 +1914,9 @@ Done: all of the above, through the shared `MediaView` component, so video works
 
 ---
 
-## Phase 9 — Audio Rack — **Not started**
+## Phase 9 — Audio Rack — **Partial**
+
+Done: per-video volume, mute, loop, speed, pitch behavior, and A-B loop, in the sidebar's Audio tab (section 14.5).
 
 Implement:
 
@@ -2239,6 +2256,7 @@ The prototype currently provides:
 - EXIF orientation applied to photos, on the canvas and in browser previews
 - animated GIF and WebP playback, on the canvas and in browser previews; each instance can be paused or played from its right-click menu
 - video on the canvas, in containers, and in browser previews, with per-instance play/pause, mute, and loop (right-click menu), and an on-object seek bar when selected
+- per-video speed (0.25x to 4x), Keep pitch, and A-B loop; an Audio tab in the sidebar with every video's sound and playback settings (section 14.5)
 - audio previews in browsers
 - containers: move, resize, rotate; hold one clipped media instance with its own pan, zoom, and rotation (Adjust mode); fit/fill; locked or independent scaling; release/remove content
 - media can be dragged into empty containers, or added from a browser to a selected empty container

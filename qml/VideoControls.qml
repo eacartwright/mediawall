@@ -84,6 +84,52 @@ Rectangle {
                 if (bar.view)
                     bar.view.seek(value)
             }
+
+            // A-B loop markers (and the looped span, when both are set).
+            function xFor(ms) {
+                return leftPadding + availableWidth * Math.min(1, Math.max(0, ms / to))
+            }
+
+            readonly property real loopA: bar.view ? bar.view.loopA : -1
+            readonly property real loopB: bar.view ? bar.view.loopB : -1
+
+            Rectangle {
+                visible: seekSlider.loopA >= 0 && seekSlider.loopB > seekSlider.loopA
+                x: seekSlider.xFor(seekSlider.loopA)
+                width: seekSlider.xFor(seekSlider.loopB) - x
+                y: seekSlider.topPadding + seekSlider.availableHeight / 2 - height / 2
+                height: 6
+                radius: 2
+                color: "#60e0a84c"
+            }
+
+            Repeater {
+                model: [
+                    { label: "A", ms: seekSlider.loopA },
+                    { label: "B", ms: seekSlider.loopB },
+                ]
+
+                Rectangle {
+                    required property var modelData
+
+                    visible: modelData.ms >= 0 && seekSlider.to > 1
+                    x: seekSlider.xFor(modelData.ms) - width / 2
+                    y: 0
+                    width: 2
+                    height: seekSlider.height
+                    color: "#e0a84c"
+
+                    Text {
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        anchors.top: parent.top
+                        anchors.topMargin: -2
+                        text: parent.modelData.label
+                        color: "#e0a84c"
+                        font.pixelSize: 9
+                        font.bold: true
+                    }
+                }
+            }
         }
 
         Text {

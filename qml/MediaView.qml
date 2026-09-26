@@ -19,6 +19,13 @@ Item {
     property bool muted: true
     property real volume: 1.0
     property bool loop: true
+    property real speed: 1.0
+    property bool preservePitch: false  // off: pitch follows speed
+
+    // A-B loop in milliseconds (-1 = not set); active when both are set.
+    property real loopA: -1
+    property real loopB: -1
+    readonly property bool abLooping: loopA >= 0 && loopB > loopA
 
     property string name: ""
     property string path: ""
@@ -178,7 +185,26 @@ Item {
 
                 loops: view.loop ? MediaPlayer.Infinite : 1
 
+                playbackRate: view.speed
+                pitchCompensation: view.preservePitch
+
                 onErrorOccurred: playerItem.failed = true
+
+                // A-B loop: jump back to A on reaching B (or if playback
+                // has got past it, e.g. B was just moved earlier). The
+                // seek is deferred: seeking from inside positionChanged
+                // is ignored by the FFmpeg backend.
+                property bool abJumpPending: false
+
+                onPositionChanged: {
+                    if (!view.abLooping || abJumpPending || mediaPlayer.position < view.loopB)
+                        return
+                    abJumpPending = true
+                    Qt.callLater(function() {
+                        mediaPlayer.setPosition(view.loopA)
+                        mediaPlayer.abJumpPending = false
+                    })
+                }
 
                 // A new source resets the player to StoppedState, which
                 // would drop the play() requested for the previous one.

@@ -3,13 +3,31 @@ import QtQuick.Controls
 import QtQuick.Layouts
 
 // Right-hand flyout panel, opened and closed with the tab on its left
-// edge. Tabs: Layers (Audio comes with the Audio Rack).
+// edge. Tabs: Layers, and Audio (every video and audio track's sound
+// and playback settings; readme section 14).
 // Overlays the canvas; hidden in Present mode (Main.qml).
 
 Item {
     id: sidebar
 
     property bool open: false
+
+    // The scene item (Main.qml), for looking up players by media id.
+    property Item sceneItem
+
+    function formatMs(ms) {
+        var t = Math.max(0, ms) / 1000
+        var m = Math.floor(t / 60)
+        var sec = Math.floor(t - m * 60)
+        return m + ":" + (sec < 10 ? "0" : "") + sec
+    }
+
+    function formatMsPrecise(ms) {
+        var t = Math.max(0, ms) / 1000
+        var m = Math.floor(t / 60)
+        var sec = (t - m * 60).toFixed(1)
+        return m + ":" + (sec < 10 ? "0" : "") + sec
+    }
 
     readonly property int panelWidth: 280
 
@@ -25,7 +43,7 @@ Item {
         x: panel.x - width
 
         width: 22
-        height: 96
+        height: 140
         radius: 4
 
         color: handleArea.containsMouse ? "#3a3a3a" : "#2c2c2c"
@@ -34,7 +52,7 @@ Item {
         Text {
             anchors.centerIn: parent
             rotation: -90
-            text: sidebar.open ? "Layers  ▸" : "◂  Layers"
+            text: sidebar.open ? "Layers · Audio  ▸" : "◂  Layers · Audio"
             color: "#dddddd"
             font.pixelSize: 12
         }
@@ -83,6 +101,7 @@ Item {
                 Layout.fillWidth: true
 
                 TabButton { text: "Layers" }
+                TabButton { text: "Audio" }
             }
 
             StackLayout {
@@ -236,6 +255,287 @@ Item {
                             enabled: parent.hasSelection && !sceneModel.selectedAtBack
                             onClicked: sceneModel.sendToBack(sceneModel.selectedId)
                         }
+                    }
+                }
+
+                // ---- Audio ----
+
+                ListView {
+                    id: audioList
+
+                    clip: true
+                    spacing: 1
+                    model: sceneModel.audioItems
+
+                    ScrollBar.vertical: ScrollBar {}
+
+                    delegate: Rectangle {
+                        id: card
+
+                        required property int index
+                        required property string itemId
+                        required property string ownerId
+                        required property string name
+                        required property string kind
+                        required property bool inContainer
+                        required property bool missing
+                        required property bool playing
+                        required property bool muted
+                        required property real volume
+                        required property bool loop
+                        required property real speed
+                        required property bool preservePitch
+                        required property real loopA
+                        required property real loopB
+
+                        // The player on the canvas, for position (A/B).
+                        readonly property var view: {
+                            var scene = sidebar.sceneItem
+                            if (!scene)
+                                return null
+                            scene.mediaViewsVersion        // re-evaluate on changes
+                            return scene.viewFor(itemId)
+                        }
+
+                        readonly property bool isSelected: ownerId === sceneModel.selectedId
+
+                        width: ListView.view.width
+                        height: cardColumn.implicitHeight + 12
+
+                        color: isSelected ? "#2f4a66" : "#2c2c2c"
+
+                        // Clicking the card (not a control) selects the
+                        // video, or the container holding it.
+                        MouseArea {
+                            anchors.fill: parent
+                            onClicked: sceneModel.select(card.ownerId)
+                        }
+
+                        ColumnLayout {
+                            id: cardColumn
+
+                            anchors.left: parent.left
+                            anchors.right: parent.right
+                            anchors.top: parent.top
+                            anchors.margins: 6
+                            spacing: 2
+
+                            // ---- Name and position ----
+                            RowLayout {
+                                Layout.fillWidth: true
+                                spacing: 6
+
+                                Rectangle {
+                                    Layout.preferredWidth: 38
+                                    Layout.preferredHeight: 16
+                                    radius: 3
+                                    color: card.kind === "audio" ? "#9a7a3a" : "#7a4a9a"
+                                    Text {
+                                        anchors.centerIn: parent
+                                        text: card.kind
+                                        color: "#ffffff"
+                                        font.pixelSize: 10
+                                    }
+                                }
+
+                                Text {
+                                    Layout.fillWidth: true
+                                    text: card.name + (card.inContainer ? "  (in container)" : "")
+                                          + (card.missing ? "  — missing" : "")
+                                    color: card.missing ? "#e08080" : "#eeeeee"
+                                    font.pixelSize: 12
+                                    elide: Text.ElideMiddle
+                                }
+
+                                Text {
+                                    visible: card.view !== null && card.view.duration > 0
+                                    text: card.view
+                                          ? sidebar.formatMs(card.view.position) + " / "
+                                            + sidebar.formatMs(card.view.duration)
+                                          : ""
+                                    color: "#aaaaaa"
+                                    font.pixelSize: 11
+                                }
+                            }
+
+                            // ---- Play, mute, volume ----
+                            RowLayout {
+                                Layout.fillWidth: true
+                                spacing: 4
+
+                                Button {
+                                    Layout.preferredHeight: 24
+                                    Layout.preferredWidth: 52
+                                    text: card.playing ? "Pause" : "Play"
+                                    onClicked: sceneModel.setPlaying(card.itemId, !card.playing)
+                                }
+
+                                Button {
+                                    Layout.preferredHeight: 24
+                                    Layout.preferredWidth: 60
+                                    text: card.muted ? "Unmute" : "Mute"
+                                    onClicked: sceneModel.setMuted(card.itemId, !card.muted)
+                                }
+
+                                // The mouse wheel over the slider changes the volume.
+                                Slider {
+                                    Layout.fillWidth: true
+                                    from: 0
+                                    to: 1
+                                    value: card.volume
+                                    wheelEnabled: true
+                                    stepSize: 0.05
+                                    opacity: card.muted ? 0.5 : 1
+                                    onMoved: sceneModel.setVolume(card.itemId, value)
+                                }
+
+                                Text {
+                                    Layout.preferredWidth: 32
+                                    text: Math.round(card.volume * 100) + "%"
+                                    color: "#cccccc"
+                                    font.pixelSize: 11
+                                    horizontalAlignment: Text.AlignRight
+                                }
+                            }
+
+                            // ---- Speed and pitch ----
+                            RowLayout {
+                                Layout.fillWidth: true
+                                spacing: 4
+
+                                Text {
+                                    text: "Speed"
+                                    color: "#cccccc"
+                                    font.pixelSize: 11
+                                }
+
+                                // Log scale: 1x in the middle, 0.25x .. 4x.
+                                Slider {
+                                    Layout.fillWidth: true
+                                    from: -2
+                                    to: 2
+                                    value: Math.log2(card.speed)
+                                    onMoved: {
+                                        var v = Math.abs(value) < 0.05 ? 0 : value  // snap to 1x
+                                        sceneModel.setSpeed(card.itemId, Math.pow(2, v))
+                                    }
+                                }
+
+                                Text {
+                                    Layout.preferredWidth: 38
+                                    text: card.speed.toFixed(2) + "×"
+                                    color: card.speed === 1 ? "#cccccc" : "#e0c060"
+                                    font.pixelSize: 11
+                                    horizontalAlignment: Text.AlignRight
+
+                                    // Double-click resets to normal speed.
+                                    MouseArea {
+                                        anchors.fill: parent
+                                        onDoubleClicked: sceneModel.setSpeed(card.itemId, 1.0)
+                                    }
+                                }
+
+                                CheckBox {
+                                    checked: card.preservePitch
+                                    onToggled: {
+                                        sceneModel.setPreservePitch(card.itemId, checked)
+                                        checked = Qt.binding(function() { return card.preservePitch })
+                                    }
+                                }
+
+                                Text {
+                                    text: "Keep pitch"
+                                    color: "#cccccc"
+                                    font.pixelSize: 11
+                                    TapHandler {
+                                        onTapped: sceneModel.setPreservePitch(card.itemId, !card.preservePitch)
+                                    }
+                                }
+                            }
+
+                            // ---- Loop and A-B ----
+                            RowLayout {
+                                Layout.fillWidth: true
+                                spacing: 4
+
+                                CheckBox {
+                                    checked: card.loop
+                                    onToggled: {
+                                        sceneModel.setLoop(card.itemId, checked)
+                                        checked = Qt.binding(function() { return card.loop })
+                                    }
+                                }
+
+                                Text {
+                                    text: "Loop"
+                                    color: "#cccccc"
+                                    font.pixelSize: 11
+                                    TapHandler {
+                                        onTapped: sceneModel.setLoop(card.itemId, !card.loop)
+                                    }
+                                }
+
+                                Item { Layout.preferredWidth: 6 }
+
+                                Button {
+                                    Layout.preferredHeight: 24
+                                    Layout.preferredWidth: 30
+                                    text: "A"
+                                    enabled: card.view !== null
+                                    onClicked: sceneModel.setLoopA(card.itemId, card.view.position)
+                                    ToolTip.visible: hovered
+                                    ToolTip.text: "Set loop start here"
+                                    ToolTip.delay: 500
+                                }
+
+                                Button {
+                                    Layout.preferredHeight: 24
+                                    Layout.preferredWidth: 30
+                                    text: "B"
+                                    enabled: card.view !== null
+                                    onClicked: sceneModel.setLoopB(card.itemId, card.view.position)
+                                    ToolTip.visible: hovered
+                                    ToolTip.text: "Set loop end here"
+                                    ToolTip.delay: 500
+                                }
+
+                                Text {
+                                    Layout.fillWidth: true
+                                    text: {
+                                        if (card.loopA < 0 && card.loopB < 0)
+                                            return ""
+                                        return (card.loopA >= 0 ? sidebar.formatMsPrecise(card.loopA) : "–")
+                                               + " → "
+                                               + (card.loopB >= 0 ? sidebar.formatMsPrecise(card.loopB) : "–")
+                                    }
+                                    color: "#e0a84c"
+                                    font.pixelSize: 11
+                                    elide: Text.ElideRight
+                                }
+
+                                Button {
+                                    Layout.preferredHeight: 24
+                                    Layout.preferredWidth: 30
+                                    text: "✕"
+                                    visible: card.loopA >= 0 || card.loopB >= 0
+                                    onClicked: sceneModel.clearLoop(card.itemId)
+                                    ToolTip.visible: hovered
+                                    ToolTip.text: "Clear the A–B loop"
+                                    ToolTip.delay: 500
+                                }
+                            }
+                        }
+                    }
+
+                    Text {
+                        anchors.centerIn: parent
+                        width: parent.width - 32
+                        visible: audioList.count === 0
+                        text: "No videos on the canvas yet"
+                        color: "#888888"
+                        font.pixelSize: 12
+                        wrapMode: Text.WordWrap
+                        horizontalAlignment: Text.AlignHCenter
                     }
                 }
             }

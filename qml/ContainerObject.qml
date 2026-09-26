@@ -35,6 +35,10 @@ Item {
     required property bool contentMuted
     required property real contentVolume
     required property bool contentLoop
+    required property real contentSpeed
+    required property bool contentPreservePitch
+    required property real contentLoopA
+    required property real contentLoopB
     required property string contentSourceId
     required property string contentSourceType
     required property string contentSourceUrl
@@ -84,6 +88,8 @@ Item {
     readonly property bool isVideo: hasContent && contentSourceType === "video"
     readonly property bool mediaMuted: contentMuted
     readonly property bool mediaLoop: contentLoop
+    readonly property real mediaLoopA: contentLoopA
+    readonly property real mediaLoopB: contentLoopB
     readonly property var mediaView: contentView
 
     x: posX
@@ -258,7 +264,31 @@ Item {
             muted: root.contentMuted
             volume: root.contentVolume
             loop: root.contentLoop
+            speed: root.contentSpeed
+            preservePitch: root.contentPreservePitch
+            loopA: root.contentLoopA
+            loopB: root.contentLoopB
             name: root.contentSourceName
+
+            // Registered under the content's id (it changes when the
+            // content is replaced or removed).
+            property string registeredId: ""
+
+            function register() {
+                if (!root.sceneItem)
+                    return
+                root.sceneItem.unregisterView(registeredId, contentView)
+                registeredId = root.contentId
+                root.sceneItem.registerView(registeredId, contentView)
+            }
+
+            Component.onCompleted: register()
+            Component.onDestruction: if (root.sceneItem) root.sceneItem.unregisterView(registeredId, contentView)
+
+            Connections {
+                target: root
+                function onContentIdChanged() { contentView.register() }
+            }
 
             // Shown for the whole frame instead (below), so it's
             // readable however far the content is zoomed.

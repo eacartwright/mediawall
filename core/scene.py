@@ -59,6 +59,13 @@ FIT_COVER = "cover"         # container completely filled, edges cropped
 # Object types that always stack above the others (workspace tools).
 OVERLAY_TYPES = {"browser"}
 
+# Playback speed range (QtMultimedia playbackRate).
+SPEED_MIN = 0.25
+SPEED_MAX = 4.0
+
+# A-B loop points closer than this are rejected (milliseconds).
+MIN_LOOP_MS = 100.0
+
 # Uniform scaling (wheel zoom) stops at these sizes.
 SCALE_MIN_SIDE = 20.0       # the shorter side
 SCALE_MAX_SIDE = 20000.0    # the longer side
@@ -74,6 +81,26 @@ def _rotate(x, y, degrees):
     r = math.radians(degrees)
     c, s = math.cos(r), math.sin(r)
     return x * c - y * s, x * s + y * c
+
+
+def clamp_speed(value) -> float:
+    return round(min(SPEED_MAX, max(SPEED_MIN, float(value))), 2)
+
+
+def normalized_loop(loop_a, loop_b):
+    """
+    Loop points in order, with unset ones as -1.0. Returns (None, None)
+    if both are set but too close together.
+    """
+    a = float(loop_a) if loop_a is not None and loop_a >= 0 else -1.0
+    b = float(loop_b) if loop_b is not None and loop_b >= 0 else -1.0
+
+    if a >= 0 and b >= 0:
+        if abs(b - a) < MIN_LOOP_MS:
+            return None, None
+        a, b = min(a, b), max(a, b)
+
+    return a, b
 
 
 def fitted_size(box_w, box_h, aspect, mode):
@@ -136,6 +163,13 @@ class SceneObject:
     muted: bool = True            # canvas videos start silent
     volume: float = 1.0           # 0.0 .. 1.0
     loop: bool = True
+    speed: float = 1.0            # SPEED_MIN .. SPEED_MAX
+    preserve_pitch: bool = False  # off: pitch follows speed (readme 14.4)
+
+    # A-B loop, in milliseconds; -1 = not set. Looping between them
+    # happens only when both are set (loop_a < loop_b).
+    loop_a: float = -1.0
+    loop_b: float = -1.0
 
     # Runtime only, not saved: the source's size wasn't known when this
     # instance was placed, so it is resized once the size is reported.
@@ -502,13 +536,19 @@ class Scene:
         return True
 
     def set_media_option(self, object_id, name, value) -> bool:
-        """Set a per-instance playback option: muted, loop, or volume."""
+        """
+        Set a per-instance playback option: muted, loop, volume, speed,
+        or preserve_pitch.
+        """
         obj = self.get(object_id)
-        if obj is None or obj.type != "media" or name not in ("muted", "loop", "volume"):
+        if obj is None or obj.type != "media" or name not in (
+                "muted", "loop", "volume", "speed", "preserve_pitch"):
             return False
 
         if name == "volume":
             value = min(1.0, max(0.0, float(value)))
+        elif name == "speed":
+            value = clamp_speed(value)
         else:
             value = bool(value)
 
@@ -516,6 +556,25 @@ class Scene:
             return False
 
         setattr(obj, name, value)
+        return True
+
+    def set_loop(self, object_id, loop_a, loop_b) -> bool:
+        """
+        Set the A-B loop points (ms; negative = not set). If both are set
+        they are put in order; points closer than MIN_LOOP_MS are rejected.
+        """
+        obj = self.get(object_id)
+        if obj is None or obj.type != "media":
+            return False
+
+        a, b = normalized_loop(loop_a, loop_b)
+        if a is None:
+            return False
+
+        if (obj.loop_a, obj.loop_b) == (a, b):
+            return False
+
+        obj.loop_a, obj.loop_b = a, b
         return True
 
     def set_playing(self, object_id, playing) -> bool:
