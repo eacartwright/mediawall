@@ -2294,7 +2294,6 @@ During a drag, resize, or rotate, QML moves the item directly so interaction sta
 - **Containers are rectangular only**, and hold one item.
 - **Undo history isn't saved** with the project; it starts fresh each time a project is opened.
 - **Rotation has no angle snapping** yet (e.g. to 15° steps).
-- **No edge handles yet**, only corners; resizing one side on its own isn't possible.
 - **Resize has no modifier options** yet (e.g. resize from center, or free aspect on images).
 - **Browser folders are saved as absolute paths only** (by decision; section 16), so on a machine with a different folder layout a browser shows "Folder not found" until a folder is chosen again.
 - **Adjust mode shows no ghost for video**, only the orange bounds outline (a second copy of the video would play out of sync).
@@ -2309,12 +2308,11 @@ Reviewed 2026-09-26. Keep this list current; it replaces the phase notes as the 
 
 ### Next
 
-1. **Edge resize handles:** thin bars along each side (unlike the square corner handles), resizing one side at a time.
-2. **Adjust-mode ghost for video:** show the part of a video outside the container's frame, as images already do.
-3. **Hide the mouse cursor while idle in Present**, if it's easy.
-4. **Keep undo history between sessions** in a `.history` file next to the project (section 55).
+1. **Adjust-mode ghost for video:** show the part of a video outside the container's frame, as images already do.
+2. **Hide the mouse cursor while idle in Present**, if it's easy.
+3. **Keep undo history between sessions** in a `.history` file next to the project (section 55).
 
-Done from this list: video as audio (section 14.2), drag-to-reorder in the Layers panel.
+Done from this list: video as audio (section 14.2), drag-to-reorder in the Layers panel, edge resize handles.
 
 ### Soon
 
@@ -2517,7 +2515,7 @@ The following design decisions are currently established:
 - Browsers form their own stacking group above everything else; z-order operations never move an object across groups (2026-09-26).
 - Rotation handles rotate relative to where they are grabbed, so objects never jump when the knob is clicked.
 - Double-clicking the rotation knob resets rotation to 0° (the content's rotation, in Adjust mode). The same resets are in the right-click menu (Reset Rotation / Reset Content Rotation), shown only when something is rotated.
-- Every object has four corner resize handles (shared `ResizeHandles` component). Dragging a corner pins the opposite corner, including on rotated objects. Images keep their aspect ratio; containers and browsers resize freely.
+- Every object has four corner resize handles and, at the middle of each side, a thin edge bar (shared `ResizeHandles` component). Dragging a corner pins the opposite corner; dragging an edge moves only that side and keeps the opposite side in place; both work on rotated objects. Images keep their aspect ratio (an edge drag changes the other dimension too, centered); containers and browsers resize freely. Edge bars hide on objects too small for them (2026-09-26).
 - Cropping a free image is done by wrapping it in a container (Crop / Zoom Inside), not by giving free media its own crop state. Such containers start with locked scaling off.
 - Videos placed on the canvas start **muted, playing, and looping**. Sound is meant to live mainly in the Audio Rack, and a wall of unmuted videos is chaotic. Each video can be unmuted individually.
 - A video's size isn't known until the player loads it, so it is placed at a 16:9 placeholder and resized once the player reports its real size. This correction is not an undo step of its own.
