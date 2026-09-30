@@ -1815,6 +1815,14 @@ How it works:
 
 The installers bundle their own Python and libraries rather than installing Python on the user's machine: that is the usual approach for Python desktop apps, it needs no internet or admin rights, and it can't break on a mismatched system Python. Settings (QSettings) and logs are per user and survive an uninstall.
 
+**Releases** go on GitHub (github.com/eacartwright/mediawall, Releases), never in git. For a new version: set `core/version.py`, commit, build on each platform, then tag and publish with the GitHub CLI (`gh`):
+
+```text
+git tag -a v<version> -m "MediaWall <version>"  &&  git push origin v<version>
+gh release create v<version> dist/MediaWall-<version>-Setup.exe --title "MediaWall <version>" --notes "..."
+gh release upload v<version> dist/mediawall_<version>_amd64.deb      # later, from Linux
+```
+
 Do not depend on any other project's virtual environment (for example ComfyUI's). MediaWall has its own environment and dependency set.
 
 ---
@@ -2427,7 +2435,7 @@ The prototype currently provides:
 - z-order and Delete through a right-click menu, plus shortcuts
 - a Layers panel (right-edge flyout): every object top first, selection linked both ways, Top/Up/Down/Bottom, drag to reorder
 - unit tests for `core/`, and app checks that drive the real app (section 37)
-- installers: a Windows `Setup.exe` and a Linux `.deb`, built by `packaging/build.py` (section 37)
+- installers: a Windows `Setup.exe` and a Linux `.deb`, built by `packaging/build.py` (section 37); 0.9.0 released on GitHub (Windows installer; the `.deb` is still to be built on Linux)
 
 ### How interactions reach the model
 
