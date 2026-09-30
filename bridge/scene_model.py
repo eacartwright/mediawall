@@ -657,6 +657,13 @@ class SceneModel(QAbstractListModel):
         source = self._register_source(path, media_type)
         return self._insert(lambda: self._scene.add_media(source.id, x, y))
 
+    @Slot(str, str, float, float, result=str)
+    def addMediaInNewContainer(self, path, media_type, x, y):
+        """A browser's New Container: the file in a container of its own."""
+        source = self._register_source(path, media_type)
+        return self._insert(
+            lambda: self._scene.add_container_with_media(source.id, x, y))
+
     @Slot(str, str, result=str)
     def addAudioTrack(self, path, media_type):
         """

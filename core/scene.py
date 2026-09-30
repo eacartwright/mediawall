@@ -799,6 +799,21 @@ class Scene:
         content.x = rx + width / 2 - content.width / 2
         content.y = ry + height / 2 - content.height / 2
 
+    def add_container_with_media(self, source_id, x, y) -> SceneObject:
+        """
+        Add a new container holding a new instance of a source, shaped
+        like the media (a video's real shape isn't known yet, so it
+        starts at the fallback aspect). Returns the container.
+        """
+        source = self.sources[source_id]
+        width = DEFAULT_MEDIA_WIDTH
+        aspect = source.aspect or FALLBACK_ASPECT
+
+        container = self.add_object("container", x, y,
+                                    width=width, height=width / aspect)
+        self.add_media_to_container(source_id, container.id)
+        return container
+
     def add_media_to_container(self, source_id, container_id):
         """
         Create a new media instance inside a container, framed to fill it.

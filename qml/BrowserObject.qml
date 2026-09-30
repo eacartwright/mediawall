@@ -53,7 +53,7 @@ Rectangle {
     color: "transparent"
 
     border.color: selected ? "#5da9ff" : "#555555"
-    border.width: selected ? 2 : 1
+    border.width: 1
 
 
     // -------------------------------------------------
@@ -265,6 +265,16 @@ Rectangle {
 
         var p = placementBeside(newMediaWidth)
         sceneModel.addMedia(currentEntry.path, currentEntry.type, p.x, p.y)
+    }
+
+    // The current image or video in a new container of its own, placed
+    // like Add to Canvas.
+    function addCurrentInNewContainer() {
+        if (!canPlace)
+            return
+
+        var p = placementBeside(newMediaWidth)
+        sceneModel.addMediaInNewContainer(currentEntry.path, currentEntry.type, p.x, p.y)
     }
 
     // ---- Where new media goes: beside the browser ----
@@ -682,6 +692,14 @@ Rectangle {
                         text: root.currentIsAudio ? "Add to Audio" : "Add to Canvas"
                         enabled: root.canAdd
                         onClicked: root.addCurrentToCanvas()
+                    }
+
+                    Button {
+                        Layout.preferredHeight: 26
+                        text: "New Container"
+                        visible: !root.currentIsAudio
+                        enabled: root.canPlace
+                        onClicked: root.addCurrentInNewContainer()
                     }
 
                     // Video as audio: the sound only, as a track.

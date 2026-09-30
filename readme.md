@@ -1444,7 +1444,7 @@ The browser is kept compact, with the media as large as possible:
 │        MEDIA PREVIEW (see-through)          │
 │                                             │
 │  [Pause] ───●────────── 0:12 / 1:40 [Mute]  │  ← videos/audio only
-│  [◀] [▶] [Add to Canvas] [Add to Container]  37 / 142 │  ← overlaid
+│  [◀] [▶] [Add to Canvas] [New Container] [Add to Container]  37 / 142 │  ← overlaid
 └─────────────────────────────────────────────┘
 ```
 
@@ -1453,6 +1453,7 @@ The browser is kept compact, with the media as large as possible:
 - Browsers always draw above other canvas objects (they are workspace tools). Among themselves they keep their normal stacking order, and z-order operations move them only among browsers (section 23).
 - Over the preview (viewer-style, like a browsing container): the **wheel zooms** around the pointer and left-drag then pans (not for audio files, which stay centered); the **back/forward mouse buttons** go to the previous/next file (as do ◀ ▶). The zoom is temporary and resets when the file changes. Double-clicking adds the current file to the canvas.
 - New media from **Add to Canvas** (or double-click) is placed **beside the browser**, level with its top: to the right of a browser in the left half of the canvas, to the left of one in the right half (switching sides when that side has too little room and the other has more), kept inside the visible canvas. Repeated adds step 24 px down and outward so they don't pile up exactly.
+- **New Container** (images and videos) does the same, but puts the file in a new container of its own, 300 px wide and shaped like the image (`Scene.add_container_with_media`; one undo step). A video's container starts at 16:9 until its real size is known, and the video is then framed to the container's Fit/Fill mode. **Add to Container** (shown while a container is selected) instead fills that existing empty container.
 
 ---
 
@@ -2034,7 +2035,7 @@ Implement:
 - Make Container
 - Add as Slideshow
 
-Done: folder selection, file discovery with optional subfolders, supported-media filtering, current item, previous/next (buttons and mouse wheel), image, GIF, video, and audio preview, preview zoom, Add to Canvas (or double-click), Add to Container (for the selected empty container), Add to Audio for audio files, and browser state stored in the scene model. Remaining (back burner, with slideshows): Make Container, Add as Slideshow.
+Done: folder selection, file discovery with optional subfolders, supported-media filtering, current item, previous/next (buttons and mouse wheel), image, GIF, video, and audio preview, preview zoom, Add to Canvas (or double-click), Add to Container (for the selected empty container), New Container (the file in a new container beside the browser), Add to Audio for audio files, and browser state stored in the scene model. Remaining (back burner, with slideshows): Add as Slideshow.
 
 ---
 
@@ -2415,7 +2416,7 @@ The prototype currently provides:
 - a Python scene model that owns all object state; QML renders it
 - one `MediaSource` per file, referenced by media objects through `source_id`
 - random object IDs, so importing a layout can never cause ID collisions
-- Browse Objects: choose folder, optional subfolders, previous/next, preview with temporary zoom/pan, Add to Canvas (or double-click), close button; always drawn above other objects, with a see-through preview (section 26)
+- Browse Objects: choose folder, optional subfolders, previous/next, preview with temporary zoom/pan, Add to Canvas (or double-click), New Container, close button; always drawn above other objects, with a see-through preview (section 26)
 - free media objects: move, aspect-locked resize, rotate
 - EXIF orientation applied to photos, on the canvas and in browser previews
 - animated GIF and WebP playback, on the canvas and in browser previews; each instance can be paused or played from its right-click menu
@@ -2704,6 +2705,7 @@ The following design decisions are currently established:
 - The app icon is the collage (option A of six) (2026-09-29).
 - Resize corners, edge bars, and the rotation knob are about 30% smaller than before; their grab areas stay about the same size (2026-09-29).
 - Later the same day, the corner squares went down again (11 → 9 px) and the edge bars got shorter (25 → 19 px); the rotation knob stayed. The Settings dialog got a lighter border (`palette.midlight`), since Fusion's default barely showed on the dark canvas.
+- Selection outlines are 1 px for every object type (media, browsers, containers); only Adjust mode's orange outline stays 2 px. A browser's **New Container** button puts the current file in a new container beside it, like Add to Canvas (2026-09-29).
 - Containers show no outline once filled unless selected (1 px green) or being adjusted (2 px orange), so a finished wall reads as pictures rather than boxes; an empty container keeps a faint grey outline (hidden in Present) until it's filled. A browsing container's badge is just `⇅`, without the `n / total` count (2026-09-29).
 
 ### Open decisions

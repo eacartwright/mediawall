@@ -175,6 +175,34 @@ class ContainerTests(unittest.TestCase):
         self.assertIs(self.scene.container_at(280, 280), top)
 
 
+class NewContainerTests(unittest.TestCase):
+
+    def test_new_container_is_shaped_like_the_image(self):
+        scene = Scene()
+        src = scene.add_source("/pics/a.jpg", "image", 400, 200)
+
+        box = scene.add_container_with_media(src.id, 50, 60)
+
+        self.assertEqual((box.type, box.x, box.y, box.width, box.height),
+                         ("container", 50, 60, 300, 150))
+        content = scene.content_of(box.id)
+        self.assertEqual(content.source_id, src.id)
+        self.assertEqual((content.x, content.y, content.width, content.height),
+                         (0, 0, 300, 150))
+        self.assertEqual([o.id for o in scene.top_level()], [box.id])
+
+    def test_video_is_reframed_once_its_size_is_known(self):
+        scene = Scene()
+        src = scene.add_source("/clips/a.mp4", "video", 0, 0)
+
+        box = scene.add_container_with_media(src.id, 0, 0)
+        self.assertAlmostEqual(box.height, 300 * 9 / 16)
+        self.assertTrue(scene.content_of(box.id).pending_size)
+
+        self.assertIn(box.id, scene.set_source_size(src.id, 1000, 1000))
+        self.assertFalse(scene.content_of(box.id).pending_size)
+
+
 class WrapTests(unittest.TestCase):
 
     def test_wrap_keeps_appearance_and_stacking(self):

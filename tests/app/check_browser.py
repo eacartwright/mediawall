@@ -78,6 +78,15 @@ def step_place2():
             if (k[i].objectId === '{right.id}') {{ k[i].addCurrentToCanvas(); return }} }})()""")
     m2 = media_objects()[-1]
     c.check("a browser on the right half places media to its left", m2.x + m2.width == 760 - 16)
+    n = len(c.scene.top_level())
+    c.js(f"""(function() {{ var k = scene.children; for (var i = 0; i < k.length; i++)
+            if (k[i].objectId === '{right.id}') {{ k[i].addCurrentInNewContainer(); return }} }})()""")
+    box = c.scene.top_level()[-1]
+    content = c.scene.content_of(box.id)
+    c.check("New Container adds one container holding the file, beside the browser",
+            len(c.scene.top_level()) == n + 1 and box.type == "container"
+            and content is not None and content.source_id == m2.source_id
+            and box.x + box.width < 760, f"{box.type} {box.x:.0f}")
     # go to the audio file
     while everything[index()]["type"] != "audio":
         c.click(*PREVIEW, Qt.ForwardButton)

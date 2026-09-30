@@ -172,7 +172,7 @@ Item {
         color: "transparent"
 
         border.color: "#5da9ff"
-        border.width: 2
+        border.width: 1
 
         visible: root.selected
 
