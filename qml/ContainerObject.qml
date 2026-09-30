@@ -147,7 +147,7 @@ Item {
             .filter(function(e) { return e.type === "image" || e.type === "video" })
 
         // An empty container starts on the folder's first file, rather
-        // than sitting empty at "0 / n" until the first step.
+        // than sitting empty until the first step.
         if (!hasContent && browseFiles.length > 0)
             Qt.callLater(function() {
                 if (root.browseMode && !root.hasContent && root.browseFiles.length > 0)
@@ -432,16 +432,16 @@ Item {
     // Outlines
     // -------------------------------------------------
 
-    // Container border / selection
+    // Selection / adjust outline (none otherwise, so a wall of
+    // containers reads as pictures, not boxes)
     Rectangle {
         anchors.fill: parent
 
+        visible: root.selected || root.adjusting
         color: "transparent"
 
-        border.color: root.adjusting ? "#e0a84c"
-                      : root.selected ? "#7fc97f"
-                      : "#555555"
-        border.width: root.selected ? 2 : 1
+        border.color: root.adjusting ? "#e0a84c" : "#7fc97f"
+        border.width: 2
 
         z: 5
     }
@@ -709,7 +709,7 @@ Item {
 
 
     // -------------------------------------------------
-    // Browsing badge (selected): position in the folder
+    // Browsing badge (selected): marks a browsing container
     // -------------------------------------------------
 
     Rectangle {
@@ -732,7 +732,7 @@ Item {
             elide: Text.ElideMiddle
             text: root.browseFiles.length === 0
                   ? "Browsing · no media found"
-                  : "⇅ " + (root.browseIndex + 1) + " / " + root.browseFiles.length
+                  : "⇅"
             color: "#dddddd"
             font.pixelSize: 11
         }
