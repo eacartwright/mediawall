@@ -24,7 +24,7 @@ On Linux: `venv/bin/python` instead. Setup: `python -m venv venv` followed by `p
 
 The unit tests cover `core/` only. They need no Qt or display and finish in milliseconds. Run them after any `core/` change.
 
-App checks (`tests/app/`, readme section 37) start the real app and drive it (about 110 checks, ~1.5 minutes; need a display and `MEDIATEST/`): `.\venv\Scripts\python.exe tests\app\run.py [name ...]` (Linux: `venv/bin/python tests/app/run.py`). Run them after QML or bridge changes, and update or add a `check_*.py` when behaviour changes. They use `tests/app/harness.py` (`Check`: timed steps, input helpers, `js()` in Main.qml's context, `item_js()` / `center_of()` to find items by `objectName`). There is no linter or build step. `MEDIATEST/` (gitignored) holds sample media for manual testing.
+App checks (`tests/app/`, readme section 37) start the real app and drive it (about 110 checks, ~1.5 minutes; need a display and `tests/media/`): `.\venv\Scripts\python.exe tests\app\run.py [name ...]` (Linux: `venv/bin/python tests/app/run.py`). Run them after QML or bridge changes, and update or add a `check_*.py` when behaviour changes. They use `tests/app/harness.py` (`Check`: timed steps, input helpers, `js()` in Main.qml's context, `item_js()` / `center_of()` to find items by `objectName`). There is no linter or build step. `tests/media/` (gitignored) holds sample media for manual testing.
 
 ## Architecture
 

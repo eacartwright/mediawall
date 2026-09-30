@@ -1728,7 +1728,7 @@ python -m unittest
 
 The tests cover `core/` only and need no display or Qt, so they run in milliseconds. Run them after any change to `core/`.
 
-**App checks** (`tests/app/`): each `check_*.py` starts the real MediaWall on a project it builds and drives it with mouse, keyboard, and wheel events, checking the results (about 110 checks: browsing containers, the Browser, Present, Layers, resizing, audio, layouts, commands and settings, undo history, video sizing). They need a display and the sample media in `MEDIATEST/`, take about a minute and a half, and are kept apart from the unit tests (they're named `check_*`, so `python -m unittest` doesn't run them):
+**App checks** (`tests/app/`): each `check_*.py` starts the real MediaWall on a project it builds and drives it with mouse, keyboard, and wheel events, checking the results (about 110 checks: browsing containers, the Browser, Present, Layers, resizing, audio, layouts, commands and settings, undo history, video sizing). They need a display and the sample media in `tests/media/`, take about a minute and a half, and are kept apart from the unit tests (they're named `check_*`, so `python -m unittest` doesn't run them):
 
 ```text
 Windows:  venv\Scripts\python.exe tests\app\run.py [name ...]
@@ -2351,7 +2351,7 @@ During a drag, resize, or rotate, QML moves the item directly so interaction sta
 - **Browser folders are saved as absolute paths only** (by decision; section 16), so on a machine with a different folder layout a browser shows "Folder not found" until a folder is chosen again.
 - **Each video instance runs its own decoder.** Two instances of the same file play independently, not in sync. Many simultaneous videos will be limited by decoding performance.
 - **Hardware video decoding hasn't been verified** on the target machines. Qt prints "No HW decoder found" when it falls back to software decoding.
-- **Harmless FFmpeg messages in the Log.** `[aac @ …] Could not update timestamps for skipped samples` repeats for some video/audio files (e.g. `test_mov.mov` in MEDIATEST): FFmpeg trimming the encoder's start-up delay samples. Playback is unaffected. The `Input #0, …` summaries printed whenever a file is opened are normal too. (FFmpeg's log level could be lowered if the noise ever matters.)
+- **Harmless FFmpeg messages in the Log.** `[aac @ …] Could not update timestamps for skipped samples` repeats for some video/audio files (e.g. `test_mov.mov` in tests/media): FFmpeg trimming the encoder's start-up delay samples. Playback is unaffected. The `Input #0, …` summaries printed whenever a file is opened are normal too. (FFmpeg's log level could be lowered if the noise ever matters.)
 
 ---
 

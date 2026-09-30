@@ -149,7 +149,7 @@ def step_end():
     c.finish()
 
 
-# The folder dialog for the empty container: answer with MEDIATEST.
+# The folder dialog for the empty container: answer with tests/media.
 import bridge.scene_model as scene_model                            # noqa: E402
 scene_model.QFileDialog.getExistingDirectory = staticmethod(lambda *a, **k: str(MEDIA))
 

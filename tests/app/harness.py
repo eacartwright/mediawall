@@ -6,7 +6,7 @@ it builds, runs timed steps against the live window (mouse, keys, wheel,
 QML expressions), prints PASS/FAIL lines and a final "N/M passed", and
 quits. tests/app/run.py runs them all in separate processes.
 
-These need a display, PySide6, and the sample media in MEDIATEST/
+These need a display, PySide6, and the sample media in tests/media/
 (gitignored). They are slow (seconds each) and are kept apart from the
 fast unit tests in tests/, which `python -m unittest` runs.
 
@@ -22,7 +22,7 @@ from pathlib import Path
 APP_DIR = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(APP_DIR))
 
-MEDIA = APP_DIR / "MEDIATEST"
+MEDIA = APP_DIR / "tests" / "media"
 
 # Output folder (screenshots, scratch projects): given by run.py, or a
 # fresh temp folder when a check is run on its own.
@@ -40,7 +40,7 @@ from core.media_browser import MediaBrowser                        # noqa: E402
 from core.project import save_project                             # noqa: E402
 
 
-# ---- Sample media (MEDIATEST/) ----
+# ---- Sample media (tests/media/) ----
 
 PHOTO = "test_jpg.jpg"                      # 4320 x 2432 photo
 SCREENSHOT = "test_png.png"
@@ -60,7 +60,7 @@ def media_available():
 
 
 def folder_files(kinds=("image", "video")):
-    """MEDIATEST as a browser/browsing container lists it."""
+    """tests/media as a browser/browsing container lists it."""
     return [e for e in MediaBrowser().scan_folder(str(MEDIA), True) if e["type"] in kinds]
 
 
@@ -94,7 +94,7 @@ class Check:
 
     def run(self, scene, steps, project_name=None):
         if not media_available():
-            print("SKIP  MEDIATEST sample media not found", flush=True)
+            print("SKIP  tests/media sample media not found", flush=True)
             sys.exit(0)
 
         project = OUT / (project_name or f"{self.name}.mediawall")

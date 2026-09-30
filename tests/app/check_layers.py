@@ -37,7 +37,7 @@ def row(i):
 
 def step_open():
     c.check("listed top first, browsers on top", names() == [
-        "Browser · MEDIATEST", "Container (empty)", VIDEO, "Container · " + PHOTO, PHOTO], str(names()))
+        "Browser · media", "Container (empty)", VIDEO, "Container · " + PHOTO, PHOTO], str(names()))
     c.open_sidebar()
 
 

@@ -1,7 +1,7 @@
 """
 Run the app-level checks: each tests/app/check_*.py starts the real
 MediaWall in its own process and drives it. Slow (seconds per check),
-needs a display and the sample media in MEDIATEST/.
+needs a display and the sample media in tests/media/.
 
     Windows:  venv\\Scripts\\python.exe tests\\app\\run.py [name ...]
     Linux:    venv/bin/python tests/app/run.py [name ...]
