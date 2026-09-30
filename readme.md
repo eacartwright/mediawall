@@ -1728,6 +1728,15 @@ python -m unittest
 
 The tests cover `core/` only and need no display or Qt, so they run in milliseconds. Run them after any change to `core/`.
 
+**App checks** (`tests/app/`): each `check_*.py` starts the real MediaWall on a project it builds and drives it with mouse, keyboard, and wheel events, checking the results (about 110 checks: browsing containers, the Browser, Present, Layers, resizing, audio, layouts, commands and settings, undo history, video sizing). They need a display and the sample media in `MEDIATEST/`, take about a minute and a half, and are kept apart from the unit tests (they're named `check_*`, so `python -m unittest` doesn't run them):
+
+```text
+Windows:  venv\Scripts\python.exe testsppun.py [name ...]
+Linux:    venv/bin/python tests/app/run.py [name ...]
+```
+
+With names (e.g. `run.py browsing layers`) only those run. Each check gets its own scratch settings file (`MEDIAWALL_SETTINGS`), so real settings are never touched. `tests/app/harness.py` holds the shared setup; a few QML items carry an `objectName` so checks can find them regardless of font sizes. Run them after changes to QML or the bridge.
+
 Do not depend on any other project's virtual environment (for example ComfyUI's). MediaWall has its own environment and dependency set.
 
 ---
@@ -1791,7 +1800,8 @@ mediawall/
     ├── test_history.py
     ├── test_history_file.py
     ├── test_layout.py
-    └── test_video.py
+    ├── test_video.py
+    └── app/                app checks: run.py, harness.py, check_*.py
 ```
 
 ### Layering rule

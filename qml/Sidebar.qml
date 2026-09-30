@@ -50,6 +50,7 @@ Item {
 
     Rectangle {
         id: handle
+        objectName: "sidebarHandle"      // objectNames: found by tests/app
 
         anchors.verticalCenter: parent.verticalCenter
         x: panel.x - width
@@ -112,8 +113,8 @@ Item {
                 id: tabs
                 Layout.fillWidth: true
 
-                TabButton { text: "Layers" }
-                TabButton { text: "Audio" }
+                TabButton { text: "Layers"; objectName: "layersTab" }
+                TabButton { text: "Audio"; objectName: "audioTab" }
             }
 
             StackLayout {
@@ -128,6 +129,7 @@ Item {
 
                     ListView {
                         id: layerList
+                        objectName: "layerList"
 
                         Layout.fillWidth: true
                         Layout.fillHeight: true
@@ -531,6 +533,7 @@ Item {
                                 // Log scale over the range set in Settings
                                 // (default 0.5x .. 3x).
                                 Slider {
+                                    objectName: "speedSlider"
                                     Layout.fillWidth: true
                                     from: Math.log2(appSettings.speedMin)
                                     to: Math.log2(appSettings.speedMax)

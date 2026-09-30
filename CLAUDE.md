@@ -22,7 +22,9 @@ On Linux: `venv/bin/python` instead. Setup: `python -m venv venv` followed by `p
 
 `bridge/log_capture.py` redirects file descriptors 1 and 2 into a pipe at startup, so all output (FFmpeg, Qt, Python) goes to the in-app Log window and `logs/mediawall.log`, and is echoed to the terminal only if one exists. When checking app output, read `logs/mediawall.log`. `launcher.pyw` and `tools/create_launchers.py` make the double-click launchers (readme section 37).
 
-The tests cover `core/` only. They need no Qt or display and finish in milliseconds. Run them after any `core/` change. There is no linter or build step. `MEDIATEST/` (gitignored) holds sample media for manual testing.
+The unit tests cover `core/` only. They need no Qt or display and finish in milliseconds. Run them after any `core/` change.
+
+App checks (`tests/app/`, readme section 37) start the real app and drive it (about 110 checks, ~1.5 minutes; need a display and `MEDIATEST/`): `.env\Scripts\python.exe testsppun.py [name ...]` (Linux: `venv/bin/python tests/app/run.py`). Run them after QML or bridge changes, and update or add a `check_*.py` when behaviour changes. They use `tests/app/harness.py` (`Check`: timed steps, input helpers, `js()` in Main.qml's context, `item_js()` / `center_of()` to find items by `objectName`). There is no linter or build step. `MEDIATEST/` (gitignored) holds sample media for manual testing.
 
 ## Architecture
 

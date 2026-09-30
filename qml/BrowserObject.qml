@@ -501,6 +501,7 @@ Rectangle {
 
         MediaView {
             id: previewView
+            objectName: "browserPreview"         // found by tests/app
 
             width: previewFrame.baseW * root.previewZoom
             height: previewFrame.baseH * root.previewZoom

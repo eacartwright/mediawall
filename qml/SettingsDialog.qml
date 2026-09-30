@@ -32,6 +32,7 @@ Dialog {
 
             SpinBox {
                 id: zoomStepBox
+                objectName: "zoomStepBox"        // found by tests/app
 
                 from: appSettings.zoomStepMin
                 to: appSettings.zoomStepMax
