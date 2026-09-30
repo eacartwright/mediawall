@@ -1,12 +1,60 @@
-# MediaWall — Complete Project Design Document
+# MediaWall
 
-**Last updated:** 2026-09-22 20:54 EDT  
-**Project status:** Working prototype: scene model, browsing, images, GIFs, video, containers, save/load, undo/redo  
+MediaWall is a desktop app for building walls of media. Photos, animated GIFs, video, and audio go on one large canvas, where you can place, size, rotate, and layer them freely, then show the result full screen. It works like a mood board or digital scrapbook that plays, rather than like a slideshow editor or file manager. Media stays where it is on disk; a project only remembers where each file lives and how it is arranged.
+
+It runs on Linux (Mint/Ubuntu, the primary platform) and Windows, built with Python, PySide6/QML, and Qt Multimedia (FFmpeg).
+
+## What it does
+
+**The canvas**
+- Place images, GIFs/animated WebP, and videos anywhere; move, resize (corners or edge bars), rotate, and scale with the mouse wheel.
+- Double-click an edge bar to stretch an object until it meets its neighbours or the canvas edge.
+- Layer objects freely, from the right-click menu, shortcuts, or the Layers panel (drag to reorder).
+- Undo and redo every change, with the history kept between sessions.
+
+**Browsers**
+- Open a folder in a floating Browser, step through it, preview with zoom and pan, and add files to the canvas with a double-click (they land beside the browser).
+- Browsers float above everything else, with a see-through background so the wall stays visible.
+
+**Containers**
+- Frames that crop the media inside them, with their own pan, zoom, and rotation, set to Fit or Fill.
+- Browsing containers step through a whole folder in place, like an image viewer: wheel zoom, drag to pan, mouse back/forward buttons to change file. Videos autoplay as you reach them.
+- Save a set of containers as a reusable layout, then start a new wall from it or add it to an existing one.
+
+**Video and audio**
+- Every video plays independently, with play/pause, mute, loop, a seek bar, speed with optional pitch correction, and A-B loops.
+- Audio files (and videos used only for their sound) become tracks in the Audio tab, controlled the same way.
+
+**Showing it**
+- Full Screen for editing without the window frame; Present for a view-only wall where browsers still work and the pointer hides when idle.
+
+**Projects**
+- `.mediawall` project files store paths, never copies of media, so they stay small; moving a project keeps its media links working.
+- Missing files show as placeholders that keep their place, and can be relinked (a whole moved folder at once).
+
+## Running it
+
+Needs Python 3 and the pinned PySide6 (6.10 or newer). From the project folder:
+
+```
+python -m venv venv
+venv/bin/pip install -r requirements.txt        # Windows: venv\Scripts\pip ...
+venv/bin/python main.py                         # Windows: venv\Scripts\python.exe main.py
+```
+
+`tools/create_launchers.py` makes double-click launchers for either platform (section 37).
+
+## About this document
+
+The rest of this file is the design document: the principles, object model, and decisions behind the app, the current state (section 50), the backlog (section 51), and the decision log (section 55).
+
+**Last updated:** 2026-09-29 22:52 EDT  
+**Project status:** In daily use; minor tweaks and polish (see section 51)  
 **Target platform:** Cross-platform desktop; Linux (Mint/Ubuntu) primary, Windows also used for development  
 **Primary implementation language:** Python  
 **UI framework:** PySide6 + QML  
 **Media playback:** QtMultimedia (FFmpeg backend)  
-**Project/layout persistence:** JSON initially, with SQLite reserved for a later media index/library  
+**Project/layout persistence:** JSON, with SQLite reserved for a later media index/library  
 **Rendering philosophy:** GPU-accelerated Qt/QML scene graph; avoid CPU-side pixel processing for normal canvas operations
 
 ---
@@ -17,7 +65,7 @@
 
 MediaWall is a local desktop application for creating interactive multimedia walls, digital scrapbooks, visual installations, presentations, and live media compositions.
 
-The central concept is a large visual canvas on which the user can arrange media and viewports rather than a conventional document editor.
+The central concept is a large visual canvas on which the user arranges media and viewports, rather than a conventional document editor.
 
 The application should feel closer to:
 
@@ -30,7 +78,7 @@ The application should feel closer to:
 
 than to a traditional file manager, slideshow editor, or video editor.
 
-The user should be able to place media freely on a canvas, put media inside viewports/containers, browse media while still seeing the canvas, create slideshows, and eventually build dynamic presentations.
+The user places media freely on a canvas, puts media inside viewports/containers, browses media while still seeing the canvas, and presents the result. Slideshows and more dynamic presentations are back-burner ideas (section 51).
 
 The canvas is the primary workspace.
 
@@ -2322,8 +2370,8 @@ The prototype currently provides:
 - EXIF orientation applied to photos, on the canvas and in browser previews
 - animated GIF and WebP playback, on the canvas and in browser previews; each instance can be paused or played from its right-click menu
 - video on the canvas, in containers, and in browser previews, with per-instance play/pause, mute, and loop (right-click menu), and an on-object seek bar when selected
-- per-video speed (0.25x to 4x), Keep pitch, and A-B loop; an Audio tab in the sidebar with every video's sound and playback settings (section 14.5)
-- a Settings dialog (toolbar): the mouse-wheel zoom step (section 25)
+- per-video speed (0.5x to 3x by default; the range is a setting), Keep pitch, and A-B loop; an Audio tab in the sidebar with every video's sound and playback settings (section 14.5)
+- a Settings dialog (toolbar): the mouse-wheel zoom step and the speed range (section 25)
 - audio tracks added from a browser (double-click or Add to Audio), controlled in the Audio tab
 - video as audio: Convert to Audio Track (right-click a video), or Add to Audio for a video in a browser (section 14.2)
 - browsing containers: viewer-style (qView) controls: pan, wheel zoom, back/forward buttons, double-click reset; moved by the border strip or middle-drag; also in Present (section 6.4); containers remember Fit/Fill

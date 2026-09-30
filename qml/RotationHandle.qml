@@ -25,8 +25,8 @@ Item {
 
     signal finished()
 
-    width: 16
-    height: 28
+    width: 11
+    height: 20
 
     anchors.horizontalCenter: target ? target.horizontalCenter : undefined
     anchors.bottom: target ? target.top : undefined
@@ -36,7 +36,7 @@ Item {
     // Guide line
     Rectangle {
         width: 2
-        height: 12
+        height: 9
 
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.bottom: parent.bottom
@@ -46,9 +46,9 @@ Item {
 
     // Knob
     Rectangle {
-        width: 16
-        height: 16
-        radius: 8
+        width: 11
+        height: 11
+        radius: 5.5
 
         anchors.top: parent.top
 
@@ -57,7 +57,9 @@ Item {
         MouseArea {
             id: area
 
+            // A little larger than the knob, so it stays easy to grab.
             anchors.fill: parent
+            anchors.margins: -3
 
             property point center
             property real startAngle

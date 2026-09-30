@@ -30,11 +30,11 @@ Item {
     property real minHeight: 40
 
     property color color: "#5da9ff"
-    property real handleSize: 16
+    property real handleSize: 11
 
     // Edge bars: visible size, and the (larger) area that grabs them.
-    property real edgeLength: 36
-    property real edgeThickness: 6
+    property real edgeLength: 25
+    property real edgeThickness: 4
     property real edgeGrab: 12
 
     signal started()
@@ -160,8 +160,10 @@ Item {
 
             color: handles.color
 
+            // The grab area reaches a little past the small square.
             Grip {
                 anchors.fill: parent
+                anchors.margins: -3
                 sx: corner.modelData.sx
                 sy: corner.modelData.sy
                 cursorShape: sx * sy > 0 ? Qt.SizeFDiagCursor : Qt.SizeBDiagCursor
