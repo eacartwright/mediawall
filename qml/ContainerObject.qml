@@ -432,16 +432,19 @@ Item {
     // Outlines
     // -------------------------------------------------
 
-    // Selection / adjust outline (none otherwise, so a wall of
-    // containers reads as pictures, not boxes)
+    // Selection / adjust outline, or a faint one while empty. A filled,
+    // unselected container has none, so a wall reads as pictures, not boxes.
     Rectangle {
         anchors.fill: parent
 
         visible: root.selected || root.adjusting
+                 || (!root.hasContent && !root.presenting)
         color: "transparent"
 
-        border.color: root.adjusting ? "#e0a84c" : "#7fc97f"
-        border.width: 2
+        border.color: root.adjusting ? "#e0a84c"
+                      : root.selected ? "#7fc97f"
+                      : "#555555"
+        border.width: root.adjusting ? 2 : 1
 
         z: 5
     }
