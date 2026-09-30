@@ -854,7 +854,7 @@ No temporary extracted audio file should be necessary.
 
 **Implemented (2026-09-26):**
 
-- **Convert to Audio Track** (right-click a video on the canvas, free or in a container): the video leaves the canvas and its sound carries on as an audio track in the Playback tab, from the same position, with the same volume, speed, pitch, loop, and A-B settings, and unmuted. The track gets a new id, so the whole conversion is one clean undo step.
+- **Convert to Audio Track** (right-click a video on the canvas, free or in a container): the video leaves the canvas (a video in a container takes the container with it, rather than leaving an empty box) and its sound carries on as an audio track in the Playback tab, from the same position, with the same volume, speed, pitch, loop, and A-B settings, and unmuted. The track gets a new id, so the whole conversion is one clean undo step.
 - **Add to Audio** in a browser, shown for video files next to Add to Canvas: adds the video as an audio-only track. The file's source keeps its real type (video), so the same file can still go on the canvas.
 - A track made from a video attaches no video output, so its picture is never decoded. In the Playback tab it shows "(audio only)".
 
@@ -2436,7 +2436,7 @@ The prototype currently provides:
 - z-order and Delete through a right-click menu, plus shortcuts
 - a Layers panel (right-edge flyout): every object top first, selection linked both ways, Top/Up/Down/Bottom, drag to reorder
 - unit tests for `core/`, and app checks that drive the real app (section 37)
-- installers: a Windows `Setup.exe` and a Linux `.deb`, built by `packaging/build.py` (section 37); 0.9.3 released on GitHub (Windows installer; the `.deb` is still to be built on Linux)
+- installers: a Windows `Setup.exe` and a Linux `.deb`, built by `packaging/build.py` (section 37); 0.9.4 released on GitHub (Windows installer; the `.deb` is still to be built on Linux)
 
 ### How interactions reach the model
 
@@ -2708,6 +2708,7 @@ The following design decisions are currently established:
 - Selection outlines are 1 px for every object type (media, browsers, containers); only Adjust mode's orange outline stays 2 px. A browser's **New Container** button puts the current file in a new container beside it, like Add to Canvas (2026-09-29).
 - The sidebar's Audio tab is now **Playback** (flyout: "Layers · Playback"): it holds speed, pitch, A-B loops, and volume for videos as well as audio tracks. The browser's Add to Audio and the Convert to Audio Track command keep their names, since they do make audio tracks. The Windows installer shows as "MediaWall 0.9.2" in Installed apps (`AppVerName`), not Inno's default "MediaWall version 0.9.2" (2026-09-30).
 - The publisher is **evans.tools** (the Windows installer's `AppPublisher`, shown in Installed apps; the `.deb`'s Maintainer, with the GitHub noreply address, since dpkg needs an email). evans.tools is the owner's domain for this and related projects (2026-09-30).
+- Converting a container's video to an audio track removes the container as well; an empty container left behind was just clutter. Undo brings back both (2026-09-30).
 - Containers show no outline once filled unless selected (1 px green) or being adjusted (2 px orange), so a finished wall reads as pictures rather than boxes; an empty container keeps a faint grey outline (hidden in Present) until it's filled. A browsing container's badge is just `⇅`, without the `n / total` count (2026-09-29).
 
 ### Open decisions

@@ -99,6 +99,13 @@ def step_convert2():
     c.sm.undo()
     c.check("one undo brings the video back", c.scene.get(clip.id) is not None
             and not any(o.type == "audio" for o in c.scene.objects))
+    c.sm.convertToAudioTrack(c.scene.content_of(box.id).id)
+    c.check("converting a container's video removes the container too (no empty box left)",
+            c.scene.get(box.id) is None and sum(o.type == "audio" for o in c.scene.objects) == 1)
+    c.sm.undo()
+    c.check("...and one undo brings back the container with its video",
+            c.scene.content_of(box.id) is not None
+            and not any(o.type == "audio" for o in c.scene.objects))
     c.files = [c.sm.addAudioTrack(media(n), "audio") for n in (AUDIO, MP3)]
 
 

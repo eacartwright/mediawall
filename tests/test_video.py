@@ -187,9 +187,10 @@ class AudioTrackTests(unittest.TestCase):
 
         track = self.scene.convert_to_audio_track(content.id)
 
-        self.assertIsNone(self.scene.content_of(self.box.id))   # container emptied
+        self.assertIsNone(self.scene.get(content.id))
+        self.assertIsNone(self.scene.get(self.box.id))           # container goes too
         self.assertIsNone(track.parent_id)
-        self.assertIn(self.box, self.scene.layer_order())
+        self.assertNotIn(self.box, self.scene.layer_order())
 
     def test_only_videos_convert(self):
         img = self.scene.add_source("/p/photo.jpg", "image", 400, 300)

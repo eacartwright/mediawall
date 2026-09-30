@@ -679,24 +679,22 @@ class SceneModel(QAbstractListModel):
     @Slot(str, result=str)
     def convertToAudioTrack(self, media_id):
         """
-        Video as audio: replace a video (free, or a container's content)
-        with an audio track of the same file and settings. One undo step.
+        Video as audio: replace a video with an audio track of the same
+        file and settings. A video in a container takes the container
+        with it (no empty container is left behind). One undo step.
         """
         track = self._scene.audio_track_from(media_id)
         if track is None:
             return ""
 
+        # The canvas row that goes: the video, or its container.
         media = self._scene.get(media_id)
-        if media.parent_id is not None:
-            container_id = media.parent_id
-            self._scene.remove_content(container_id)
-            self._emit_row(container_id, CONTENT_ROLES)
-        else:
-            row = self._row_of(media_id)
-            self.beginRemoveRows(QModelIndex(), row, row)
-            self._scene.remove_object(media_id)
-            self.endRemoveRows()
-            self._emit_all(Z_ROLES)
+        row_id = media.parent_id or media_id
+        row = self._row_of(row_id)
+        self.beginRemoveRows(QModelIndex(), row, row)
+        self._scene.remove_object(row_id)
+        self.endRemoveRows()
+        self._emit_all(Z_ROLES)
 
         # _insert records the whole conversion as one undo step.
         track_id = self._insert(lambda: self._scene.insert_audio_track(track))

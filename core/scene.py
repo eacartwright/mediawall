@@ -470,15 +470,15 @@ class Scene:
         )
 
     def convert_to_audio_track(self, media_id) -> Optional[SceneObject]:
-        """Replace a video (free, or a container's content) with an audio track."""
+        """
+        Replace a video with an audio track. A video in a container takes
+        the container with it, rather than leaving it empty.
+        """
         track = self.audio_track_from(media_id)
         if track is None:
             return None
         media = self.get(media_id)
-        if media.parent_id is not None:
-            self.remove_content(media.parent_id)
-        else:
-            self.remove_object(media_id)
+        self.remove_object(media.parent_id or media_id)
         return self.insert_audio_track(track)
 
     def insert_audio_track(self, track) -> SceneObject:
