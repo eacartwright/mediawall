@@ -92,49 +92,21 @@ ApplicationWindow {
 
 
     // -------------------------------------------------
-    // Keyboard shortcuts
+    // Commands (AppActions.qml): each defined once, with its shortcut.
     // -------------------------------------------------
 
-    Shortcut {
-        sequences: [StandardKey.New]
-        enabled: !window.presenting
-        onActivated: projectController.newProject()
+    AppActions {
+        id: appActions
+        window: window
+        settingsDialog: settingsDialog
+        logWindow: logWindow
     }
 
     Shortcut {
-        sequences: [StandardKey.Open]
-        enabled: !window.presenting
-        onActivated: projectController.openProject()
-    }
-
-    Shortcut {
-        sequences: [StandardKey.Save]
-        onActivated: projectController.save()
-    }
-
-    Shortcut {
-        // Explicit: StandardKey.SaveAs has no binding on Windows.
-        sequence: "Ctrl+Shift+S"
-        onActivated: projectController.saveAs()
-    }
-
-    Shortcut {
-        sequences: [StandardKey.Undo]
-        enabled: !window.presenting
-        onActivated: sceneModel.undo()
-    }
-
-    Shortcut {
-        // Both common conventions (Linux/macOS and Windows).
-        sequences: ["Ctrl+Shift+Z", "Ctrl+Y"]
-        enabled: !window.presenting
-        onActivated: sceneModel.redo()
-    }
-
-    Shortcut {
-        sequence: "Ctrl+D"
-        enabled: !window.presenting
-        onActivated: sceneModel.duplicateSelected()
+        // Redo's second key (both common conventions: Ctrl+Shift+Z is
+        // on the action itself).
+        sequence: "Ctrl+Y"
+        onActivated: appActions.redo.trigger()
     }
 
     Shortcut {
@@ -149,51 +121,6 @@ ApplicationWindow {
             else if (window.fullScreenEditing)
                 window.fullScreenEditing = false
         }
-    }
-
-    Shortcut {
-        sequence: "F11"
-        onActivated: {
-            if (window.presenting)
-                window.presenting = false
-            else
-                window.fullScreenEditing = !window.fullScreenEditing
-        }
-    }
-
-    Shortcut {
-        sequence: "F5"
-        onActivated: window.presenting = !window.presenting
-    }
-
-    Shortcut {
-        sequences: [StandardKey.Delete]
-        enabled: !window.presenting
-        onActivated: sceneModel.removeSelected()
-    }
-
-    Shortcut {
-        sequence: "Ctrl+Shift+Up"
-        enabled: !window.presenting
-        onActivated: sceneModel.bringToFront(sceneModel.selectedId)
-    }
-
-    Shortcut {
-        sequence: "Ctrl+Up"
-        enabled: !window.presenting
-        onActivated: sceneModel.bringForward(sceneModel.selectedId)
-    }
-
-    Shortcut {
-        sequence: "Ctrl+Down"
-        enabled: !window.presenting
-        onActivated: sceneModel.sendBackward(sceneModel.selectedId)
-    }
-
-    Shortcut {
-        sequence: "Ctrl+Shift+Down"
-        enabled: !window.presenting
-        onActivated: sceneModel.sendToBack(sceneModel.selectedId)
     }
 
 
@@ -242,25 +169,10 @@ ApplicationWindow {
 
                 spacing: 8
 
-                Button {
-                    text: "New"
-                    onClicked: projectController.newProject()
-                }
-
-                Button {
-                    text: "Open"
-                    onClicked: projectController.openProject()
-                }
-
-                Button {
-                    text: "Save"
-                    onClicked: projectController.save()
-                }
-
-                Button {
-                    text: "Save As"
-                    onClicked: projectController.saveAs()
-                }
+                Button { action: appActions.newWall }
+                Button { action: appActions.open }
+                Button { action: appActions.save }
+                Button { action: appActions.saveAs }
 
                 // Layouts: a wall's containers only, saved for reuse.
                 Button {
@@ -271,18 +183,9 @@ ApplicationWindow {
                     Menu {
                         id: layoutMenu
 
-                        MenuItem {
-                            text: "Save Layout…"
-                            onTriggered: projectController.saveLayout()
-                        }
-                        MenuItem {
-                            text: "New from Layout…"
-                            onTriggered: projectController.newFromLayout()
-                        }
-                        MenuItem {
-                            text: "Add Layout to Wall…"
-                            onTriggered: projectController.addLayoutToWall()
-                        }
+                        MenuItem { action: appActions.saveLayout }
+                        MenuItem { action: appActions.newFromLayout }
+                        MenuItem { action: appActions.addLayout }
                     }
                 }
 
@@ -295,17 +198,8 @@ ApplicationWindow {
                     color: "#555555"
                 }
 
-                Button {
-                    text: "Undo"
-                    enabled: sceneModel.canUndo
-                    onClicked: sceneModel.undo()
-                }
-
-                Button {
-                    text: "Redo"
-                    enabled: sceneModel.canRedo
-                    onClicked: sceneModel.redo()
-                }
+                Button { action: appActions.undo }
+                Button { action: appActions.redo }
 
                 // Divider
                 Rectangle {
@@ -316,50 +210,17 @@ ApplicationWindow {
                     color: "#555555"
                 }
 
-                Button {
-                    text: "Add Browser"
-                    onClicked: sceneModel.addBrowser(
-                        100 + Math.random() * 100,
-                        100 + Math.random() * 100
-                    )
-                }
-
-                Button {
-                    text: "Add Container"
-                    onClicked: sceneModel.addContainer(
-                        150 + Math.random() * 100,
-                        150 + Math.random() * 100
-                    )
-                }
+                Button { action: appActions.addBrowser }
+                Button { action: appActions.addContainer }
 
                 Item {
                     Layout.fillWidth: true
                 }
 
-                Button {
-                    text: "Full Screen"
-                    onClicked: window.fullScreenEditing = true
-                }
-
-                Button {
-                    text: "Present"
-                    onClicked: window.presenting = true
-                }
-
-                Button {
-                    text: "Settings"
-                    onClicked: settingsDialog.open()
-                }
-
-                // Messages the app would print to a terminal.
-                Button {
-                    text: "Log"
-                    onClicked: {
-                        logWindow.show()
-                        logWindow.raise()
-                        logWindow.requestActivate()
-                    }
-                }
+                Button { action: appActions.fullScreen }
+                Button { action: appActions.present }
+                Button { action: appActions.settings }
+                Button { action: appActions.log }
             }
         }
 
@@ -474,6 +335,7 @@ ApplicationWindow {
 
             ObjectContextMenu {
                 id: objectMenu
+                actions: appActions
             }
 
 
@@ -514,6 +376,7 @@ ApplicationWindow {
 
         Sidebar {
             sceneItem: scene
+            actions: appActions
 
             anchors.top: toolbar.visible ? toolbar.bottom : parent.top
             anchors.bottom: parent.bottom

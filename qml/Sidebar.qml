@@ -15,6 +15,9 @@ Item {
     // The scene item (Main.qml), for looking up players by media id.
     property Item sceneItem
 
+    // Shared commands (AppActions.qml), set in Main.qml.
+    property var actions
+
     // Show the Audio tab when a track is added.
     Connections {
         target: sceneModel
@@ -325,34 +328,29 @@ Item {
                         Layout.margins: 6
                         spacing: 4
 
-                        readonly property bool hasSelection: sceneModel.selectedId !== ""
 
                         Button {
                             Layout.fillWidth: true
-                            text: "Top"
-                            enabled: parent.hasSelection && !sceneModel.selectedAtFront
-                            onClicked: sceneModel.bringToFront(sceneModel.selectedId)
+                            action: sidebar.actions.bringToFront
+                            text: "Top"            // shorter than the action's name
                         }
 
                         Button {
                             Layout.fillWidth: true
-                            text: "Up"
-                            enabled: parent.hasSelection && !sceneModel.selectedAtFront
-                            onClicked: sceneModel.bringForward(sceneModel.selectedId)
+                            action: sidebar.actions.bringForward
+                            text: "Up"            // shorter than the action's name
                         }
 
                         Button {
                             Layout.fillWidth: true
-                            text: "Down"
-                            enabled: parent.hasSelection && !sceneModel.selectedAtBack
-                            onClicked: sceneModel.sendBackward(sceneModel.selectedId)
+                            action: sidebar.actions.sendBackward
+                            text: "Down"            // shorter than the action's name
                         }
 
                         Button {
                             Layout.fillWidth: true
-                            text: "Bottom"
-                            enabled: parent.hasSelection && !sceneModel.selectedAtBack
-                            onClicked: sceneModel.sendToBack(sceneModel.selectedId)
+                            action: sidebar.actions.sendToBack
+                            text: "Bottom"            // shorter than the action's name
                         }
                     }
                 }

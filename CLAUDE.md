@@ -31,6 +31,7 @@ The tests cover `core/` only. They need no Qt or display and finish in milliseco
 - **`core/`** is plain Python and must never import Qt or `bridge/`. It holds all logic and data: `scene.py` (`MediaSource`, `SceneObject`, `Scene`, geometry and z-order), `project.py` (JSON save/load), `history.py` (undo/redo), and `media_browser.py` (folder scanning and extension-based type detection). This separation is what makes Qt-free tests, direct serialization, and snapshot undo possible.
 - **`bridge/`** is the Qt glue. `SceneModel` (a `QAbstractListModel`) exposes the scene to QML and turns QML slot calls into `core` operations. `ProjectController` handles New/Open/Save dialogs, the dirty flag, and the window title.
 - **`qml/`** renders model rows and handles live interaction. It never owns persistent state.
+- App commands (toolbar, menus, shortcuts) are Qt Quick `Action`s defined once in `qml/AppActions.qml`; controls use `action: appActions.<name>`. Add new commands there rather than wiring buttons and `Shortcut`s separately.
 - `main.py` wires `sceneModel`, `projectController`, `browserBackend`, and `appSettings` (app-wide settings via QSettings, `bridge/app_settings.py`) into QML as context properties. Set `MEDIAWALL_SETTINGS` to an `.ini` path when running the app in tests, so the user's real settings are never changed. It sets `QML_DISABLE_DISK_CACHE=1`, because stale compiled QML causes errors like "Type X unavailable".
 
 ### Source → Instance → Viewport (readme section 52; do not collapse these)

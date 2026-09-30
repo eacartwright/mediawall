@@ -11,12 +11,10 @@ Menu {
     // The object item that was right-clicked.
     property Item target: null
 
+    // Shared commands (AppActions.qml), set in Main.qml.
+    property var actions
+
     readonly property string targetId: target ? target.objectId : ""
-    // Stacking within the object's group (browsers stack above
-    // everything else). The target is always the selected object:
-    // right-clicking selects it first.
-    readonly property bool atFront: sceneModel.selectedAtFront
-    readonly property bool atBack: sceneModel.selectedAtBack
 
     // Media with more than one frame (a free GIF, or one in a container)
     readonly property bool targetAnimated:
@@ -368,39 +366,16 @@ Menu {
 
     // ---- Z-order ----
 
-    MenuItem {
-        text: "Bring to Front"
-        enabled: !menu.atFront
-        onTriggered: sceneModel.bringToFront(menu.targetId)
-    }
+    // Shared commands (AppActions.qml). They act on the selection, and
+    // the right-clicked object is always the selected one.
 
-    MenuItem {
-        text: "Bring Forward"
-        enabled: !menu.atFront
-        onTriggered: sceneModel.bringForward(menu.targetId)
-    }
-
-    MenuItem {
-        text: "Send Backward"
-        enabled: !menu.atBack
-        onTriggered: sceneModel.sendBackward(menu.targetId)
-    }
-
-    MenuItem {
-        text: "Send to Back"
-        enabled: !menu.atBack
-        onTriggered: sceneModel.sendToBack(menu.targetId)
-    }
+    MenuItem { action: menu.actions.bringToFront }
+    MenuItem { action: menu.actions.bringForward }
+    MenuItem { action: menu.actions.sendBackward }
+    MenuItem { action: menu.actions.sendToBack }
 
     MenuSeparator {}
 
-    MenuItem {
-        text: "Duplicate"
-        onTriggered: sceneModel.duplicate(menu.targetId)
-    }
-
-    MenuItem {
-        text: "Delete"
-        onTriggered: sceneModel.removeObject(menu.targetId)
-    }
+    MenuItem { action: menu.actions.duplicate }
+    MenuItem { action: menu.actions.deleteSelected }
 }

@@ -1318,6 +1318,10 @@ Controls z-order, visibility, and locking.
 
 Persistent or dockable audio controls.
 
+### Commands (actions)
+
+Every app command is defined once in `qml/AppActions.qml` as a Qt Quick `Action`: its name, keyboard shortcut, and when it's available (canvas-editing commands are off in Present). Toolbar buttons, the Layout menu, the right-click menu's arrange/Duplicate/Delete items, and the Layers panel's Top/Up/Down/Bottom all point at these (`Button { action: appActions.undo }`), so a command is wired in one place. New commands should be added there too; a later UI pass (menu bar, icons; section 51) then only rearranges them. Esc and Redo's second key (Ctrl+Y) stay plain `Shortcut`s in `Main.qml`.
+
 ### Settings
 
 The **Settings** button on the toolbar opens app-wide settings (not per project; `bridge/app_settings.py`, `qml/SettingsDialog.qml`). Changes apply at once and are saved immediately with Qt's `QSettings`: the registry on Windows (`HKEY_CURRENT_USER\Software\MediaWall\MediaWall`), `~/.config/MediaWall/MediaWall.conf` on Linux. The environment variable `MEDIAWALL_SETTINGS` can point at an `.ini` file to use instead (tests do this, so they never touch real settings).
@@ -1761,6 +1765,7 @@ mediawall/
 │   ├── BrowserObject.qml   Browse Object
 │   ├── ContainerObject.qml container (viewport with clipped content)
 │   ├── AudioTrackObject.qml audio track (a player with no canvas item)
+│   ├── AppActions.qml      every command, defined once (text, shortcut, enabled)
 │   ├── MediaView.qml       displays one media source (image, GIF/WebP, video, audio)
 │   ├── VideoControls.qml   play/seek/mute bar for video and audio
 │   ├── MediaErrorBox.qml   "Missing file" / "Can't display file" box
