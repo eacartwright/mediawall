@@ -2703,6 +2703,7 @@ The following design decisions are currently established:
 - An installed copy writes its logs to the user's data folder; running from source keeps `logs/` in the project folder (2026-09-29).
 - The app icon is the collage (option A of six) (2026-09-29).
 - Resize corners, edge bars, and the rotation knob are about 30% smaller than before; their grab areas stay about the same size (2026-09-29).
+- Later the same day, the corner squares went down again (11 → 9 px) and the edge bars got shorter (25 → 19 px); the rotation knob stayed. The Settings dialog got a lighter border (`palette.midlight`), since Fusion's default barely showed on the dark canvas.
 - Containers show no outline once filled unless selected (1 px green) or being adjusted (2 px orange), so a finished wall reads as pictures rather than boxes; an empty container keeps a faint grey outline (hidden in Present) until it's filled. A browsing container's badge is just `⇅`, without the `n / total` count (2026-09-29).
 
 ### Open decisions

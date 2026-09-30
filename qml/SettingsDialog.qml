@@ -15,6 +15,13 @@ Dialog {
     anchors.centerIn: Overlay.overlay
     width: 460
 
+    // Fusion's own border (palette.mid) barely shows on the dark canvas.
+    background: Rectangle {
+        color: dialog.palette.window
+        border.color: dialog.palette.midlight
+        radius: 2
+    }
+
     ColumnLayout {
         anchors.left: parent.left
         anchors.right: parent.right
