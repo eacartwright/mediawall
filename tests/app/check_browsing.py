@@ -5,7 +5,7 @@ stepping, autoplay, empty containers, undo, and Present.
 
 import os
 
-from harness import (Check, GIF, MEDIA, PHOTO, SCREENSHOT, Qt, folder_files, media)
+from harness import (Check, MEDIA, PHOTO, Qt, folder_files, media)
 from core.scene import FIT_CONTAIN, Scene
 
 c = Check("browsing")
@@ -13,7 +13,12 @@ names = [e["name"] for e in folder_files()]
 
 scene = Scene()
 photo = scene.add_source(media(PHOTO), "image", 4320, 2432)
-shot = scene.add_source(media(SCREENSHOT), "image", 0, 0)
+# The second container starts on an image that the folder order follows
+# with a video, to check that stepping image -> video plays.
+_files = folder_files()
+_start = next(e for i, e in enumerate(_files)
+              if e["type"] == "image" and _files[(i + 1) % len(_files)]["type"] == "video")
+shot = scene.add_source(_start["path"], "image", 0, 0)
 box = scene.add_object("container", 60, 80, width=600, height=420)
 scene.add_media_to_container(photo.id, box.id)
 box.browse_mode, box.browse_folder = True, str(MEDIA)
@@ -85,7 +90,7 @@ def step_after_reset():
     b, item = c.scene.get(box.id), content()
     c.check("Fit is remembered for the next file",
             b.fit_mode == FIT_CONTAIN and item.width <= b.width + 0.5 and item.height <= b.height + 0.5)
-    c.click(950, 290, Qt.ForwardButton)                             # second: screenshot -> video
+    c.click(950, 290, Qt.ForwardButton)                             # second: image -> video
 
 
 def step_autoplay():
@@ -96,11 +101,17 @@ def step_autoplay():
 
 def step_autoplay2():
     c.check("after pausing a video, the next file plays", content(second.id).playing, shown(second.id))
-    c.click(950, 290, Qt.ForwardButton)                             # GIF -> MOV
+    # Step on to the next video (however far, in the folder's order).
+    here = names.index(shown(second.id))
+    kinds = [e["type"] for e in folder_files()]
+    ahead = next(k for k in range(1, len(names) + 1) if kinds[(here + k) % len(names)] == "video")
+    c.from_kind = kinds[here]
+    for _ in range(ahead):
+        c.click(950, 290, Qt.ForwardButton)
 
 
 def step_autoplay3():
-    c.check("GIF -> video: plays", player_state(second.id) == 1, shown(second.id))
+    c.check(f"{c.from_kind} -> ... -> video: plays", player_state(second.id) == 1, shown(second.id))
     c.double_click(210, 640)                                        # empty container
 
 

@@ -42,13 +42,13 @@ from core.project import save_project                             # noqa: E402
 
 # ---- Sample media (MEDIATEST/) ----
 
-PHOTO = "IMG_20161015_184258308.jpg"        # 4320 x 2432
-SCREENSHOT = "Screenshot 2026-07-20 202445.png"
-GIF = "beetlejuice.gif"                     # 600 x 326, animated
-VIDEO = "VID_20161226_050020233.mp4"        # phone video, stored sideways
-MOV = "IMG_2431.MOV"                        # phone video, stored sideways
-WEBM = "steamdeck_thumbstick_move.webm"     # 3 s
-AUDIO = "Relaxing ASMR Reiki Healing 2 (3D sound) please wear headphones =).m4a"
+PHOTO = "test_jpg.jpg"                      # 4320 x 2432 photo
+SCREENSHOT = "test_png.png"
+GIF = "test_gif.gif"                        # animated
+VIDEO = "test_mp4.mp4"                      # phone video, stored sideways
+MOV = "test_mov.mov"                        # phone video, stored sideways
+WEBM = "test_webm.webm"                     # 3 s
+AUDIO = "test_m4a.m4a"
 
 
 def media(name):
