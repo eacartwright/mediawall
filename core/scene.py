@@ -68,7 +68,9 @@ FIT_MODES = {FIT_CONTAIN, FIT_COVER}
 # Object types that always stack above the others (workspace tools).
 OVERLAY_TYPES = {"browser"}
 
-# Playback speed range (QtMultimedia playbackRate).
+# Playback speed limits (QtMultimedia playbackRate): the outer bounds any
+# saved speed is kept within. The Audio tab's slider offers a narrower
+# range, set in Settings (bridge/app_settings.py; default 0.5x .. 3x).
 SPEED_MIN = 0.25
 SPEED_MAX = 4.0
 

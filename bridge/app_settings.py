@@ -23,9 +23,20 @@ ZOOM_STEP_MIN = 1.0
 ZOOM_STEP_MAX = 50.0
 
 
+# Playback speed range offered by the Audio tab's speed slider. The
+# outer limits are core's SPEED_MIN / SPEED_MAX (0.25x .. 4x).
+SPEED_MIN_KEY = "playback/speedMin"
+SPEED_MIN_DEFAULT = 0.5
+SPEED_MIN_RANGE = (0.25, 1.0)
+SPEED_MAX_KEY = "playback/speedMax"
+SPEED_MAX_DEFAULT = 3.0
+SPEED_MAX_RANGE = (1.0, 4.0)
+
+
 class AppSettings(QObject):
 
     zoomStepChanged = Signal()
+    speedRangeChanged = Signal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -77,3 +88,55 @@ class AppSettings(QObject):
     @Slot()
     def resetZoomStep(self):
         self._set_zoom_step(ZOOM_STEP_DEFAULT)
+
+    # ---- Playback speed range (the Audio tab's speed slider) ----
+
+    def _read(self, key, default, low, high):
+        try:
+            value = float(self._settings.value(key, default))
+        except (TypeError, ValueError):
+            value = default
+        return round(min(high, max(low, value)), 2)
+
+    def _write(self, key, value, default, low, high, signal):
+        value = round(min(high, max(low, float(value))), 2)
+        if value == self._read(key, default, low, high):
+            return
+        self._settings.setValue(key, value)
+        self._settings.sync()
+        signal.emit()
+
+    def _get_speed_min(self):
+        return self._read(SPEED_MIN_KEY, SPEED_MIN_DEFAULT, *SPEED_MIN_RANGE)
+
+    def _set_speed_min(self, value):
+        self._write(SPEED_MIN_KEY, value, SPEED_MIN_DEFAULT, *SPEED_MIN_RANGE,
+                    self.speedRangeChanged)
+
+    # Slowest speed offered (0.25 .. 1).
+    speedMin = Property(float, _get_speed_min, _set_speed_min, notify=speedRangeChanged)
+
+    def _get_speed_max(self):
+        return self._read(SPEED_MAX_KEY, SPEED_MAX_DEFAULT, *SPEED_MAX_RANGE)
+
+    def _set_speed_max(self, value):
+        self._write(SPEED_MAX_KEY, value, SPEED_MAX_DEFAULT, *SPEED_MAX_RANGE,
+                    self.speedRangeChanged)
+
+    # Fastest speed offered (1 .. 4).
+    speedMax = Property(float, _get_speed_max, _set_speed_max, notify=speedRangeChanged)
+
+    def _get_speed_min_default(self):
+        return SPEED_MIN_DEFAULT
+
+    speedMinDefault = Property(float, _get_speed_min_default, constant=True)
+
+    def _get_speed_max_default(self):
+        return SPEED_MAX_DEFAULT
+
+    speedMaxDefault = Property(float, _get_speed_max_default, constant=True)
+
+    @Slot()
+    def resetSpeedRange(self):
+        self._set_speed_min(SPEED_MIN_DEFAULT)
+        self._set_speed_max(SPEED_MAX_DEFAULT)

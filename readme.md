@@ -847,7 +847,7 @@ Implementation: QtMultimedia's `playbackRate` sets speed, and `pitchCompensation
 Every video instance (free, or a container's content) has its own, saved and undoable:
 
 - **volume**, **mute**, **play/pause**, **loop** (as before)
-- **speed**, 0.25x to 4x (`speed`), and **Keep pitch** (`preserve_pitch`, off by default so pitch follows speed). `pitchCompensation` was confirmed available on Windows with PySide6 6.11.2.
+- **speed** (`speed`; the slider's range is set in Settings, default 0.5x to 3x, within core's 0.25x to 4x), and **Keep pitch** (`preserve_pitch`, off by default so pitch follows speed). `pitchCompensation` was confirmed available on Windows with PySide6 6.11.2.
 - an **A-B loop** (`loop_a` / `loop_b`, milliseconds, -1 = not set). Looping between them happens only when both are set; the points are kept in order, and points less than 0.1 s apart are rejected. Set them at the current position from the right-click menu (Set Loop Start (A) Here / Set Loop End (B) Here / Clear A–B Loop) or the Audio tab. The seek bar shows A and B markers and the looped span. Reaching B seeks back to A (deferred to the next event-loop turn: the FFmpeg backend ignores a seek made inside `positionChanged`).
 
 The sidebar's **Audio** tab (next to Layers) lists every video instance, top first, each with Play/Pause, Mute, a volume slider (the mouse wheel over it changes the volume), a speed slider on a log scale (1x in the middle; double-click the value to reset), Keep pitch, Loop, and A/B buttons. Clicking a card selects the video (or the container holding it). The list is a real list model (`bridge/audio_model.py`) that updates rows in place, so sliders aren't recreated while being dragged.
@@ -1329,6 +1329,7 @@ The **Settings** button on the toolbar opens app-wide settings (not per project;
 Settings so far:
 
 - **Mouse-wheel zoom step**: percent per wheel notch, 1 to 50, default 10. Used by every wheel zoom: free images and containers, browsing containers, Adjust mode, and browser previews.
+- **Playback speed range**: the slowest and fastest speed offered by the Audio tab's speed slider, default **0.5× to 3×** (slowest 0.25–1×, fastest 1–4×, in 0.25× steps). Core's limits (`SPEED_MIN` / `SPEED_MAX`, 0.25× to 4×) remain the outer bounds any saved speed is kept within; a video already set outside the chosen range keeps its speed.
 
 ### Context menus
 
@@ -2572,6 +2573,7 @@ The following design decisions are currently established:
 - Browsing containers and the browser preview use picture-viewer (qView) controls: wheel zooms, back/forward mouse buttons change file, left-drag pans; a browsing container moves by its border strip or a middle-button drag (both kept for now to compare) (2026-09-29).
 - App-wide settings live in a Settings dialog, saved with QSettings; the first is the wheel zoom step (default 10% per notch) (2026-09-29).
 - Audio previews in a browser don't zoom or pan: they stay centered (2026-09-29).
+- The speed slider's range is a setting (default 0.5x to 3x); core keeps 0.25x to 4x as the outer limits (2026-09-29).
 - Phone videos stored sideways with a rotation flag get their displayed (upright) size: MediaView reports the stored size in the orientation actually drawn, once it has settled; a size report that is the old one turned sideways re-sizes (fits within its box) and re-frames everything already placed, which also repairs older walls (2026-09-26).
 - Speed changes pitch by default (Keep pitch off), as in Celluloid (2026-09-26).
 - The application's name is written **MediaWall** (one word) everywhere (2026-09-26).

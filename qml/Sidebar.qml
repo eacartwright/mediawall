@@ -528,11 +528,12 @@ Item {
                                     font.pixelSize: 11
                                 }
 
-                                // Log scale: 1x in the middle, 0.25x .. 4x.
+                                // Log scale over the range set in Settings
+                                // (default 0.5x .. 3x).
                                 Slider {
                                     Layout.fillWidth: true
-                                    from: -2
-                                    to: 2
+                                    from: Math.log2(appSettings.speedMin)
+                                    to: Math.log2(appSettings.speedMax)
                                     value: Math.log2(card.speed)
                                     onMoved: {
                                         var v = Math.abs(value) < 0.05 ? 0 : value  // snap to 1x
