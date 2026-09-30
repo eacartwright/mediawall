@@ -470,10 +470,11 @@ Rectangle {
 
 
     // -------------------------------------------------
-    // Preview
+    // Preview (qView-style)
     //
-    // Wheel: previous/next file. Left button + wheel: zoom around the
-    // pointer; left-drag pans while zoomed. Double-click: add to canvas.
+    // Wheel: zoom around the pointer; left-drag pans while zoomed.
+    // Back/forward mouse buttons: previous/next file. Double-click:
+    // add to canvas.
     // -------------------------------------------------
 
     Rectangle {
@@ -563,12 +564,21 @@ Rectangle {
 
             anchors.fill: parent
 
-            acceptedButtons: Qt.LeftButton | Qt.RightButton
+            acceptedButtons: Qt.LeftButton | Qt.RightButton | Qt.BackButton | Qt.ForwardButton
 
             property point startMouse
             property point startPan
 
             onPressed: function(mouse) {
+                if (mouse.button === Qt.BackButton) {
+                    root.previousMedia()
+                    return
+                }
+                if (mouse.button === Qt.ForwardButton) {
+                    root.nextMedia()
+                    return
+                }
+
                 sceneModel.select(root.objectId)
 
                 if (mouse.button === Qt.RightButton) {
@@ -595,17 +605,9 @@ Rectangle {
             }
 
             onWheel: function(wheel) {
-                if (wheel.angleDelta.y === 0)
-                    return
-
-                if (wheel.buttons & Qt.LeftButton) {
+                if (wheel.angleDelta.y !== 0)
                     root.zoomPreviewAt(wheel.x, wheel.y,
                                        Zoom.wheelFactor(wheel.angleDelta.y))
-                } else if (wheel.angleDelta.y > 0) {
-                    root.previousMedia()
-                } else {
-                    root.nextMedia()
-                }
             }
         }
 

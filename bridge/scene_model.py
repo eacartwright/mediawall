@@ -41,7 +41,8 @@ from core.scene import FIT_CONTAIN, FIT_COVER, Scene
 BROWSER_FIELDS = ("folder", "current_index", "include_subfolders")
 
 # The same for browsing containers: their browse settings, and while
-# browsing, the content itself (which file, and how it's framed).
+# browsing, the content itself (which file, and how it's framed) and
+# the Fit/Fill mode it's framed with.
 CONTAINER_BROWSE_FIELDS = ("browse_mode", "browse_folder", "browse_subfolders")
 
 
@@ -450,6 +451,7 @@ class SceneModel(QAbstractListModel):
             for name in CONTAINER_BROWSE_FIELDS:
                 setattr(obj, name, getattr(live, name))
             if live.browse_mode:
+                obj.fit_mode = live.fit_mode
                 target.objects = [o for o in target.objects if o.parent_id != obj.id]
                 live_content = cur.content_of(obj.id)
                 if live_content is not None:
@@ -897,19 +899,32 @@ class SceneModel(QAbstractListModel):
             self._emit_row(container_id, CONTENT_ROLES)
             self._changed()
 
+    def _browsing(self, container_id):
+        """A browsing container's content is workspace state (not undone)."""
+        container = self._scene.get(container_id)
+        return container is not None and container.browse_mode
+
     @Slot(str, float, float, float, float, float)
     def commitContent(self, container_id, x, y, width, height, rotation):
         if self._scene.set_content_geometry(container_id, x, y, width,
                                             height, rotation):
             self._emit_row(container_id, CONTENT_ROLES)
-            self._changed()
+            self._changed(workspace_only=self._browsing(container_id))
 
     @Slot(str, bool)
     def fitContent(self, container_id, fill):
         mode = FIT_COVER if fill else FIT_CONTAIN
         if self._scene.fit_content(container_id, mode):
             self._emit_row(container_id, CONTENT_ROLES + CONTAINER_ROLES)
-            self._changed()
+            self._changed(workspace_only=self._browsing(container_id))
+
+    @Slot(str)
+    def resetContentFraming(self, container_id):
+        """Back to the container's Fit/Fill framing (e.g. double-click)."""
+        container = self._scene.get(container_id)
+        if container is not None and self._scene.fit_content(container_id, container.fit_mode):
+            self._emit_row(container_id, CONTENT_ROLES)
+            self._changed(workspace_only=self._browsing(container_id))
 
     # -------------------------------------------------
     # Browsing containers (workspace state: saved, not undone)

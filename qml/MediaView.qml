@@ -128,7 +128,8 @@ Item {
             autoTransform: true         // EXIF orientation
 
             asynchronous: true
-            smooth: true
+            smooth: true            // bilinear filtering when scaled
+            mipmap: true            // clean downscaling (fine detail, text)
             cache: true
 
             onStatusChanged: {
@@ -149,6 +150,7 @@ Item {
 
             asynchronous: true
             smooth: true
+            mipmap: true            // calmer GIF dither patterns when scaled down
 
             playing: view.playing
 

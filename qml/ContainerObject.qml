@@ -8,9 +8,12 @@ import "Zoom.js" as Zoom
 // Adjust mode:  drag pans the content, wheel zooms, knob rotates the
 //               content. The part outside the frame shows as a ghost.
 //               Enter by double-clicking or from the right-click menu.
-// Browsing:     the wheel steps through the media in a folder, showing
-//               each file as the content (right-click > Browse This
-//               Folder). Also works in Present: a hand-driven slideshow.
+// Browsing:     like a picture viewer (qView): left-drag pans, the
+//               wheel zooms, back/forward mouse buttons step through the
+//               folder's media, double-click resets the zoom. The border
+//               strip or a middle-button drag moves the container.
+//               (Right-click > Browse This Folder.) Also works in
+//               Present: a hand-driven slideshow.
 //
 // Content geometry is in the container's local coordinates
 // (0, 0 = top-left of the unrotated container).
@@ -156,7 +159,16 @@ Item {
         return -1
     }
 
-    // Wheel up = previous, down = next, wrapping around (as in a browser).
+    // A browsing container moves by this band just inside its edge (or
+    // by a middle-button drag); elsewhere left-drag pans the picture.
+    readonly property real borderStrip: 10
+
+    function inBorderStrip(px, py) {
+        return px < borderStrip || py < borderStrip
+               || px > width - borderStrip || py > height - borderStrip
+    }
+
+    // -1 = previous, +1 = next, wrapping around (as in a browser).
     function browseStep(delta) {
         var n = browseFiles.length
         if (n === 0)
@@ -455,34 +467,76 @@ Item {
 
         z: 10
 
-        // In Present only the wheel is used (browsing containers).
-        acceptedButtons: root.presenting ? Qt.NoButton : Qt.LeftButton | Qt.RightButton
+        // Browsing (qView-style): left-drag pans the picture, the wheel
+        // zooms it, back/forward mouse buttons change file, double-click
+        // resets the zoom. The container itself moves by its border
+        // strip or a middle-button drag. In Present a browsing container
+        // keeps pan, zoom, and back/forward; nothing else responds.
+        acceptedButtons: {
+            if (root.presenting)
+                return root.browseMode ? Qt.LeftButton | Qt.BackButton | Qt.ForwardButton
+                                       : Qt.NoButton
+            return Qt.LeftButton | Qt.RightButton | Qt.MiddleButton
+                   | Qt.BackButton | Qt.ForwardButton
+        }
+
+        // Show a move cursor over a browsing container's border strip.
+        hoverEnabled: root.browseMode && !root.presenting
+        cursorShape: hoverEnabled && !root.adjusting && root.inBorderStrip(mouseX, mouseY)
+                     ? Qt.SizeAllCursor : Qt.ArrowCursor
 
         property string mode: ""      // "move" | "pan" | ""
         property point startMouse
         property point startPos
 
+        function startMove(mouse) {
+            mode = "move"
+            startMouse = area.mapToItem(root.sceneItem, mouse.x, mouse.y)
+            startPos = Qt.point(root.x, root.y)
+        }
+
+        // The container doesn't move while panning, so local mouse
+        // coordinates are stable.
+        function startPan(mouse) {
+            mode = "pan"
+            startMouse = Qt.point(mouse.x, mouse.y)
+            startPos = Qt.point(cg.cx, cg.cy)
+        }
+
         onPressed: function(mouse) {
-            sceneModel.select(root.objectId)
+            mode = ""
+
+            if (mouse.button === Qt.BackButton || mouse.button === Qt.ForwardButton) {
+                if (root.browseMode)
+                    root.browseStep(mouse.button === Qt.BackButton ? -1 : 1)
+                else
+                    mouse.accepted = false
+                return
+            }
+
+            if (!root.presenting)
+                sceneModel.select(root.objectId)
 
             if (mouse.button === Qt.RightButton) {
-                mode = ""
                 if (root.contextMenu)
                     root.contextMenu.openFor(root)
                 return
             }
 
-            if (root.adjusting) {
-                // The container doesn't move while panning, so local
-                // mouse coordinates are stable.
-                mode = "pan"
-                startMouse = Qt.point(mouse.x, mouse.y)
-                startPos = Qt.point(cg.cx, cg.cy)
-            } else {
-                mode = "move"
-                startMouse = area.mapToItem(root.sceneItem, mouse.x, mouse.y)
-                startPos = Qt.point(root.x, root.y)
+            if (mouse.button === Qt.MiddleButton) {
+                if (!root.adjusting)
+                    startMove(mouse)
+                return
             }
+
+            // Left button
+            if (root.adjusting)
+                startPan(mouse)
+            else if (root.browseMode && root.hasContent
+                     && (root.presenting || !root.inBorderStrip(mouse.x, mouse.y)))
+                startPan(mouse)
+            else if (!root.presenting)
+                startMove(mouse)
         }
 
         onPositionChanged: function(mouse) {
@@ -507,13 +561,19 @@ Item {
             mode = ""
         }
 
+        // Browsing: reset the zoom (the container's Fit/Fill framing).
+        // Otherwise: Adjust mode.
         onDoubleClicked: function(mouse) {
-            if (mouse.button === Qt.LeftButton && root.hasContent)
+            if (mouse.button !== Qt.LeftButton || !root.hasContent)
+                return
+            if (root.browseMode && !root.adjusting)
+                sceneModel.resetContentFraming(root.objectId)
+            else if (!root.presenting)
                 root.adjusting = true
         }
 
-        // Adjusting: zoom the content. Browsing: step through the
-        // folder (selected or not, and in Present). Otherwise, when
+        // Adjusting or browsing: zoom the content around the pointer
+        // (browsing: selected or not, and in Present). Otherwise, when
         // selected, scale the whole container like a free image.
         onWheel: function(wheel) {
             if (wheel.angleDelta.y === 0) {
@@ -521,25 +581,21 @@ Item {
                 return
             }
 
-            if (root.browseMode && !root.adjusting) {
-                root.browseStep(wheel.angleDelta.y > 0 ? -1 : 1)
+            var f = Zoom.wheelFactor(wheel.angleDelta.y)
+
+            if (root.adjusting || (root.browseMode && root.hasContent)) {
+                root.zoomAt(wheel.x, wheel.y, f)
                 return
             }
 
-            if (!(root.adjusting || root.selected)) {
+            if (!root.selected) {
                 wheel.accepted = false
                 return
             }
 
-            var f = Zoom.wheelFactor(wheel.angleDelta.y)
-
-            if (root.adjusting) {
-                root.zoomAt(wheel.x, wheel.y, f)
-            } else {
-                var p = area.mapToItem(root.sceneItem, wheel.x, wheel.y)
-                sceneModel.setMergeKey("scale:" + root.objectId)
-                sceneModel.scaleObject(root.objectId, p.x, p.y, f)
-            }
+            var p = area.mapToItem(root.sceneItem, wheel.x, wheel.y)
+            sceneModel.setMergeKey("scale:" + root.objectId)
+            sceneModel.scaleObject(root.objectId, p.x, p.y, f)
         }
     }
 
