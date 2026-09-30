@@ -1758,9 +1758,9 @@ Linux:    venv/bin/python tools/create_launchers.py [--desktop]
 
 ### Log window
 
-Everything the app would print to a terminal (FFmpeg, Qt warnings and QML errors, Python output and uncaught exceptions) is captured by `bridge/log_capture.py` and shown in the **Log** window (toolbar button), with Copy All and Clear. It is also written to `logs/mediawall.log` (the previous run is kept as `mediawall.previous.log`), so a start that fails before the window appears still leaves a trace. When the app is started from a terminal, the output appears there too.
+Everything the app would print to a terminal (FFmpeg, Qt warnings and QML errors, Python output and uncaught exceptions) is captured by `bridge/log_capture.py` and shown in the **Log** window (toolbar button), with Copy All and Clear. It is also written to `logs/mediawall.log` (the previous run is kept as `mediawall.previous.log`); an installed copy writes it to the user's own data folder instead (`%LOCALAPPDATA%/MediaWall/logs` on Windows, `~/.local/state/MediaWall/logs` on Linux), since its install folder may not be writable. That way a start that fails before the window appears still leaves a trace. When the app is started from a terminal, the output appears there too.
 
-The capture works by redirecting file descriptors 1 and 2 into a pipe, since FFmpeg writes to stderr directly.
+The capture works by redirecting file descriptors 1 and 2 into a pipe, since FFmpeg writes to stderr directly. On Windows it also points the process's standard output and error handles at the pipe (`SetStdHandle`): `python.exe` does that as part of the redirect, but the installed build's launcher doesn't, and without it FFmpeg's messages went missing there.
 
 ### QML disk cache
 
@@ -1785,6 +1785,27 @@ Linux:    venv/bin/python tests/app/run.py [name ...]
 
 With names (e.g. `run.py browsing layers`) only those run. Each check gets its own scratch settings file (`MEDIAWALL_SETTINGS`), so real settings are never touched. `tests/app/harness.py` holds the shared setup; a few QML items carry an `objectName` so checks can find them regardless of font sizes. Run them after changes to QML or the bridge.
 
+### Installers
+
+`packaging/build.py` builds the installer for the platform it runs on, in about a minute:
+
+```text
+Windows:  venv\Scripts\python.exe packaging\build.py      -> dist\MediaWall-<version>-Setup.exe
+Linux:    venv/bin/python packaging/build.py                -> dist/mediawall_<version>_amd64.deb
+```
+
+One-time setup: `pip install -r requirements-build.txt` (PyInstaller), plus Inno Setup 6 on Windows (`winget install JRSoftware.InnoSetup`); Linux needs `dpkg-deb`, which Mint and Ubuntu already have. Each platform's installer has to be built on that platform. `--app-only` stops after the app folder (`dist/MediaWall/`), which runs without installing. `build/` and `dist/` are gitignored. The version comes from `core/version.py`.
+
+How it works:
+
+1. The icon (`assets/mediawall.svg`) is rendered to PNGs and a Windows `.ico` in `build/icon/`.
+2. PyInstaller (`packaging/mediawall.spec`) makes `dist/MediaWall/`: Python, PySide6/Qt, Qt's FFmpeg libraries, the QML files, and the icon, so nothing needs to be installed first. Parts of Qt MediaWall doesn't use (web engine, 3D, charts, PDF, other Controls styles, and so on) are left out by name in the spec; if a new QML import is added, check it isn't on that list. QtMultimedia is named as a hidden import because only QML uses it.
+3. The installer:
+   - **Windows:** Inno Setup (`packaging/windows/mediawall.iss`) makes one `Setup.exe` (about 40 MB). It installs per user without an admin prompt (or for everyone, if chosen), adds a Start Menu shortcut, an optional desktop shortcut, an uninstaller, and (optional, on by default) makes `.mediawall` files open in MediaWall. The app folder has two programs: `MediaWall.exe`, a small windowed launcher, starts `MediaWall-app.exe` (the app, a console program) with a hidden console, for the same reason as `launcher.pyw` (section 37, Launchers).
+   - **Linux:** a `.deb` that installs the app in `/opt/mediawall`, `mediawall` on the PATH, a menu entry, the icon, and the `.mediawall` file type (`packaging/linux/`). Its `Depends` lists the few system libraries PySide6 doesn't bundle (e.g. `libxcb-cursor0`), so installing it with `sudo apt install ./mediawall_<version>_amd64.deb` (or double-clicking it) fetches any that are missing.
+
+The installers bundle their own Python and libraries rather than installing Python on the user's machine: that is the usual approach for Python desktop apps, it needs no internet or admin rights, and it can't break on a mismatched system Python. Settings (QSettings) and logs are per user and survive an uninstall.
+
 Do not depend on any other project's virtual environment (for example ComfyUI's). MediaWall has its own environment and dependency set.
 
 ---
@@ -1798,6 +1819,7 @@ mediawall/
 ├── main.py                 entry point: creates the app, engine, and models
 ├── launcher.pyw            starts main.py without a terminal window
 ├── requirements.txt
+├── requirements-build.txt  extra requirements for building the installers
 ├── readme.md
 │
 ├── core/                   plain Python, no Qt imports
@@ -1807,6 +1829,7 @@ mediawall/
 │   ├── history.py          undo/redo history (scene snapshots)
 │   ├── history_file.py     undo history saved next to the project
 │   ├── layout.py           layouts: containers only, saved for reuse
+│   ├── version.py          the app's version number
 │   └── media_browser.py    folder scanning, media type detection
 │
 ├── bridge/                 Qt glue between core and QML
@@ -1834,6 +1857,16 @@ mediawall/
 │   ├── LogWindow.qml       the Log window
 │   ├── Sidebar.qml         right-edge flyout: Layers and Audio tabs
 │   └── Zoom.js             shared mouse-wheel zoom step
+│
+├── assets/
+│   └── mediawall.svg       the app icon
+│
+├── packaging/              installers (section 37, Installers)
+│   ├── build.py            builds this platform's installer into dist/
+│   ├── mediawall.spec      PyInstaller recipe
+│   ├── windows_launcher.py MediaWall.exe: starts the app without a console
+│   ├── windows/            Inno Setup script
+│   └── linux/              .desktop entry, .mediawall file type
 │
 ├── tools/
 │   ├── create_launchers.py shortcuts / menu entries for this machine
@@ -2384,7 +2417,8 @@ The prototype currently provides:
 - single selection; clicking empty canvas deselects
 - z-order and Delete through a right-click menu, plus shortcuts
 - a Layers panel (right-edge flyout): every object top first, selection linked both ways, Top/Up/Down/Bottom, drag to reorder
-- unit tests for `core/`
+- unit tests for `core/`, and app checks that drive the real app (section 37)
+- installers: a Windows `Setup.exe` and a Linux `.deb`, built by `packaging/build.py` (section 37)
 
 ### How interactions reach the model
 
@@ -2648,6 +2682,10 @@ The following design decisions are currently established:
 - No audio solo, and no choosing between audio streams in one file (2026-09-26).
 - The wall is not scaled to the screen: a larger screen shows more canvas, with the wall at the same size in the top-left; multi-monitor walls use one MediaWall instance per screen (2026-09-26).
 - The window uses 4x MSAA so rotated edges are smooth (2026-09-26).
+- Installers bundle Python and all libraries (PyInstaller) rather than installing Python or downloading dependencies at install time: Inno Setup on Windows, a `.deb` on Linux, both built by one script (2026-09-29).
+- An installed copy writes its logs to the user's data folder; running from source keeps `logs/` in the project folder (2026-09-29).
+- The app icon is the collage (option A of six) (2026-09-29).
+- Resize corners, edge bars, and the rotation knob are about 30% smaller than before; their grab areas stay about the same size (2026-09-29).
 
 ### Open decisions
 

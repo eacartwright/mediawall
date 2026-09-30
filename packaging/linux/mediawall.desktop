@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=MediaWall
+Comment=Arrange images, GIFs, video, and audio on a free canvas
+Exec=mediawall %f
+Icon=mediawall
+Terminal=false
+Categories=AudioVideo;Graphics;
+MimeType=application/x-mediawall;
+StartupWMClass=mediawall

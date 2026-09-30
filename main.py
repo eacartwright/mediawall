@@ -9,7 +9,7 @@ from pathlib import Path
 os.environ.setdefault("QML_DISABLE_DISK_CACHE", "1")
 
 from PySide6.QtCore import QObject, QUrl, Slot
-from PySide6.QtGui import QFontDatabase, QSurfaceFormat
+from PySide6.QtGui import QFontDatabase, QIcon, QSurfaceFormat
 from PySide6.QtQml import QQmlApplicationEngine
 from PySide6.QtQuickControls2 import QQuickStyle
 from PySide6.QtWidgets import QApplication, QFileDialog
@@ -21,11 +21,34 @@ from bridge.scene_model import SceneModel
 from core.media_browser import MediaBrowser
 
 
-# Resolve everything relative to this file so the app works
-# no matter which directory it is launched from.
-APP_DIR = Path(__file__).resolve().parent
+# An installed build (PyInstaller, see packaging/) is "frozen": its
+# files are unpacked under sys._MEIPASS, and its own folder may not be
+# writable (Program Files, /opt).
+FROZEN = getattr(sys, "frozen", False)
+
+# Resolve everything relative to the app's files so it works no matter
+# which directory it is launched from.
+APP_DIR = Path(sys._MEIPASS) if FROZEN else Path(__file__).resolve().parent
 MAIN_QML = APP_DIR / "qml" / "Main.qml"
-LOG_PATH = APP_DIR / "logs" / "mediawall.log"
+ICON_PATH = APP_DIR / "assets" / "mediawall.svg"
+
+
+def log_dir():
+    """
+    Run from source: logs/ in the project folder. Installed: the user's
+    own data folder, %LOCALAPPDATA%/MediaWall/logs on Windows and
+    ~/.local/state/MediaWall/logs on Linux ($XDG_STATE_HOME if set).
+    """
+    if not FROZEN:
+        return APP_DIR / "logs"
+    if sys.platform == "win32":
+        base = Path(os.environ.get("LOCALAPPDATA") or Path.home() / "AppData" / "Local")
+    else:
+        base = Path(os.environ.get("XDG_STATE_HOME") or Path.home() / ".local" / "state")
+    return base / "MediaWall" / "logs"
+
+
+LOG_PATH = log_dir() / "mediawall.log"
 
 
 class BrowserBackend(QObject):
@@ -64,6 +87,7 @@ def main():
     QSurfaceFormat.setDefaultFormat(surface_format)
 
     app = QApplication(sys.argv)
+    app.setWindowIcon(QIcon(str(ICON_PATH)))
 
     # One Qt Quick Controls style on every platform, so Windows and Linux
     # look and behave the same. (The native Windows style also drew the

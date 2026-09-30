@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- The .mediawall file type, so project files open in MediaWall. -->
+<mime-info xmlns="http://www.freedesktop.org/standards/shared-mime-info">
+  <mime-type type="application/x-mediawall">
+    <comment>MediaWall project</comment>
+    <glob pattern="*.mediawall"/>
+    <generic-icon name="mediawall"/>
+  </mime-type>
+</mime-info>

@@ -95,6 +95,7 @@ class LogCapture(QObject):
                 os.dup2(self._write_fd, fd)
             except OSError:
                 pass    # no such stream; Python/Qt output still arrives
+        self._point_windows_std_handles(self._write_fd)
 
         # Python's own streams write into the pipe too.
         stream = io.TextIOWrapper(
@@ -158,6 +159,25 @@ class LogCapture(QObject):
     # -------------------------------------------------
     # Helpers
     # -------------------------------------------------
+
+    @staticmethod
+    def _point_windows_std_handles(fd):
+        """
+        On Windows, FFmpeg writes to the process's standard handles, not
+        to C file descriptors. dup2 updates those handles only in some
+        setups (python.exe, not the installed PyInstaller build), so set
+        them here too.
+        """
+        if sys.platform != "win32":
+            return
+        import ctypes
+        import msvcrt
+        try:
+            handle = msvcrt.get_osfhandle(fd)
+        except OSError:
+            return
+        for std in (-11, -12):      # STD_OUTPUT_HANDLE, STD_ERROR_HANDLE
+            ctypes.windll.kernel32.SetStdHandle(std, handle)
 
     @staticmethod
     def _dup_or_none(fd):

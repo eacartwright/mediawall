@@ -20,7 +20,7 @@ Use the project's own venv (`venv/`, gitignored). Do not use any other project's
 
 On Linux: `venv/bin/python` instead. Setup: `python -m venv venv` followed by `pip install -r requirements.txt`. PySide6 is pinned to an exact version and must stay at 6.10 or newer, because pitch compensation needs Qt 6.10.
 
-`bridge/log_capture.py` redirects file descriptors 1 and 2 into a pipe at startup, so all output (FFmpeg, Qt, Python) goes to the in-app Log window and `logs/mediawall.log`, and is echoed to the terminal only if one exists. When checking app output, read `logs/mediawall.log`. `launcher.pyw` and `tools/create_launchers.py` make the double-click launchers (readme section 37).
+`bridge/log_capture.py` redirects file descriptors 1 and 2 into a pipe at startup, so all output (FFmpeg, Qt, Python) goes to the in-app Log window and `logs/mediawall.log`, and is echoed to the terminal only if one exists. When checking app output, read `logs/mediawall.log`. `launcher.pyw` and `tools/create_launchers.py` make the double-click launchers (readme section 37). Installers: `packaging/build.py` builds this platform's installer (Windows `Setup.exe` via PyInstaller + Inno Setup, Linux `.deb`) into `dist/`; needs `requirements-build.txt` (readme section 37, Installers). If a new QML import is added, check it isn't excluded by `UNUSED_QT` in `packaging/mediawall.spec`.
 
 The unit tests cover `core/` only. They need no Qt or display and finish in milliseconds. Run them after any `core/` change.
 
