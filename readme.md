@@ -32,7 +32,16 @@ It runs on Linux (Mint/Ubuntu, the primary platform) and Windows, built with Pyt
 - `.mediawall` project files store paths, never copies of media, so they stay small; moving a project keeps its media links working.
 - Missing files show as placeholders that keep their place, and can be relinked (a whole moved folder at once).
 
-## Running it
+## Installing
+
+Installers bundle everything MediaWall needs (Python, Qt, FFmpeg), so nothing else has to be installed first.
+
+- **Windows:** run `MediaWall-<version>-Setup.exe`. It installs for your user account without an admin prompt, adds a Start Menu entry (and optionally a desktop shortcut), and can make `.mediawall` files open in MediaWall. Uninstall from Settings › Apps.
+- **Linux (Mint/Ubuntu):** `sudo apt install ./mediawall_<version>_amd64.deb`, or double-click the file. It adds MediaWall to the menu and the `mediawall` command, and apt fetches the few system libraries it needs if any are missing. Remove it with `sudo apt remove mediawall`.
+
+Settings and logs are kept per user and survive an uninstall. To build the installers yourself: `packaging/build.py`, run on each platform (section 37, Installers).
+
+## Running from source
 
 Needs Python 3 and the pinned PySide6 (6.10 or newer). From the project folder:
 
