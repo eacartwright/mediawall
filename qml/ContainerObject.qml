@@ -581,7 +581,7 @@ Item {
                 return
             }
 
-            var f = Zoom.wheelFactor(wheel.angleDelta.y)
+            var f = Zoom.wheelFactor(wheel.angleDelta.y, appSettings.zoomStep)
 
             if (root.adjusting || (root.browseMode && root.hasContent)) {
                 root.zoomAt(wheel.x, wheel.y, f)

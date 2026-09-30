@@ -86,6 +86,10 @@ ApplicationWindow {
         palette: window.palette
     }
 
+    SettingsDialog {
+        id: settingsDialog
+    }
+
 
     // -------------------------------------------------
     // Keyboard shortcuts
@@ -342,6 +346,11 @@ ApplicationWindow {
                     onClicked: window.presenting = true
                 }
 
+                Button {
+                    text: "Settings"
+                    onClicked: settingsDialog.open()
+                }
+
                 // Messages the app would print to a terminal.
                 Button {
                     text: "Log"
@@ -350,12 +359,6 @@ ApplicationWindow {
                         logWindow.raise()
                         logWindow.requestActivate()
                     }
-                }
-
-                Label {
-                    text: "MediaWall"
-                    color: "#dddddd"
-                    font.pixelSize: 16
                 }
             }
         }

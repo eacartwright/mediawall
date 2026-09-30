@@ -321,7 +321,7 @@ The default should be aspect-ratio preserving.
 
 ## 5.2 Zoom and crop (implemented)
 
-- **Scaling:** the mouse wheel over a *selected* free image scales it around the pointer, keeping its aspect ratio (5% per wheel notch, proportional for trackpads; the same step is used for all wheel zoom). This is an accelerator for the resize handle. Unselected objects ignore the wheel, so scrolling over the canvas never resizes things by accident.
+- **Scaling:** the mouse wheel over a *selected* free image scales it around the pointer, keeping its aspect ratio (by the **zoom step** set in Settings, default 10% per wheel notch, proportional for trackpads; the same step is used for all wheel zoom). This is an accelerator for the resize handle. Unselected objects ignore the wheel, so scrolling over the canvas never resizes things by accident.
 - **Cropping / zooming inside:** right-click → **Crop / Zoom Inside…** replaces the image with a container of exactly the same box, rotation, and stacking position, holding the image, and opens it in Adjust mode. Nothing visibly changes until you zoom or pan. Cropping is container behavior, so there is only one implementation of pan/zoom/crop.
 - Containers made this way start with **Scale Content with Container off**, so dragging the frame's corner crops the image instead of scaling it. **Release Content** turns it back into a plain free image.
 
@@ -1318,6 +1318,14 @@ Controls z-order, visibility, and locking.
 
 Persistent or dockable audio controls.
 
+### Settings
+
+The **Settings** button on the toolbar opens app-wide settings (not per project; `bridge/app_settings.py`, `qml/SettingsDialog.qml`). Changes apply at once and are saved immediately with Qt's `QSettings`: the registry on Windows (`HKEY_CURRENT_USER\Software\MediaWall\MediaWall`), `~/.config/MediaWall/MediaWall.conf` on Linux. The environment variable `MEDIAWALL_SETTINGS` can point at an `.ini` file to use instead (tests do this, so they never touch real settings).
+
+Settings so far:
+
+- **Mouse-wheel zoom step**: percent per wheel notch, 1 to 50, default 10. Used by every wheel zoom: free images and containers, browsing containers, Adjust mode, and browser previews.
+
 ### Context menus
 
 Right-clicking an object opens a menu of the actions that apply to it (currently z-order, Delete, and Pause/Play for animated images). Items that don't apply to an object are hidden, not just disabled. This is the primary way to reach object actions.
@@ -1381,7 +1389,7 @@ The browser is kept compact, with the media as large as possible:
 - The header shows the folder name and the current file's path relative to it. Only the header moves the browser; the ✕ closes (deletes) it, which can be undone.
 - The preview background is about 60% transparent (the same gray, `#66202020`), so the canvas shows through around the media.
 - Browsers always draw above other canvas objects (they are workspace tools). Among themselves they keep their normal stacking order, and z-order operations move them only among browsers (section 23).
-- Over the preview (viewer-style, like a browsing container): the **wheel zooms** around the pointer and left-drag then pans; the **back/forward mouse buttons** go to the previous/next file (as do ◀ ▶). The zoom is temporary and resets when the file changes. Double-clicking adds the current file to the canvas.
+- Over the preview (viewer-style, like a browsing container): the **wheel zooms** around the pointer and left-drag then pans (not for audio files, which stay centered); the **back/forward mouse buttons** go to the previous/next file (as do ◀ ▶). The zoom is temporary and resets when the file changes. Double-clicking adds the current file to the canvas.
 - New media from **Add to Canvas** (or double-click) is placed **beside the browser**, level with its top: to the right of a browser in the left half of the canvas, to the left of one in the right half (switching sides when that side has too little room and the other has more), kept inside the visible canvas. Repeated adds step 24 px down and outward so they don't pile up exactly.
 
 ---
@@ -1743,6 +1751,7 @@ mediawall/
 │   ├── __init__.py
 │   ├── log_capture.py      terminal output -> Log window and logs/
 │   ├── audio_model.py      video/audio instances for the Audio tab
+│   ├── app_settings.py     app-wide settings (QSettings), for Settings
 │   ├── scene_model.py      exposes Scene to QML as a list model
 │   └── project_controller.py  New/Open/Save dialogs, title, unsaved prompts
 │
@@ -1758,6 +1767,7 @@ mediawall/
 │   ├── RotationHandle.qml  shared rotation knob
 │   ├── ResizeHandles.qml   shared four-corner resize handles
 │   ├── ObjectContextMenu.qml  shared right-click menu
+│   ├── SettingsDialog.qml  the Settings dialog
 │   ├── LogWindow.qml       the Log window
 │   ├── Sidebar.qml         right-edge flyout: Layers and Audio tabs
 │   └── Zoom.js             shared mouse-wheel zoom step
@@ -2297,6 +2307,7 @@ The prototype currently provides:
 - animated GIF and WebP playback, on the canvas and in browser previews; each instance can be paused or played from its right-click menu
 - video on the canvas, in containers, and in browser previews, with per-instance play/pause, mute, and loop (right-click menu), and an on-object seek bar when selected
 - per-video speed (0.25x to 4x), Keep pitch, and A-B loop; an Audio tab in the sidebar with every video's sound and playback settings (section 14.5)
+- a Settings dialog (toolbar): the mouse-wheel zoom step (section 25)
 - audio tracks added from a browser (double-click or Add to Audio), controlled in the Audio tab
 - video as audio: Convert to Audio Track (right-click a video), or Add to Audio for a video in a browser (section 14.2)
 - browsing containers: viewer-style (qView) controls: pan, wheel zoom, back/forward buttons, double-click reset; moved by the border strip or middle-drag; also in Present (section 6.4); containers remember Fit/Fill
@@ -2552,6 +2563,8 @@ The following design decisions are currently established:
 - Slideshows are replaced by browsing containers; browsing is workspace state, not undone (2026-09-26).
 - Layouts are `.mediawall.layout` files holding only containers; they can start a new wall or be added to the current one (2026-09-26).
 - Browsing containers and the browser preview use picture-viewer (qView) controls: wheel zooms, back/forward mouse buttons change file, left-drag pans; a browsing container moves by its border strip or a middle-button drag (both kept for now to compare) (2026-09-29).
+- App-wide settings live in a Settings dialog, saved with QSettings; the first is the wheel zoom step (default 10% per notch) (2026-09-29).
+- Audio previews in a browser don't zoom or pan: they stay centered (2026-09-29).
 - Phone videos stored sideways with a rotation flag get their displayed (upright) size: MediaView reports the stored size in the orientation actually drawn, once it has settled; a size report that is the old one turned sideways re-sizes (fits within its box) and re-frames everything already placed, which also repairs older walls (2026-09-26).
 - Speed changes pitch by default (Keep pitch off), as in Celluloid (2026-09-26).
 - The application's name is written **MediaWall** (one word) everywhere (2026-09-26).

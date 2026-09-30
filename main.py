@@ -14,6 +14,7 @@ from PySide6.QtQml import QQmlApplicationEngine
 from PySide6.QtQuickControls2 import QQuickStyle
 from PySide6.QtWidgets import QApplication, QFileDialog
 
+from bridge.app_settings import AppSettings
 from bridge.log_capture import LogCapture
 from bridge.project_controller import ProjectController
 from bridge.scene_model import SceneModel
@@ -69,6 +70,7 @@ def main():
     # last button of a row with white text on a light face.)
     QQuickStyle.setStyle("Fusion")
 
+    app_settings = AppSettings()
     browser_backend = BrowserBackend()
     scene_model = SceneModel()
     project_controller = ProjectController(scene_model)
@@ -79,6 +81,7 @@ def main():
     context.setContextProperty("sceneModel", scene_model)
     context.setContextProperty("projectController", project_controller)
     context.setContextProperty("appLog", log_capture.model)
+    context.setContextProperty("appSettings", app_settings)
     context.setContextProperty(
         "fixedFontFamily",
         QFontDatabase.systemFont(QFontDatabase.FixedFont).family(),

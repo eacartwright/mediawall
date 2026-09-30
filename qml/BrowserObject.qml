@@ -604,10 +604,11 @@ Rectangle {
                     root.addCurrentToCanvas()
             }
 
+            // Audio has nothing to zoom or pan: it stays centered.
             onWheel: function(wheel) {
-                if (wheel.angleDelta.y !== 0)
+                if (wheel.angleDelta.y !== 0 && !root.currentIsAudio)
                     root.zoomPreviewAt(wheel.x, wheel.y,
-                                       Zoom.wheelFactor(wheel.angleDelta.y))
+                                       Zoom.wheelFactor(wheel.angleDelta.y, appSettings.zoomStep))
             }
         }
 

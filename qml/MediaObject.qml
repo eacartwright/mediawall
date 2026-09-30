@@ -275,7 +275,7 @@ Item {
             }
 
             var p = moveArea.mapToItem(root.sceneItem, wheel.x, wheel.y)
-            root.scaleAround(p.x, p.y, Zoom.wheelFactor(wheel.angleDelta.y))
+            root.scaleAround(p.x, p.y, Zoom.wheelFactor(wheel.angleDelta.y, appSettings.zoomStep))
         }
 
         onCanceled: {
