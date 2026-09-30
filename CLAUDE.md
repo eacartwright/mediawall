@@ -67,7 +67,7 @@ Projects are `.mediawall` JSON files. Media is stored as paths, never as bytes. 
 
 - Match filename case exactly (`Main.qml`, not `main.qml`). Development happens on both Windows and Linux (Linux is primary), and Linux file names are case-sensitive.
 - Keep platform-specific code isolated. Every Python package folder needs an `__init__.py` (unittest discovery depends on it).
-- Guiding rule (readme section 56): keep the architectural boundaries, and build the smallest working version of the current feature rather than adding speculative complexity.
+- Guiding rule: keep the architectural boundaries, and build the smallest working version of the current feature rather than adding speculative complexity.
 
 ## Development environments
 - Developed on both Windows and Linux Mint. Linux Mint is the primary target; every change must keep working there.

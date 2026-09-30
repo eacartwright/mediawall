@@ -2439,6 +2439,7 @@ Done since the review: browsing containers (section 6.4), layouts (section 17), 
 - Background folder scanning (scanning is fast enough so far; revisit if large folders or network drives freeze the app).
 - Duplicate videos playing in sync / sharing one decoder (each instance decodes separately today).
 - Checking hardware video decoding on the target machines (the Log window shows Qt's "No HW decoder found" when it falls back to software).
+- Frosted-glass (acrylic) browser background: blur the canvas behind a browser with `MultiEffect`, as an option in Settings, falling back to the plain translucent grey.
 
 ### Dropped
 
@@ -2651,18 +2652,3 @@ The following design decisions are currently established:
 ### Open decisions
 
 None currently.
-
----
-
-# 56. Guiding Development Rule
-
-Do not implement future complexity merely for the sake of complexity.
-
-Instead:
-
-1. Preserve the important architectural boundaries.
-2. Build the smallest working version of the current feature.
-3. Test it.
-4. Add the next capability without breaking those boundaries.
-
-The application should grow from a simple working canvas into the full media wall rather than attempting to build the entire system before anything runs.
