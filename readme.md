@@ -2360,6 +2360,7 @@ Done since the review: browsing containers (section 6.4), layouts (section 17), 
 ### Later (kept on the roadmap)
 
 - **Inspector** (Phase 11): exact position, size, and rotation.
+- **UI pass**, once the functionality has settled (decided 2026-09-29): a traditional **menu bar** (e.g. File / Edit / View / Wall / Help) instead of only a row of buttons; **icons** instead of text on toolbar buttons, from one bundled SVG icon set so Windows and Linux match (Qt has no consistent icon theme on Windows; candidates: Lucide, Material Symbols; check licenses); a compact toolbar for the most-used commands (it already barely fits at 1280 px). The groundwork is done: every command is an `Action` in `qml/AppActions.qml` (section 25), so the menu bar and toolbar can be built from the same actions without rewiring. Reference points: XnView MP, qView, qBittorrent (all Qt applications).
 
 ### Back burner
 
