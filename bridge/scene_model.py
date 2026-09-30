@@ -199,7 +199,7 @@ class SceneModel(QAbstractListModel):
     # The Layers list changed (objects, names, or stacking).
     layersChanged = Signal()
 
-    # An audio track was added (the sidebar shows its Audio tab).
+    # An audio track was added (the sidebar shows its Playback tab).
     audioTrackAdded = Signal(str)
 
     def __init__(self, scene=None, parent=None):
@@ -232,7 +232,7 @@ class SceneModel(QAbstractListModel):
     def _get_audio_items(self):
         return self._audio_model
 
-    # Every video/audio instance, for the sidebar's Audio tab.
+    # Every video/audio instance, for the sidebar's Playback tab.
     audioItems = Property(QObject, _get_audio_items, constant=True)
 
     # -------------------------------------------------
@@ -667,7 +667,7 @@ class SceneModel(QAbstractListModel):
     @Slot(str, str, result=str)
     def addAudioTrack(self, path, media_type):
         """
-        Add a file as a track in the Audio tab (no canvas item): an audio
+        Add a file as a track in the Playback tab (no canvas item): an audio
         file, or a video used only for its sound. The source keeps its
         real type, so the same video can still go on the canvas.
         """

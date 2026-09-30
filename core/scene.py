@@ -69,7 +69,7 @@ FIT_MODES = {FIT_CONTAIN, FIT_COVER}
 OVERLAY_TYPES = {"browser"}
 
 # Playback speed limits (QtMultimedia playbackRate): the outer bounds any
-# saved speed is kept within. The Audio tab's slider offers a narrower
+# saved speed is kept within. The Playback tab's slider offers a narrower
 # range, set in Settings (bridge/app_settings.py; default 0.5x .. 3x).
 SPEED_MIN = 0.25
 SPEED_MAX = 4.0
@@ -432,7 +432,7 @@ class Scene:
     def add_audio_track(self, source_id) -> SceneObject:
         """
         Add an audio track: a player with no place on the canvas (it
-        lives in the Audio tab). Tracks start audible and looping.
+        lives in the Playback tab). Tracks start audible and looping.
         """
         return self.add_object(
             "audio", 0, 0, source_id=source_id, muted=False, loop=True, z=0,

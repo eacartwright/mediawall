@@ -1,5 +1,5 @@
 """
-Audio (readme section 14): the Audio tab, speed/A-B loop, the speed
+Audio (readme section 14): the Playback tab, speed/A-B loop, the speed
 range setting, video as audio, and audio files (.m4a, .mp3).
 """
 
@@ -18,7 +18,7 @@ webm = scene.add_source(media(WEBM), "video", 0, 0)
 scene.add_media(photo.id, 40, 90)
 box = scene.add_object("container", 600, 90, width=320, height=200)
 scene.add_media_to_container(webm.id, box.id)
-clip = scene.add_media(video.id, 60, 330)            # topmost: first card in the Audio tab
+clip = scene.add_media(video.id, 60, 330)            # topmost: first card in the Playback tab
 clip.width, clip.height = 300, 533
 
 
@@ -36,13 +36,13 @@ def slider_ends():
 
 
 def step_list():
-    c.check("the Audio tab lists both videos (free and in a container)", rows() == 2, str(rows()))
+    c.check("the Playback tab lists both videos (free and in a container)", rows() == 2, str(rows()))
     c.sm.select(clip.id)
     c.open_sidebar()
 
 
 def step_tab():
-    c.choose_tab("audioTab")
+    c.choose_tab("playbackTab")
 
 
 def step_speed():
@@ -108,7 +108,7 @@ def step_files():
         dur = c.js(f"scene.viewFor('{tid}') ? scene.viewFor('{tid}').player.duration : -1")
         c.check(f"audio file {os.path.splitext(name)[1]} loads as a track and plays",
                 state == 1 and dur > 0, f"state {state}, {dur} ms")
-    c.check("the Audio tab lists both tracks beside the two videos", rows() == 4, str(rows()))
+    c.check("the Playback tab lists both tracks beside the two videos", rows() == 4, str(rows()))
     c.finish()
 
 

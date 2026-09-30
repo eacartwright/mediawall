@@ -3,7 +3,7 @@ import QtQuick
 // An audio track: a player with no place on the canvas. It is a row of
 // sceneModel like every other object (so saving, undo, and deleting
 // work the same), but draws nothing; it is controlled from the
-// sidebar's Audio tab (readme section 14).
+// sidebar's Playback tab (readme section 14).
 
 Item {
     id: root

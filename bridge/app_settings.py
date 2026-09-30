@@ -23,7 +23,7 @@ ZOOM_STEP_MIN = 1.0
 ZOOM_STEP_MAX = 50.0
 
 
-# Playback speed range offered by the Audio tab's speed slider. The
+# Playback speed range offered by the Playback tab's speed slider. The
 # outer limits are core's SPEED_MIN / SPEED_MAX (0.25x .. 4x).
 SPEED_MIN_KEY = "playback/speedMin"
 SPEED_MIN_DEFAULT = 0.5
@@ -89,7 +89,7 @@ class AppSettings(QObject):
     def resetZoomStep(self):
         self._set_zoom_step(ZOOM_STEP_DEFAULT)
 
-    # ---- Playback speed range (the Audio tab's speed slider) ----
+    # ---- Playback speed range (the Playback tab's speed slider) ----
 
     def _read(self, key, default, low, high):
         try:

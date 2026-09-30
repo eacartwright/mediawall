@@ -172,7 +172,7 @@ Menu {
     }
 
     // Video as audio: the video leaves the canvas and its sound goes on
-    // as a track in the Audio tab, from the same position (undoable).
+    // as a track in the Playback tab, from the same position (undoable).
     MenuItem {
         text: "Convert to Audio Track"
 

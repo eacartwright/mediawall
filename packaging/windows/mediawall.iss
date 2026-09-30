@@ -11,6 +11,9 @@
 AppId={{826848C3-1FED-4C45-84A7-5E011B3DE82F}
 AppName=MediaWall
 AppVersion={#AppVersion}
+; Shown in Installed apps (appwiz.cpl) and the wizard: "MediaWall 0.9.2",
+; not Inno's default "MediaWall version 0.9.2".
+AppVerName=MediaWall {#AppVersion}
 AppPublisher=MediaWall
 DefaultDirName={autopf}\MediaWall
 DefaultGroupName=MediaWall

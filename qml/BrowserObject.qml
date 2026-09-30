@@ -83,7 +83,7 @@ Rectangle {
         currentEntry !== null &&
         (currentEntry.type === "image" || currentEntry.type === "video")
 
-    // Audio files are added as tracks in the sidebar's Audio tab.
+    // Audio files are added as tracks in the sidebar's Playback tab.
     readonly property bool currentIsAudio:
         currentEntry !== null && currentEntry.type === "audio"
 
@@ -245,7 +245,7 @@ Rectangle {
     }
 
     // An audio file, or a video used only for its sound, becomes a track
-    // in the Audio tab.
+    // in the Playback tab.
     function addCurrentToAudio() {
         if (!currentIsAudio && !(currentEntry && currentEntry.type === "video"))
             return

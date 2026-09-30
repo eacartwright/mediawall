@@ -3,7 +3,7 @@ import QtQuick.Controls
 import QtQuick.Layouts
 
 // Right-hand flyout panel, opened and closed with the tab on its left
-// edge. Tabs: Layers, and Audio (every video and audio track's sound
+// edge. Tabs: Layers, and Playback (every video and audio track's sound
 // and playback settings; readme section 14).
 // Overlays the canvas; hidden in Present mode (Main.qml).
 
@@ -18,7 +18,7 @@ Item {
     // Shared commands (AppActions.qml), set in Main.qml.
     property var actions
 
-    // Show the Audio tab when a track is added.
+    // Show the Playback tab when a track is added.
     Connections {
         target: sceneModel
         function onAudioTrackAdded(trackId) {
@@ -56,7 +56,7 @@ Item {
         x: panel.x - width
 
         width: 22
-        height: 140
+        height: 160
         radius: 4
 
         color: handleArea.containsMouse ? "#3a3a3a" : "#2c2c2c"
@@ -65,7 +65,7 @@ Item {
         Text {
             anchors.centerIn: parent
             rotation: -90
-            text: sidebar.open ? "Layers · Audio  ▸" : "◂  Layers · Audio"
+            text: sidebar.open ? "Layers · Playback  ▸" : "◂  Layers · Playback"
             color: "#dddddd"
             font.pixelSize: 12
         }
@@ -114,7 +114,7 @@ Item {
                 Layout.fillWidth: true
 
                 TabButton { text: "Layers"; objectName: "layersTab" }
-                TabButton { text: "Audio"; objectName: "audioTab" }
+                TabButton { text: "Playback"; objectName: "playbackTab" }
             }
 
             StackLayout {
@@ -357,7 +357,7 @@ Item {
                     }
                 }
 
-                // ---- Audio ----
+                // ---- Playback ----
 
                 ListView {
                     id: audioList

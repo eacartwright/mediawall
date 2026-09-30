@@ -1,6 +1,6 @@
 """
 Qt bridge: every sound-producing media instance, for the sidebar's
-Audio tab (readme section 14).
+Playback tab (readme section 14).
 
 Rows are audio tracks first, then media instances whose source is a
 video or an audio file, in Layers order (top first). A container's
@@ -9,7 +9,7 @@ content is listed as itself, with ownerId pointing at the container
 
 SceneModel calls refresh() after every change. When the set of rows is
 unchanged, rows are updated in place, so a slider being dragged in the
-Audio tab isn't recreated under the pointer.
+Playback tab isn't recreated under the pointer.
 """
 
 from PySide6.QtCore import QAbstractListModel, QByteArray, QModelIndex, Qt

@@ -124,7 +124,7 @@ Dialog {
         Label {
             Layout.fillWidth: true
             wrapMode: Text.WordWrap
-            text: "The range of the speed slider in the Audio tab (default "
+            text: "The range of the speed slider in the Playback tab (default "
                   + appSettings.speedMinDefault + "× to " + appSettings.speedMaxDefault
                   + "×). With Keep pitch off, pitch follows speed."
             color: "#999999"

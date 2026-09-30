@@ -23,7 +23,7 @@ It runs on Linux (Mint/Ubuntu, the primary platform) and Windows, built with Pyt
 
 **Video and audio**
 - Every video plays independently, with play/pause, mute, loop, a seek bar, speed with optional pitch correction, and A-B loops.
-- Audio files (and videos used only for their sound) become tracks in the Audio tab, controlled the same way.
+- Audio files (and videos used only for their sound) become tracks in the Playback tab, controlled the same way.
 
 **Showing it**
 - Full Screen for editing without the window frame; Present for a view-only wall where browsers still work and the pointer hides when idle.
@@ -854,9 +854,9 @@ No temporary extracted audio file should be necessary.
 
 **Implemented (2026-09-26):**
 
-- **Convert to Audio Track** (right-click a video on the canvas, free or in a container): the video leaves the canvas and its sound carries on as an audio track in the Audio tab, from the same position, with the same volume, speed, pitch, loop, and A-B settings, and unmuted. The track gets a new id, so the whole conversion is one clean undo step.
+- **Convert to Audio Track** (right-click a video on the canvas, free or in a container): the video leaves the canvas and its sound carries on as an audio track in the Playback tab, from the same position, with the same volume, speed, pitch, loop, and A-B settings, and unmuted. The track gets a new id, so the whole conversion is one clean undo step.
 - **Add to Audio** in a browser, shown for video files next to Add to Canvas: adds the video as an audio-only track. The file's source keeps its real type (video), so the same file can still go on the canvas.
-- A track made from a video attaches no video output, so its picture is never decoded. In the Audio tab it shows "(audio only)".
+- A track made from a video attaches no video output, so its picture is never decoded. In the Playback tab it shows "(audio only)".
 
 ---
 
@@ -905,13 +905,13 @@ Every video instance (free, or a container's content) has its own, saved and und
 
 - **volume**, **mute**, **play/pause**, **loop** (as before)
 - **speed** (`speed`; the slider's range is set in Settings, default 0.5x to 3x, within core's 0.25x to 4x), and **Keep pitch** (`preserve_pitch`, off by default so pitch follows speed). `pitchCompensation` was confirmed available on Windows with PySide6 6.11.2.
-- an **A-B loop** (`loop_a` / `loop_b`, milliseconds, -1 = not set). Looping between them happens only when both are set; the points are kept in order, and points less than 0.1 s apart are rejected. Set them at the current position from the right-click menu (Set Loop Start (A) Here / Set Loop End (B) Here / Clear A–B Loop) or the Audio tab. The seek bar shows A and B markers and the looped span. Reaching B seeks back to A (deferred to the next event-loop turn: the FFmpeg backend ignores a seek made inside `positionChanged`).
+- an **A-B loop** (`loop_a` / `loop_b`, milliseconds, -1 = not set). Looping between them happens only when both are set; the points are kept in order, and points less than 0.1 s apart are rejected. Set them at the current position from the right-click menu (Set Loop Start (A) Here / Set Loop End (B) Here / Clear A–B Loop) or the Playback tab. The seek bar shows A and B markers and the looped span. Reaching B seeks back to A (deferred to the next event-loop turn: the FFmpeg backend ignores a seek made inside `positionChanged`).
 
-The sidebar's **Audio** tab (next to Layers) lists every video instance, top first, each with Play/Pause, Mute, a volume slider (the mouse wheel over it changes the volume), a speed slider on a log scale (1x in the middle; double-click the value to reset), Keep pitch, Loop, and A/B buttons. Clicking a card selects the video (or the container holding it). The list is a real list model (`bridge/audio_model.py`) that updates rows in place, so sliders aren't recreated while being dragged.
+The sidebar's **Playback** tab (next to Layers; named Audio before 0.9.2) lists every video instance, top first, each with Play/Pause, Mute, a volume slider (the mouse wheel over it changes the volume), a speed slider on a log scale (1x in the middle; double-click the value to reset), Keep pitch, Loop, and A/B buttons. Clicking a card selects the video (or the container holding it). The list is a real list model (`bridge/audio_model.py`) that updates rows in place, so sliders aren't recreated while being dragged.
 
 Panels find a video's player (for its position) through a registry on the scene item (`registerView` / `viewFor` in `Main.qml`), keyed by media instance id.
 
-**Audio tracks** (MP3, M4A, and other audio files) are added from a Browser: double-click the preview, or use **Add to Audio** (the Add to Canvas button's label for audio files). A track is an object of type `audio` with a source and the same playback settings as a video, saved and undoable like any other object, but with no place on the canvas: no geometry, no stacking, not in the Layers list (`NON_VISUAL_TYPES` in `core/scene.py`). On the QML side it is a row of `sceneModel` whose delegate (`AudioTrackObject.qml`) draws nothing and only hosts a player. Tracks start **audible and looping** (canvas videos start muted). They are listed first in the Audio tab, with a ✕ to remove them and, if the file is missing, **Locate…**. Adding a track opens the Audio tab and pauses the browser's preview of that file, so it isn't heard twice. Audio previews in a browser are audible by default, with their own mute state separate from video previews.
+**Audio tracks** (MP3, M4A, and other audio files) are added from a Browser: double-click the preview, or use **Add to Audio** (the Add to Canvas button's label for audio files). A track is an object of type `audio` with a source and the same playback settings as a video, saved and undoable like any other object, but with no place on the canvas: no geometry, no stacking, not in the Layers list (`NON_VISUAL_TYPES` in `core/scene.py`). On the QML side it is a row of `sceneModel` whose delegate (`AudioTrackObject.qml`) draws nothing and only hosts a player. Tracks start **audible and looping** (canvas videos start muted). They are listed first in the Playback tab, with a ✕ to remove them and, if the file is missing, **Locate…**. Adding a track opens the Playback tab and pauses the browser's preview of that file, so it isn't heard twice. Audio previews in a browser are audible by default, with their own mute state separate from video previews.
 
 Video as audio is described in section 14.2. The mouse wheel changes volume only over a card's volume slider; elsewhere it scrolls the list. Solo and audio stream selection were dropped.
 
@@ -1386,7 +1386,7 @@ The **Settings** button on the toolbar opens app-wide settings (not per project;
 Settings so far:
 
 - **Mouse-wheel zoom step**: percent per wheel notch, 1 to 50, default 10. Used by every wheel zoom: free images and containers, browsing containers, Adjust mode, and browser previews.
-- **Playback speed range**: the slowest and fastest speed offered by the Audio tab's speed slider, default **0.5× to 3×** (slowest 0.25–1×, fastest 1–4×, in 0.25× steps). Core's limits (`SPEED_MIN` / `SPEED_MAX`, 0.25× to 4×) remain the outer bounds any saved speed is kept within; a video already set outside the chosen range keeps its speed.
+- **Playback speed range**: the slowest and fastest speed offered by the Playback tab's speed slider, default **0.5× to 3×** (slowest 0.25–1×, fastest 1–4×, in 0.25× steps). Core's limits (`SPEED_MIN` / `SPEED_MAX`, 0.25× to 4×) remain the outer bounds any saved speed is kept within; a video already set outside the chosen range keeps its speed.
 
 ### Context menus
 
@@ -1853,7 +1853,7 @@ mediawall/
 ├── bridge/                 Qt glue between core and QML
 │   ├── __init__.py
 │   ├── log_capture.py      terminal output -> Log window and logs/
-│   ├── audio_model.py      video/audio instances for the Audio tab
+│   ├── audio_model.py      video/audio instances for the Playback tab
 │   ├── app_settings.py     app-wide settings (QSettings), for Settings
 │   ├── scene_model.py      exposes Scene to QML as a list model
 │   └── project_controller.py  New/Open/Save dialogs, title, unsaved prompts
@@ -1873,7 +1873,7 @@ mediawall/
 │   ├── ObjectContextMenu.qml  shared right-click menu
 │   ├── SettingsDialog.qml  the Settings dialog
 │   ├── LogWindow.qml       the Log window
-│   ├── Sidebar.qml         right-edge flyout: Layers and Audio tabs
+│   ├── Sidebar.qml         right-edge flyout: Layers and Playback tabs
 │   └── Zoom.js             shared mouse-wheel zoom step
 │
 ├── assets/
@@ -2072,7 +2072,7 @@ Done: all of the above, through the shared `MediaView` component, so video works
 
 ## Phase 9 — Audio Rack — **Done**
 
-Done: audio tracks (MP3/M4A etc., added from a browser), video-as-audio (section 14.2), audio preview, and per-video / per-track volume, mute, loop, speed, pitch behavior, and A-B loop, in the sidebar's Audio tab (section 14.5). Solo and choosing between several audio streams in one file were dropped (section 55).
+Done: audio tracks (MP3/M4A etc., added from a browser), video-as-audio (section 14.2), audio preview, and per-video / per-track volume, mute, loop, speed, pitch behavior, and A-B loop, in the sidebar's Playback tab (section 14.5). Solo and choosing between several audio streams in one file were dropped (section 55).
 
 Implement:
 
@@ -2421,9 +2421,9 @@ The prototype currently provides:
 - EXIF orientation applied to photos, on the canvas and in browser previews
 - animated GIF and WebP playback, on the canvas and in browser previews; each instance can be paused or played from its right-click menu
 - video on the canvas, in containers, and in browser previews, with per-instance play/pause, mute, and loop (right-click menu), and an on-object seek bar when selected
-- per-video speed (0.5x to 3x by default; the range is a setting), Keep pitch, and A-B loop; an Audio tab in the sidebar with every video's sound and playback settings (section 14.5)
+- per-video speed (0.5x to 3x by default; the range is a setting), Keep pitch, and A-B loop; an Playback tab in the sidebar with every video's sound and playback settings (section 14.5)
 - a Settings dialog (toolbar): the mouse-wheel zoom step and the speed range (section 25)
-- audio tracks added from a browser (double-click or Add to Audio), controlled in the Audio tab
+- audio tracks added from a browser (double-click or Add to Audio), controlled in the Playback tab
 - video as audio: Convert to Audio Track (right-click a video), or Add to Audio for a video in a browser (section 14.2)
 - browsing containers: viewer-style (qView) controls: pan, wheel zoom, back/forward buttons, double-click reset; moved by the border strip or middle-drag; also in Present (section 6.4); containers remember Fit/Fill
 - layouts: Save Layout (containers only), New from Layout, Add Layout to Wall (section 17)
@@ -2706,6 +2706,7 @@ The following design decisions are currently established:
 - Resize corners, edge bars, and the rotation knob are about 30% smaller than before; their grab areas stay about the same size (2026-09-29).
 - Later the same day, the corner squares went down again (11 → 9 px) and the edge bars got shorter (25 → 19 px); the rotation knob stayed. The Settings dialog got a lighter border (`palette.midlight`), since Fusion's default barely showed on the dark canvas.
 - Selection outlines are 1 px for every object type (media, browsers, containers); only Adjust mode's orange outline stays 2 px. A browser's **New Container** button puts the current file in a new container beside it, like Add to Canvas (2026-09-29).
+- The sidebar's Audio tab is now **Playback** (flyout: "Layers · Playback"): it holds speed, pitch, A-B loops, and volume for videos as well as audio tracks. The browser's Add to Audio and the Convert to Audio Track command keep their names, since they do make audio tracks. The Windows installer shows as "MediaWall 0.9.2" in Installed apps (`AppVerName`), not Inno's default "MediaWall version 0.9.2" (2026-09-30).
 - Containers show no outline once filled unless selected (1 px green) or being adjusted (2 px orange), so a finished wall reads as pictures rather than boxes; an empty container keeps a faint grey outline (hidden in Present) until it's filled. A browsing container's badge is just `⇅`, without the `n / total` count (2026-09-29).
 
 ### Open decisions
