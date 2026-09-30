@@ -979,6 +979,13 @@ class SceneModel(QAbstractListModel):
             self._emit_row(object_id, GEOMETRY_ROLES + CONTENT_ROLES)
             self._changed()
 
+    @Slot(str, str, float, float)
+    def fillAlong(self, object_id, axis, canvas_width, canvas_height):
+        """Double-click an edge bar: stretch into the free space ("v"/"h")."""
+        if self._scene.fill_along(object_id, axis, canvas_width, canvas_height):
+            self._emit_row(object_id, GEOMETRY_ROLES + CONTENT_ROLES)
+            self._changed()
+
     @Slot(str, float, float, float)
     def scaleObject(self, object_id, px, py, factor):
         """Wheel zoom: scale around a scene point (content included)."""

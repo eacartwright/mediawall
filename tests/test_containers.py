@@ -326,6 +326,62 @@ class BrowsingContainerTests(unittest.TestCase):
         self.assertEqual(len(warnings), 1)
 
 
+class FillAlongTests(unittest.TestCase):
+    """Double-click an edge bar: stretch into the free space (1280 x 800 canvas)."""
+
+    def setUp(self):
+        self.scene = Scene()
+
+    def box(self, x, y, w, h, kind="container"):
+        return self.scene.add_object(kind, x, y, width=w, height=h)
+
+    def fill(self, obj, axis):
+        return self.scene.fill_along(obj.id, axis, 1280, 800)
+
+    def test_alone_fills_the_canvas_height(self):
+        b = self.box(100, 300, 200, 100)
+        self.assertTrue(self.fill(b, "v"))
+        self.assertEqual((b.x, b.y, b.width, b.height), (100, 0, 200, 800))
+
+    def test_stops_at_neighbours_in_its_column(self):
+        above = self.box(80, 50, 300, 100)        # overlaps the column
+        below = self.box(250, 600, 300, 100)      # overlaps the column
+        aside = self.box(600, 0, 300, 800)        # another column: ignored
+        b = self.box(100, 300, 200, 100)
+        self.fill(b, "v")
+        self.assertEqual((b.y, b.height), (150, 450))
+
+    def test_horizontal(self):
+        left = self.box(0, 100, 300, 400)
+        b = self.box(500, 200, 200, 100)
+        self.fill(b, "h")
+        self.assertEqual((b.x, b.width), (300, 980))
+
+    def test_browsers_and_overlapping_objects_are_ignored(self):
+        self.box(100, 0, 200, 100, "browser")
+        self.box(150, 320, 50, 50)                # already overlaps b
+        b = self.box(100, 300, 200, 100)
+        self.fill(b, "v")
+        self.assertEqual((b.y, b.height), (0, 800))
+
+    def test_only_grows(self):
+        b = self.box(100, -50, 200, 900)          # already past both edges
+        self.assertFalse(self.fill(b, "v"))
+        self.assertEqual((b.y, b.height), (-50, 900))
+
+    def test_rotated_objects_are_left_alone(self):
+        b = self.box(100, 300, 200, 100)
+        b.rotation = 20
+        self.assertFalse(self.fill(b, "v"))
+
+    def test_content_follows_the_usual_resize(self):
+        src = self.scene.add_source("/p/a.jpg", "image", 400, 200)
+        b = self.box(100, 300, 200, 100)
+        content, _ = self.scene.add_media_to_container(src.id, b.id)
+        self.fill(b, "v")                         # locked: content scales
+        self.assertAlmostEqual(content.height, 800)
+
+
 class ScaleObjectTests(unittest.TestCase):
 
     def setUp(self):

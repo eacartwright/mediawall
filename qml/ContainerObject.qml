@@ -392,9 +392,8 @@ Item {
 
             visible: !root.hasContent && !root.isDropTarget
 
-            text: "Empty container\n\nDouble-click to browse a folder, drag an image\n"
-                  + "or video onto it, or select it and use a\n"
-                  + "browser's Add to Container"
+            text: "Empty container\n\nDouble-click to browse a folder, drag an image "
+                  + "or video onto it, or select it and use a browser's Add to Container"
 
             color: "#777777"
             font.pixelSize: 13
@@ -631,6 +630,14 @@ Item {
         color: "#7fc97f"
 
         onStarted: root.resizing = true
+
+        // Like double-clicking a window's top edge in Windows: stretch
+        // into the free space (up to neighbours, or the canvas edge).
+        onEdgeDoubleClicked: function(sx, sy) {
+            if (root.sceneItem)
+                sceneModel.fillAlong(root.objectId, sy !== 0 ? "v" : "h",
+                                     root.sceneItem.width, root.sceneItem.height)
+        }
         onFinished: {
             // Commit first, so the content's new position arrives from
             // the model before the live preview switches off.

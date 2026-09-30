@@ -92,6 +92,15 @@ def _rotate(x, y, degrees):
     return x * c - y * s, x * s + y * c
 
 
+def _bounding_box(obj):
+    """Axis-aligned ((left, top), (right, bottom)) of a possibly rotated object."""
+    r = math.radians(obj.rotation)
+    half_w = abs(obj.width / 2 * math.cos(r)) + abs(obj.height / 2 * math.sin(r))
+    half_h = abs(obj.width / 2 * math.sin(r)) + abs(obj.height / 2 * math.cos(r))
+    cx, cy = obj.center
+    return (cx - half_w, cy - half_h), (cx + half_w, cy + half_h)
+
+
 def clamp_speed(value) -> float:
     return round(min(SPEED_MAX, max(SPEED_MIN, float(value))), 2)
 
@@ -547,6 +556,54 @@ class Scene:
 
         obj.x, obj.y, obj.width, obj.height, obj.rotation = new
         return True
+
+    def fill_along(self, object_id, axis, canvas_width, canvas_height) -> bool:
+        """
+        Stretch an unrotated object along one axis ("v" = vertically,
+        "h" = horizontally) to fill the free space: up to the nearest
+        neighbours in its column (or row), or the canvas edges. Like
+        double-clicking a window's top edge in Windows, but it stops at
+        other objects, so tiled layouts stay tiled.
+
+        Neighbours are other visual objects (not browsers, which are
+        workspace tools) whose span across the axis overlaps this one's
+        and that don't already overlap it. It only grows, never shrinks.
+        Applied through set_geometry, so content follows the usual
+        resize rules. Rotated objects are left alone.
+        """
+        obj = self.get(object_id)
+        if obj is None or obj.parent_id is not None or obj.type in NON_VISUAL_TYPES:
+            return False
+        if abs(((obj.rotation + 180) % 360) - 180) > 0.01:
+            return False
+
+        vertical = axis == "v"
+        # (start, end) along the axis, and across it.
+        along = (obj.y, obj.y + obj.height) if vertical else (obj.x, obj.x + obj.width)
+        across = (obj.x, obj.x + obj.width) if vertical else (obj.y, obj.y + obj.height)
+        low, high = 0.0, float(canvas_height if vertical else canvas_width)
+
+        for other in self._by_z():
+            if other is obj or self._is_overlay(other):
+                continue
+            (left, top), (right, bottom) = _bounding_box(other)
+            o_along = (top, bottom) if vertical else (left, right)
+            o_across = (left, right) if vertical else (top, bottom)
+            if o_across[1] <= across[0] + 0.5 or o_across[0] >= across[1] - 0.5:
+                continue                        # not in this column / row
+            if o_along[1] <= along[0] + 0.5:
+                low = max(low, o_along[1])      # before it
+            elif o_along[0] >= along[1] - 0.5:
+                high = min(high, o_along[0])    # after it
+
+        start = min(along[0], low)
+        end = max(along[1], high)
+        if (start, end) == along:
+            return False
+
+        if vertical:
+            return self.set_geometry(obj.id, obj.x, start, obj.width, end - start, obj.rotation)
+        return self.set_geometry(obj.id, start, obj.y, end - start, obj.height, obj.rotation)
 
     def scale_object(self, object_id, px, py, factor) -> bool:
         """

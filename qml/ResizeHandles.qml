@@ -40,6 +40,9 @@ Item {
     signal started()
     signal finished()
 
+    // An edge bar was double-clicked: sx, sy say which (as for Grip).
+    signal edgeDoubleClicked(int sx, int sy)
+
     anchors.fill: parent
     z: 20
 
@@ -127,6 +130,10 @@ Item {
                 handles.drag(grip, sx, sy, mouse)
         }
         onReleased: handles.finished()
+        onDoubleClicked: {
+            if (sx === 0 || sy === 0)
+                handles.edgeDoubleClicked(sx, sy)
+        }
     }
 
 
