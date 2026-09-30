@@ -145,6 +145,15 @@ Item {
         }
         browseFiles = browserBackend.scanFolder(browseFolder, browseSubfolders)
             .filter(function(e) { return e.type === "image" || e.type === "video" })
+
+        // An empty container starts on the folder's first file, rather
+        // than sitting empty at "0 / n" until the first step.
+        if (!hasContent && browseFiles.length > 0)
+            Qt.callLater(function() {
+                if (root.browseMode && !root.hasContent && root.browseFiles.length > 0)
+                    sceneModel.showInContainer(root.objectId, root.browseFiles[0].path,
+                                               root.browseFiles[0].type)
+            })
     }
 
     onBrowseModeChanged: rescanBrowse()
@@ -383,9 +392,9 @@ Item {
 
             visible: !root.hasContent && !root.isDropTarget
 
-            text: "Empty container\n\nDrag an image or video onto it, select it and\n"
-                  + "use a browser's Add to Container, or right-click >\n"
-                  + "Browse This Folder"
+            text: "Empty container\n\nDouble-click to browse a folder, drag an image\n"
+                  + "or video onto it, or select it and use a\n"
+                  + "browser's Add to Container"
 
             color: "#777777"
             font.pixelSize: 13
@@ -564,8 +573,14 @@ Item {
         // Browsing: reset the zoom (the container's Fit/Fill framing).
         // Otherwise: Adjust mode.
         onDoubleClicked: function(mouse) {
-            if (mouse.button !== Qt.LeftButton || !root.hasContent)
+            if (mouse.button !== Qt.LeftButton)
                 return
+            // Empty (and not yet browsing a folder): choose one to browse.
+            if (!root.hasContent) {
+                if (!root.presenting && !(root.browseMode && root.browseFolder !== ""))
+                    sceneModel.startBrowsing(root.objectId)
+                return
+            }
             if (root.browseMode && !root.adjusting)
                 sceneModel.resetContentFraming(root.objectId)
             else if (!root.presenting)
