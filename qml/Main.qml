@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
+import QtQuick.Shapes
 import Qt.labs.qmlmodels
 
 ApplicationWindow {
@@ -454,7 +455,7 @@ ApplicationWindow {
                 id: hideTimer
                 interval: 2000
                 onTriggered: {
-                    if (exitArea.containsMouse)
+                    if (exitArea.containsMouse || presentArea.containsMouse)
                         restart()
                     else
                         exitButton.opacity = 0
@@ -479,6 +480,58 @@ ApplicationWindow {
             ToolTip.text: window.presenting
                           ? "Stop presenting (Esc, or double-click the canvas)"
                           : "Leave full screen (F11, or double-click the canvas)"
+            ToolTip.delay: 500
+        }
+
+        // Full Screen (editing) only: go straight to Present. Shows and
+        // fades together with the exit button.
+        Rectangle {
+            id: presentButton
+
+            anchors.top: exitButton.top
+            anchors.right: exitButton.left
+            anchors.rightMargin: 8
+
+            width: 40
+            height: 40
+            radius: 20
+
+            z: 3000000
+
+            color: presentArea.containsMouse ? "#e0404040" : "#b0202020"
+            border.color: "#80ffffff"
+
+            opacity: exitButton.opacity
+            visible: window.fullScreenEditing && !window.presenting && opacity > 0
+
+            // A "play" triangle, drawn (not a font glyph) so it looks the
+            // same on every system.
+            Shape {
+                anchors.centerIn: parent
+                anchors.horizontalCenterOffset: 2      // optical center
+                width: 14
+                height: 16
+                preferredRendererType: Shape.CurveRenderer
+
+                ShapePath {
+                    fillColor: "#ffffff"
+                    strokeColor: "transparent"
+                    startX: 0; startY: 0
+                    PathLine { x: 14; y: 8 }
+                    PathLine { x: 0; y: 16 }
+                    PathLine { x: 0; y: 0 }
+                }
+            }
+
+            MouseArea {
+                id: presentArea
+                anchors.fill: parent
+                hoverEnabled: true
+                onClicked: appActions.present.trigger()
+            }
+
+            ToolTip.visible: presentArea.containsMouse
+            ToolTip.text: "Present (F5)"
             ToolTip.delay: 500
         }
     }

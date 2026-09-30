@@ -913,7 +913,7 @@ There are two full-screen modes, both window state only (not saved):
 
 In Present, **browsing containers** keep their viewer controls (the hand-driven slideshow: e.g. two half-screen containers flipped independently): pan, wheel zoom, back/forward buttons, and double-click to reset the zoom; they can't be moved. Nothing else on the canvas responds.
 
-Leaving: Esc (in Full Screen, Esc first deselects), F11 / F5 again, double-clicking the canvas (in Present, anywhere except a browser or a browsing container), or the ✕ in the top-right corner, which appears when the mouse moves and fades after about two seconds. In Present, the mouse pointer hides along with it and comes back when the mouse moves. (Only a real change of position counts as movement: Qt also re-sends hover updates every frame while something animates.) Leaving Present returns to where you were (window or Full Screen).
+Leaving: Esc (in Full Screen, Esc first deselects), F11 / F5 again, double-clicking the canvas (in Present, anywhere except a browser or a browsing container), or the ✕ in the top-right corner, which appears when the mouse moves and fades after about two seconds. In Full Screen (editing), a ▶ button beside it goes straight to Present (like F5); it appears and fades together with the ✕. In Present, the mouse pointer hides along with it and comes back when the mouse moves. (Only a real change of position counts as movement: Qt also re-sends hover updates every frame while something animates.) Leaving Present returns to where you were (window or Full Screen).
 
 The toolbar overlays the canvas instead of pushing it down, so objects keep exactly the same screen positions when entering or leaving full screen: what you arrange is what you present.
 
