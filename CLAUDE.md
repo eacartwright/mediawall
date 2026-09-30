@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 MediaWall is a desktop app (Python + PySide6/QML, QtMultimedia) for arranging images, GIFs, video, and viewports freely on a canvas. `readme.md` is the full design document (~2400 lines). Consult it by section number: the code cites sections like "readme section 52" often. Key sections: 2.3 (source/instance/viewport), 37 (dev environment), 38 (structure and layering), 39 (roadmap and phase status), 47 (undo), 50 (current state and known limitations), 51 (the prioritised backlog: what to work on next), 52 (the architectural rule), and 55 (decision log and open decisions). When a feature changes, update the matching readme sections (the roadmap status, 50 Current State, and 55 Decision Log).
 
-`docs/changes.txt` is the user's working list of observed errors (with terminal output), requested changes, and new features.
+New errors, requested changes, and feature ideas are collected in the **Inbox** at the top of readme section 51 (the backlog), then sorted into its Next / Soon / Later lists.
 
 ## Commands
 
@@ -79,5 +79,5 @@ Projects are `.mediawall` JSON files. Media is stored as paths, never as bytes. 
 
 ## Working context
 - Architecture rules and decisions: see `readme.md`.
-- Current errors, changes and planned features: see `docs/changes.txt`.
+- Current errors, changes and planned features: see readme section 51 (Inbox, then Next / Soon / Later).
 - Propose a plan before making large or multi-file changes.
