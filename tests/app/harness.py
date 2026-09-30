@@ -49,6 +49,7 @@ VIDEO = "test_mp4.mp4"                      # phone video, stored sideways
 MOV = "test_mov.mov"                        # phone video, stored sideways
 WEBM = "test_webm.webm"                     # 3 s
 AUDIO = "test_m4a.m4a"
+MP3 = "test_mp3.mp3"
 
 
 def media(name):
@@ -56,7 +57,7 @@ def media(name):
 
 
 def media_available():
-    return all((MEDIA / n).exists() for n in (PHOTO, SCREENSHOT, GIF, VIDEO, MOV, WEBM, AUDIO))
+    return all((MEDIA / n).exists() for n in (PHOTO, SCREENSHOT, GIF, VIDEO, MOV, WEBM, AUDIO, MP3))
 
 
 def folder_files(kinds=("image", "video")):
@@ -222,4 +223,4 @@ class Check:
 
 # Re-exported for check scripts.
 __all__ = ["Check", "Qt", "OUT", "MEDIA", "media", "folder_files",
-           "PHOTO", "SCREENSHOT", "GIF", "VIDEO", "MOV", "WEBM", "AUDIO"]
+           "PHOTO", "SCREENSHOT", "GIF", "VIDEO", "MOV", "WEBM", "AUDIO", "MP3"]

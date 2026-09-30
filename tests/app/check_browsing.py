@@ -57,7 +57,8 @@ def step_controls():
     c.check("forward button: next file", shown() == names[(i0 + 1) % len(names)], shown())
     c.click(360, 290, Qt.BackButton)
     c.check("back button: previous file", shown() == names[i0], shown())
-    c.check("audio files are skipped", all(n.split(".")[-1].lower() != "m4a" for n in names))
+    audio = [e["name"] for e in folder_files(("audio",))]
+    c.check("audio files are skipped", audio and not set(audio) & set(names), str(audio))
 
 
 def step_pan_and_move():

@@ -1,11 +1,11 @@
 """
 Audio (readme section 14): the Audio tab, speed/A-B loop, the speed
-range setting, and video as audio.
+range setting, video as audio, and audio files (.m4a, .mp3).
 """
 
 import os
 
-from harness import Check, MEDIA, PHOTO, VIDEO, WEBM, Qt, folder_files, media
+from harness import AUDIO, MP3, Check, MEDIA, PHOTO, VIDEO, WEBM, Qt, folder_files, media
 from core.scene import Scene
 
 c = Check("audio")
@@ -99,8 +99,19 @@ def step_convert2():
     c.sm.undo()
     c.check("one undo brings the video back", c.scene.get(clip.id) is not None
             and not any(o.type == "audio" for o in c.scene.objects))
+    c.files = [c.sm.addAudioTrack(media(n), "audio") for n in (AUDIO, MP3)]
+
+
+def step_files():
+    for name, tid in zip((AUDIO, MP3), c.files):
+        state = c.js(f"scene.viewFor('{tid}') ? scene.viewFor('{tid}').player.playbackState : -1")
+        dur = c.js(f"scene.viewFor('{tid}') ? scene.viewFor('{tid}').player.duration : -1")
+        c.check(f"audio file {os.path.splitext(name)[1]} loads as a track and plays",
+                state == 1 and dur > 0, f"state {state}, {dur} ms")
+    c.check("the Audio tab lists both tracks beside the two videos", rows() == 4, str(rows()))
     c.finish()
 
 
 c.run(scene, [(1500, step_list), (800, step_tab), (800, step_speed), (1000, step_loop),
-              (1500, step_loop2), (1500, step_convert), (1500, step_convert2)])
+              (1500, step_loop2), (1500, step_convert), (1500, step_convert2),
+              (2000, step_files)])
