@@ -1731,7 +1731,7 @@ The tests cover `core/` only and need no display or Qt, so they run in milliseco
 **App checks** (`tests/app/`): each `check_*.py` starts the real MediaWall on a project it builds and drives it with mouse, keyboard, and wheel events, checking the results (about 110 checks: browsing containers, the Browser, Present, Layers, resizing, audio, layouts, commands and settings, undo history, video sizing). They need a display and the sample media in `MEDIATEST/`, take about a minute and a half, and are kept apart from the unit tests (they're named `check_*`, so `python -m unittest` doesn't run them):
 
 ```text
-Windows:  venv\Scripts\python.exe testsppun.py [name ...]
+Windows:  venv\Scripts\python.exe tests\app\run.py [name ...]
 Linux:    venv/bin/python tests/app/run.py [name ...]
 ```
 
