@@ -14,7 +14,7 @@ AppVersion={#AppVersion}
 ; Shown in Installed apps (appwiz.cpl) and the wizard: "MediaWall 0.9.2",
 ; not Inno's default "MediaWall version 0.9.2".
 AppVerName=MediaWall {#AppVersion}
-AppPublisher=MediaWall
+AppPublisher=evans.tools
 DefaultDirName={autopf}\MediaWall
 DefaultGroupName=MediaWall
 DisableProgramGroupPage=yes

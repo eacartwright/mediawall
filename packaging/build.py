@@ -39,7 +39,7 @@ ICON_SVG = ROOT / "assets" / "mediawall.svg"
 ICON_SIZES = [16, 24, 32, 48, 64, 128, 256]
 
 # The .deb's Maintainer field (dpkg requires one).
-MAINTAINER = "MediaWall <mediawall@localhost>"
+MAINTAINER = "evans.tools <7413334+eacartwright@users.noreply.github.com>"
 
 # System libraries the Linux build needs that PySide6 doesn't bundle.
 # apt installs any that are missing along with the .deb.

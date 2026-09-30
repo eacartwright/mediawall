@@ -2436,7 +2436,7 @@ The prototype currently provides:
 - z-order and Delete through a right-click menu, plus shortcuts
 - a Layers panel (right-edge flyout): every object top first, selection linked both ways, Top/Up/Down/Bottom, drag to reorder
 - unit tests for `core/`, and app checks that drive the real app (section 37)
-- installers: a Windows `Setup.exe` and a Linux `.deb`, built by `packaging/build.py` (section 37); 0.9.2 released on GitHub (Windows installer; the `.deb` is still to be built on Linux)
+- installers: a Windows `Setup.exe` and a Linux `.deb`, built by `packaging/build.py` (section 37); 0.9.3 released on GitHub (Windows installer; the `.deb` is still to be built on Linux)
 
 ### How interactions reach the model
 
@@ -2707,6 +2707,7 @@ The following design decisions are currently established:
 - Later the same day, the corner squares went down again (11 → 9 px) and the edge bars got shorter (25 → 19 px); the rotation knob stayed. The Settings dialog got a lighter border (`palette.midlight`), since Fusion's default barely showed on the dark canvas.
 - Selection outlines are 1 px for every object type (media, browsers, containers); only Adjust mode's orange outline stays 2 px. A browser's **New Container** button puts the current file in a new container beside it, like Add to Canvas (2026-09-29).
 - The sidebar's Audio tab is now **Playback** (flyout: "Layers · Playback"): it holds speed, pitch, A-B loops, and volume for videos as well as audio tracks. The browser's Add to Audio and the Convert to Audio Track command keep their names, since they do make audio tracks. The Windows installer shows as "MediaWall 0.9.2" in Installed apps (`AppVerName`), not Inno's default "MediaWall version 0.9.2" (2026-09-30).
+- The publisher is **evans.tools** (the Windows installer's `AppPublisher`, shown in Installed apps; the `.deb`'s Maintainer, with the GitHub noreply address, since dpkg needs an email). evans.tools is the owner's domain for this and related projects (2026-09-30).
 - Containers show no outline once filled unless selected (1 px green) or being adjusted (2 px orange), so a finished wall reads as pictures rather than boxes; an empty container keeps a faint grey outline (hidden in Present) until it's filled. A browsing container's badge is just `⇅`, without the `n / total` count (2026-09-29).
 
 ### Open decisions
