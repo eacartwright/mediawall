@@ -4,11 +4,12 @@ Tests for containers in the scene core. No Qt required.
 Run from the project folder:  python -m unittest
 """
 
+import json
 import tempfile
 import unittest
 from pathlib import Path
 
-from core.project import load_project, save_project, scene_from_dict, FORMAT
+from core.project import load_project, save_project, scene_from_dict, scene_to_dict, FORMAT
 from core.scene import FIT_CONTAIN, FIT_COVER, Scene, fitted_size
 
 
@@ -351,6 +352,34 @@ class BrowsingContainerTests(unittest.TestCase):
         }
         scene, warnings = scene_from_dict(data)
         self.assertEqual(scene.get("c").fit_mode, FIT_COVER)
+        self.assertEqual(len(warnings), 1)
+
+
+class MediaFilterTests(unittest.TestCase):
+
+    def test_allowed_filters_per_type(self):
+        scene = Scene()
+        browser = scene.add_object("browser", 0, 0)
+        box = scene.add_object("container", 0, 0)
+        self.assertTrue(scene.set_media_filter(browser.id, "audio"))
+        self.assertTrue(scene.set_media_filter(box.id, "video"))
+        self.assertFalse(scene.set_media_filter(box.id, "audio"))      # containers show no audio
+        self.assertFalse(scene.set_media_filter(box.id, "gifs"))
+        self.assertEqual((browser.media_filter, box.media_filter), ("audio", "video"))
+
+    def test_saved_and_repaired(self):
+        scene = Scene()
+        box = scene.add_object("container", 0, 0)
+        scene.set_media_filter(box.id, "image")
+        loaded, warnings = scene_from_dict(json.loads(json.dumps(scene_to_dict(scene))))
+        self.assertEqual((loaded.get(box.id).media_filter, warnings), ("image", []))
+
+        data = {
+            "format": FORMAT, "version": 1, "media_sources": {},
+            "objects": [{"id": "c", "type": "container", "media_filter": "audio"}],
+        }
+        scene, warnings = scene_from_dict(data)
+        self.assertEqual(scene.get("c").media_filter, "all")
         self.assertEqual(len(warnings), 1)
 
 

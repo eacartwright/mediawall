@@ -65,6 +65,13 @@ FIT_CONTAIN = "contain"     # whole image visible inside the container
 FIT_COVER = "cover"         # container completely filled, edges cropped
 FIT_MODES = {FIT_CONTAIN, FIT_COVER}
 
+# Which files a browser or browsing container steps through: every
+# kind it shows, or one type. Containers show no audio.
+MEDIA_FILTERS = {
+    "browser": ("all", "image", "video", "audio"),
+    "container": ("all", "image", "video"),
+}
+
 # Object types that always stack above the others (workspace tools).
 OVERLAY_TYPES = {"browser"}
 
@@ -211,6 +218,10 @@ class SceneObject:
     browse_mode: bool = False
     browse_folder: str = ""
     browse_subfolders: bool = True
+
+    # browser and browsing container: "all" or one media type
+    # (MEDIA_FILTERS). Workspace state.
+    media_filter: str = "all"
 
     @property
     def center(self):
@@ -682,6 +693,15 @@ class Scene:
             return False
 
         obj.include_subfolders = bool(include)
+        return True
+
+    def set_media_filter(self, object_id, media_filter) -> bool:
+        obj = self.get(object_id)
+        if obj is None or media_filter not in MEDIA_FILTERS.get(obj.type, ()):
+            return False
+        if obj.media_filter == media_filter:
+            return False
+        obj.media_filter = media_filter
         return True
 
     def set_media_option(self, object_id, name, value) -> bool:

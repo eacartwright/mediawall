@@ -32,6 +32,13 @@ Menu {
     readonly property bool isContainer:
         target !== null && target.isContainer === true
 
+    readonly property bool isBrowser:
+        target !== null && target.isBrowser === true
+
+    // Objects that step through a folder, and so can filter it.
+    readonly property bool filtersFiles:
+        isBrowser || (isContainer && target.browseMode === true)
+
     readonly property bool containerHasContent:
         isContainer && target.hasContent === true
 
@@ -292,6 +299,34 @@ Menu {
             browseSubfoldersItem.checked = Qt.binding(function() {
                 return menu.isContainer && menu.target.browseSubfolders === true
             })
+        }
+    }
+
+    // Which files a browser or browsing container steps through (one
+    // is checked). Containers show no audio.
+    Repeater {
+        model: [
+            { text: "Show All Media", value: "all" },
+            { text: "Show Images Only", value: "image" },
+            { text: "Show Videos Only", value: "video" },
+            { text: "Show Audio Only", value: "audio" },
+        ]
+
+        MenuItem {
+            required property var modelData
+
+            text: modelData.value === "all" && menu.isContainer
+                  ? "Show Images and Videos" : modelData.text
+            checkable: true
+            checked: menu.filtersFiles && menu.target.mediaFilter === modelData.value
+            visible: menu.filtersFiles && (modelData.value !== "audio" || menu.isBrowser)
+            height: visible ? implicitHeight : 0
+            onTriggered: {
+                sceneModel.setMediaFilter(menu.targetId, modelData.value)
+                checked = Qt.binding(function() {
+                    return menu.filtersFiles && menu.target.mediaFilter === modelData.value
+                })
+            }
         }
     }
 

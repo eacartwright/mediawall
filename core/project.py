@@ -26,7 +26,7 @@ import tempfile
 from pathlib import Path
 
 from core.scene import (
-    CLIP_SHAPES, FIT_COVER, FIT_MODES, OBJECT_TYPES, PLAYABLE_TYPES,
+    CLIP_SHAPES, FIT_COVER, FIT_MODES, MEDIA_FILTERS, OBJECT_TYPES, PLAYABLE_TYPES,
     MediaSource, Scene, SceneObject,
     clamp_speed, new_id, normalized_loop,
 )
@@ -42,9 +42,10 @@ COMMON_FIELDS = ["id", "type", "x", "y", "width", "height", "rotation", "z"]
 TYPE_FIELDS = {
     "media": ["source_id", "playing", "parent_id", "muted", "volume", "loop",
               "speed", "preserve_pitch", "loop_a", "loop_b"],
-    "browser": ["folder", "current_index", "include_subfolders"],
+    "browser": ["folder", "current_index", "include_subfolders", "media_filter"],
     "container": ["lock_content", "clip_shape", "fit_mode",
-                  "browse_mode", "browse_folder", "browse_subfolders"],
+                  "browse_mode", "browse_folder", "browse_subfolders",
+                  "media_filter"],
     "audio": ["source_id", "playing", "muted", "volume", "loop",
               "speed", "preserve_pitch", "loop_a", "loop_b"],
 }
@@ -296,6 +297,10 @@ def scene_from_dict(data, project_path=None):
                 f"Unknown container shape {obj.clip_shape!r}; using rectangle."
             )
             obj.clip_shape = "rect"
+
+        if object_type in MEDIA_FILTERS and obj.media_filter not in MEDIA_FILTERS[object_type]:
+            warnings.append(f"Unknown media filter {obj.media_filter!r}; showing all.")
+            obj.media_filter = "all"
 
         scene.objects.append(obj)
 

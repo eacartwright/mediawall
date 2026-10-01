@@ -106,6 +106,17 @@ def step_audio():
     c.check("tracks start audible and looping", not tracks[0].muted and tracks[0].loop)
 
 
+def step_filter():
+    c.sm.setMediaFilter(left.id, "image")
+    files = c.js(f"""(function() {{ var k = scene.children; for (var i = 0; i < k.length; i++)
+            if (k[i].objectId === '{left.id}') return k[i].mediaFiles.map(function(e) {{ return e.type }}) }})()""")
+    c.check("the browser's filter: Images shows only images", files and set(files) == {"image"}, str(files))
+    label = c.js(f"""(function() {{ var k = scene.children; for (var i = 0; i < k.length; i++)
+            if (k[i].objectId === '{left.id}') return k[i].positionText }})()""")
+    c.check("...and its position label says so", label.endswith(" images"), label)
+    c.sm.setMediaFilter(left.id, "all")
+
+
 def step_close():
     c.sm.select(left.id)
     b = c.scene.get(left.id)
@@ -120,4 +131,4 @@ c.played = []
 c.run(scene, [(1500, lambda: c.click(*PREVIEW, Qt.ForwardButton))]      # leave the photo
              + [(1400, step_cycle)] * (len(names) - 1)
              + [(800, step_cycle_report), (300, step_viewer), (1300, step_place),
-                (1300, step_place2), (1500, step_audio), (1300, step_close)])
+                (1300, step_place2), (1500, step_audio), (800, step_filter), (1300, step_close)])

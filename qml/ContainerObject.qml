@@ -34,6 +34,7 @@ Item {
     required property bool browseMode
     required property string browseFolder
     required property bool browseSubfolders
+    required property string mediaFilter        // "all", "image", or "video"
 
     required property string contentId
     required property real contentX
@@ -148,8 +149,12 @@ Item {
             browseFiles = []
             return
         }
+        var filter = mediaFilter
         browseFiles = browserBackend.scanFolder(browseFolder, browseSubfolders)
-            .filter(function(e) { return e.type === "image" || e.type === "video" })
+            .filter(function(e) {
+                return (e.type === "image" || e.type === "video")
+                       && (filter === "all" || e.type === filter)
+            })
 
         // An empty container starts on the folder's first file, rather
         // than sitting empty until the first step. So does one given a
@@ -173,6 +178,11 @@ Item {
     onBrowseModeChanged: rescanBrowse()
     onBrowseFolderChanged: rescanBrowse()
     onBrowseSubfoldersChanged: rescanBrowse()
+    // A new filter that hides the file shown moves on to the first one.
+    onMediaFilterChanged: {
+        startAtFirstFile = true
+        rescanBrowse()
+    }
 
     readonly property int browseIndex: {
         for (var i = 0; i < browseFiles.length; i++) {

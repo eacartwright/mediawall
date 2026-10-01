@@ -26,6 +26,7 @@ Rectangle {
     required property string folder
     required property int currentIndex
     required property bool includeSubfolders
+    required property string mediaFilter        // "all" or a media type
 
     property Item sceneItem
 
@@ -169,10 +170,16 @@ Rectangle {
         previewZoom = newZoom
     }
 
-    readonly property string positionText:
-        mediaFiles.length === 0
-        ? "No media"
-        : (displayIndex + 1) + " / " + mediaFiles.length
+    // With a filter (right-click menu), it says which type, e.g. "2 / 3 videos".
+    readonly property string positionText: {
+        var kind = { "image": "images", "video": "videos", "audio": "audio files" }[mediaFilter]
+        if (mediaFiles.length === 0)
+            return kind ? "No " + kind : "No media"
+        return (displayIndex + 1) + " / " + mediaFiles.length + (kind ? " " + kind : "")
+    }
+
+    // Used by the context menu.
+    readonly property bool isBrowser: true
 
 
     // -------------------------------------------------
@@ -196,8 +203,10 @@ Rectangle {
         // doesn't throw you back to the first file.
         var previousPath = currentEntry ? currentEntry.path : ""
 
+        var filter = mediaFilter
         mediaFiles = folder !== ""
                      ? browserBackend.scanFolder(folder, includeSubfolders)
+                         .filter(function(e) { return filter === "all" || e.type === filter })
                      : []
 
         if (previousPath === "")
@@ -210,10 +219,16 @@ Rectangle {
                 return
             }
         }
+
+        // The file shown is gone from the list (e.g. filtered out):
+        // start from the first one.
+        if (currentIndex !== 0)
+            sceneModel.setBrowserIndex(objectId, 0)
     }
 
     onFolderChanged: rescan()
     onIncludeSubfoldersChanged: rescan()
+    onMediaFilterChanged: rescan()
     Component.onCompleted: rescan()
 
 
@@ -755,7 +770,7 @@ Rectangle {
                         color: "#cccccc"
 
                         horizontalAlignment: Text.AlignRight
-                        elide: Text.ElideLeft
+                        elide: Text.ElideRight         // keep the numbers when space is short
                     }
                 }
             }

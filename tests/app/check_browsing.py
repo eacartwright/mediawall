@@ -185,6 +185,24 @@ def step_other_folder():
 
 def step_other_folder2():
     c.check("choosing another folder again: its first file", shown() == names[0], str(shown()))
+    c.js(f"""(function() {{ var k = scene.children; for (var i = 0; i < k.length; i++)
+            if (k[i].objectId === '{box.id}') objectMenu.openFor(k[i]) }})()""")
+    triggered = c.js("""(function() { for (var i = 0; i < objectMenu.count; i++) {
+        var it = objectMenu.itemAt(i)
+        if (it && it.text === 'Show Videos Only' && it.visible) { it.triggered(); return true } }
+        return false })()""")
+    c.js("objectMenu.close()")
+    c.check("a browsing container's menu offers Show Videos Only", triggered is True)
+
+
+def step_filter():
+    videos = [e["name"] for e in folder_files(("video",))]
+    c.check("...which moves to a video and steps through videos only",
+            shown() in videos and c.scene.get(box.id).media_filter == "video", str(shown()))
+    c.click(360, 290, Qt.ForwardButton)
+    c.check("...(forward: another video)", shown() in videos, str(shown()))
+    c.sm.setMediaFilter(box.id, "audio")
+    c.check("a container can't be set to audio", c.scene.get(box.id).media_filter == "video")
     c.finish()
 
 
@@ -202,4 +220,4 @@ c.run(scene, [(1500, step_controls), (800, step_hold), (1300, step_pan_and_move)
               (1300, step_after_reset), (1800, step_autoplay), (1500, step_autoplay2),
               (1800, step_autoplay3), (1500, step_empty), (1500, step_present),
               (1300, step_present2), (1300, step_end), (1300, step_other_folder),
-              (1300, step_other_folder2)])
+              (1300, step_other_folder2), (1300, step_filter)])

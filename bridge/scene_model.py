@@ -38,12 +38,13 @@ from core.scene import FIT_CONTAIN, FIT_COVER, Scene
 
 # Browser fields are workspace state: saved with the project, but not
 # part of undo (undoing a move shouldn't also rewind your browsing).
-BROWSER_FIELDS = ("folder", "current_index", "include_subfolders")
+BROWSER_FIELDS = ("folder", "current_index", "include_subfolders", "media_filter")
 
 # The same for browsing containers: their browse settings, and while
 # browsing, the content itself (which file, and how it's framed) and
 # the Fit/Fill mode it's framed with.
-CONTAINER_BROWSE_FIELDS = ("browse_mode", "browse_folder", "browse_subfolders")
+CONTAINER_BROWSE_FIELDS = ("browse_mode", "browse_folder", "browse_subfolders",
+                           "media_filter")
 
 
 def _media_file_filter():
@@ -81,6 +82,7 @@ OBJECT_ROLE_NAMES = [
     "browseMode",
     "browseFolder",
     "browseSubfolders",
+    "mediaFilter",
 ]
 
 # Roles describing a media source. Used as "source*" for a media row,
@@ -108,7 +110,7 @@ ROLES = {name: int(Qt.UserRole) + 1 + i for i, name in enumerate(ROLE_NAMES)}
 GEOMETRY_ROLES = [ROLES[n] for n in
                   ("posX", "posY", "objWidth", "objHeight", "objRotation")]
 BROWSER_ROLES = [ROLES[n] for n in
-                 ("folder", "currentIndex", "includeSubfolders")]
+                 ("folder", "currentIndex", "includeSubfolders", "mediaFilter")]
 Z_ROLES = [ROLES["objZ"]]
 PLAYBACK_ROLES = [ROLES[n] for n in
                   ("objPlaying", "objMuted", "objVolume", "objLoop",
@@ -116,7 +118,7 @@ PLAYBACK_ROLES = [ROLES[n] for n in
 SOURCE_ROLES = [ROLES["source" + f] for f in SOURCE_FIELDS]
 CONTAINER_ROLES = [ROLES[n] for n in
                    ("lockContent", "clipShape", "fitMode", "browseMode",
-                    "browseFolder", "browseSubfolders")]
+                    "browseFolder", "browseSubfolders", "mediaFilter")]
 CONTENT_ROLES = [ROLES[n] for n in CONTENT_ROLE_NAMES]
 
 
@@ -350,6 +352,7 @@ class SceneModel(QAbstractListModel):
             "browseMode": obj.browse_mode,
             "browseFolder": obj.browse_folder,
             "browseSubfolders": obj.browse_subfolders,
+            "mediaFilter": obj.media_filter,
         }.get(name)
 
     # -------------------------------------------------
@@ -1040,6 +1043,14 @@ class SceneModel(QAbstractListModel):
     def setBrowserSubfolders(self, object_id, include):
         if self._scene.set_browser_subfolders(object_id, include):
             self._emit_row(object_id, BROWSER_ROLES)
+            self._changed(workspace_only=True)
+
+    @Slot(str, str)
+    def setMediaFilter(self, object_id, media_filter):
+        """Which files a browser or browsing container steps through."""
+        if self._scene.set_media_filter(object_id, media_filter):
+            obj = self._scene.get(object_id)
+            self._emit_row(object_id, BROWSER_ROLES if obj.type == "browser" else CONTAINER_ROLES)
             self._changed(workspace_only=True)
 
     @Slot(str, bool)
