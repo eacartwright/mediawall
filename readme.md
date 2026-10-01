@@ -2463,19 +2463,36 @@ Reviewed 2026-09-26. Keep this list current; it replaces the phase notes as the 
 
 New errors (with the Log window's output), requested changes, and feature ideas go here first, then get sorted into the lists below (or done). This replaces the old `docs/changes.txt` working list, whose items were all fixed or built by 2026-09-26 (see git history).
 
-Empty.
+Waiting on an answer or more information (2026-09-30):
+
+- **Linux UI font** looked better before the monospace change. Only the Log window is set to monospace (the system fixed-width font), so the rest of the UI change has another cause, possibly the Fusion style switch picking a different default font. Needs a screenshot from Mint to compare.
+- **Speed/pitch copied on duplicate**: Duplicate copies an instance's whole playback state today, by design. Which case should start fresh: duplicating a browsing container, adding a file from a browser, or every duplicate?
+- **Zooming a filled container's media**: today, the wheel zooms the content in Adjust mode (double-click) and in browsing containers; on a selected, normal container the wheel scales the whole container. Is the request a way to zoom the content without entering Adjust mode?
+- **Adding single files**: does this mean adding a file from a file dialog, with no browser (needed if the browser is folded into containers)?
+- **Linux: no sound until the app is restarted** (other apps play fine; nothing in the log). Watching; next time, note what was playing and copy the Log window.
 
 ### Next
 
-Nothing queued. Pick the next items from Soon or Later.
+Proposed 2026-09-30:
+
+- **File stepping** in browsers and browsing containers: Left/Right arrow keys, the horizontal wheel (tilt), and holding a back/forward thumb button (one step, a short pause, then repeating).
+- **One-button A-B loop** on canvas video bars, as in VLC: press once for A, again for B, a third time to clear.
+- **Open Recent** dropdown on the Open button.
+- **Browse Folder…** on a filled container, replacing its content without removing it first.
+- **Type filter** (images / videos / audio) for browsers and browsing containers.
 
 Done since the review: browsing containers (section 6.4), layouts (section 17), video as audio (section 14.2), drag-to-reorder in the Layers panel, edge resize handles, the Adjust-mode ghost for video, hiding the idle pointer in Present, and undo history kept between sessions (section 47).
 
 ### Soon
 
-- Arrow keys to nudge the selected object (Shift for bigger steps).
+- Arrow keys to nudge the selected object (Shift for bigger steps). Left/Right step through files instead when a browser or browsing container is selected.
+- **Continue play** in browsing containers: when a video ends, go on to the next file unless the video is looped (probably a per-container option).
+- **Duplicate by mouse**, e.g. Alt+drag. A double right-click is awkward, since the first right-click already opens the menu.
 
 ### Later (kept on the roadmap)
+
+- **Fold the browser into browsing containers** (open decision, section 55), with double-clicking the empty canvas creating a container.
+- **Multi-select**: drag a selection box on the empty canvas to select several free media and containers, and move them as a group (resize and rotate later). Selection is a single id today, so this touches the model, the handles, and undo.
 
 - **Inspector** (Phase 11): exact position, size, and rotation.
 - **UI pass**, once the functionality has settled (decided 2026-09-29): a traditional **menu bar** (e.g. File / Edit / View / Wall / Help) instead of only a row of buttons; **icons** instead of text on toolbar buttons, from one bundled SVG icon set so Windows and Linux match (Qt has no consistent icon theme on Windows; candidates: Lucide, Material Symbols; check licenses); a compact toolbar for the most-used commands (it already barely fits at 1280 px). The groundwork is done: every command is an `Action` in `qml/AppActions.qml` (section 25), so the menu bar and toolbar can be built from the same actions without rewiring. Reference points: XnView MP, qView, qBittorrent (all Qt applications).
@@ -2713,4 +2730,4 @@ The following design decisions are currently established:
 
 ### Open decisions
 
-None currently.
+- **Fold the browser into browsing containers?** (raised 2026-09-30) A browsing container already steps through a folder. For it to replace the browser, it also needs Add to Canvas / New Container, the subfolders option, a type filter, and a home for audio files and audio previews. The browser's other traits would go: it always draws on top, it has a see-through preview, and its header shows the folder. Leaning yes, once the container can do everything the browser does. Then double-clicking the empty canvas creates a container.
