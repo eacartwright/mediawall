@@ -9,6 +9,7 @@ import shutil
 
 from harness import (Check, GIF, MEDIA, OUT, PHOTO, Qt, folder_files, media)
 from core.scene import FIT_CONTAIN, Scene
+from PySide6.QtCore import QTimer
 
 c = Check("browsing")
 names = [e["name"] for e in folder_files()]
@@ -72,13 +73,19 @@ def step_controls():
     c.key(Qt.Key_Left)
     c.check("Left arrow: previous file", shown() == names[i0], shown())
     c.press(360, 290, Qt.ForwardButton)                             # held until step_hold
+    c.held = []
+    for t in range(0, 1100, 50):                                    # what it shows while held
+        QTimer.singleShot(t, lambda: c.held.append(shown()))
 
 
 def step_hold():
     c.release(360, 290, Qt.ForwardButton)
+    steps = sum(1 for a, b in zip(c.held, c.held[1:]) if a != b)
+    # One step at once, one after 400 ms, then one every 150 ms: about 6.
+    c.check("holding the forward button keeps stepping (through videos and GIFs too)",
+            steps >= 5, f"{steps} steps: {c.held}")
     i0 = names.index(c.start_name)
     moved = (names.index(shown()) - i0) % len(names)
-    c.check("holding the forward button keeps stepping", 2 <= moved < len(names) - 1, f"{moved} steps")
     for _ in range(moved):                                          # back to where it was
         c.key(Qt.Key_Left)
     c.check("...and it stops when released", shown() == c.start_name, shown())
@@ -216,7 +223,7 @@ OTHER = OUT / "other folder"
 OTHER.mkdir(parents=True, exist_ok=True)
 shutil.copy(media(GIF), OTHER / GIF)
 
-c.run(scene, [(1500, step_controls), (800, step_hold), (1300, step_pan_and_move), (1300, step_undo_and_reset),
+c.run(scene, [(1500, step_controls), (1150, step_hold), (1300, step_pan_and_move), (1300, step_undo_and_reset),
               (1300, step_after_reset), (1800, step_autoplay), (1500, step_autoplay2),
               (1800, step_autoplay3), (1500, step_empty), (1500, step_present),
               (1300, step_present2), (1300, step_end), (1300, step_other_folder),

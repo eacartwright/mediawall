@@ -7,30 +7,39 @@ import QtQuick
 //
 // The owner sets `step` to its function(delta), delta -1 or +1.
 
-Timer {
+QtObject {
     id: stepper
 
     property var step
 
-    readonly property int firstDelay: 400     // ms before repeating
-    readonly property int repeatDelay: 150    // ms between repeats
-
     property int delta: 0
 
+    // Two timers with fixed intervals: changing a running Timer's
+    // interval (400 ms first, then 150 ms) made it stop repeating.
+    property Timer firstDelay: Timer {
+        interval: 400                   // ms before repeating
+        onTriggered: {
+            stepper.step(stepper.delta)
+            stepper.repeater.start()
+        }
+    }
+
+    property Timer repeater: Timer {
+        interval: 150                   // ms between repeats
+        repeat: true
+        onTriggered: stepper.step(stepper.delta)
+    }
+
     function begin(d) {
+        end()
         delta = d
         step(d)
-        interval = firstDelay
-        restart()
+        firstDelay.start()
     }
 
     function end() {
-        stop()
-    }
-
-    onTriggered: {
-        interval = repeatDelay
-        step(delta)
+        firstDelay.stop()
+        repeater.stop()
     }
 
     // ---- Horizontal wheel ----
