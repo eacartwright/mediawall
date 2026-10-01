@@ -762,9 +762,9 @@ Item {
     Rectangle {
         anchors.left: parent.left
         anchors.top: parent.top
-        anchors.margins: 22                 // clear of the corner handles
+        anchors.margins: 12                 // just clear of the 9 px corner square
 
-        width: Math.min(badgeText.implicitWidth + 12, parent.width - 44)
+        width: Math.min(badgeText.implicitWidth + 12, parent.width - 24)
         height: badgeText.implicitHeight + 6
         radius: 3
 
