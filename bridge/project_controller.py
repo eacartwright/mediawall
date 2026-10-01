@@ -34,9 +34,10 @@ class ProjectController(QObject):
     titleChanged = Signal()
     dirtyChanged = Signal()
 
-    def __init__(self, scene_model, parent=None):
+    def __init__(self, scene_model, app_settings=None, parent=None):
         super().__init__(parent)
         self._model = scene_model
+        self._settings = app_settings       # for Open Recent
         self._path = ""
         self._dirty = False
         self._last_dir = str(Path.home())
@@ -164,6 +165,22 @@ class ProjectController(QObject):
 
         self.openPath(path)
 
+    @Slot(str)
+    def openRecent(self, path):
+        """Open a project from the Open Recent list."""
+        if not Path(path).is_file():
+            QMessageBox.warning(
+                None, "Couldn't Open Project",
+                f"This project no longer exists:\n{path}\n\n"
+                "It has been removed from the recent list."
+            )
+            if self._settings is not None:
+                self._settings.removeRecentProject(path)
+            return
+
+        if self._confirm_discard():
+            self.openPath(path)
+
     @Slot(str, result=bool)
     def openPath(self, path):
         try:
@@ -175,6 +192,7 @@ class ProjectController(QObject):
         self._model.setScene(scene)
         self._set_path(str(Path(path).resolve()))
         self._set_dirty(False)
+        self._remember(self._path)
 
         # Continue the undo history from last time, if it still matches.
         history, note = load_history(path, project_file_fingerprint(path))
@@ -236,7 +254,12 @@ class ProjectController(QObject):
 
         self._set_path(str(Path(path).resolve()))
         self._set_dirty(False)
+        self._remember(self._path)
         return True
+
+    def _remember(self, path):
+        if self._settings is not None:
+            self._settings.addRecentProject(path)
 
     def _confirm_discard(self):
         """True if it's OK to throw away the current scene."""

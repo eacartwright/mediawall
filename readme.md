@@ -997,6 +997,8 @@ It should NOT normally store the media bytes.
 
 **Paths (as implemented):** each media file is saved with its full absolute path, which is always tried first, plus a path relative to the project file, used only as a fallback when the absolute path no longer exists (the project and its media moved together). So a `.mediawall` file can be moved anywhere on its own (e.g. from `Pictures/Japan` to `Documents/mediawalls`) and every file is still found. Browser folders are saved as absolute paths only. Moving projects between machines or operating systems is not a goal for now (decision, 2026-09-26).
 
+**Open Recent:** the ▾ beside Open lists the last 10 projects opened or saved (newest first, file name then folder), plus Clear Recent. The list is an app setting (`recent/projects` in QSettings; list logic in `core/recent.py`). Choosing a project that no longer exists says so and removes it from the list.
+
 ---
 
 ## 16.1 Missing media
@@ -2405,7 +2407,7 @@ Exact bindings can still change.
 
 The prototype currently provides:
 
-- a canvas with a toolbar (New, Open, Save, Save As, Undo, Redo, Add Browser, Add Container, Full Screen, Present, Log)
+- a canvas with a toolbar (New, Open with Open Recent ▾, Save, Save As, Undo, Redo, Add Browser, Add Container, Full Screen, Present, Log)
 - Full Screen (editing) and Present (view-only canvas, browsers still usable) modes (section 15)
 - a right-click menu on empty canvas (Add Browser Here, Add Container Here)
 - project save/load to `.mediawall` files, with unsaved-changes prompts and the project name in the window title
@@ -2475,7 +2477,6 @@ Waiting on an answer or more information (2026-09-30):
 
 Proposed 2026-09-30:
 
-- **Open Recent** dropdown on the Open button.
 - **Browse Folder…** on a filled container, replacing its content without removing it first.
 - **Type filter** (images / videos / audio) for browsers and browsing containers.
 
@@ -2726,6 +2727,7 @@ The following design decisions are currently established:
 - Converting a container's video to an audio track removes the container as well; an empty container left behind was just clutter. Undo brings back both (2026-09-30).
 - File stepping (browsers and browsing containers) also works by holding a thumb button (400 ms, then every 150 ms), by tilting the wheel (one step per notch; sideways trackpad swipes add up), and with the Left/Right arrow keys on the selected one (`previousFile` / `nextFile` in AppActions). Planned arrow-key nudging will apply to other objects (2026-09-30).
 - Canvas video bars got a one-button A-B loop, as in VLC (set A, set B, clear), next to the seek bar (2026-09-30).
+- Open Recent is a ▾ button beside Open, rather than a separate toolbar button or a split button, until the planned menu bar (UI pass) gives it a File menu home (2026-09-30).
 - Containers show no outline once filled unless selected (1 px green) or being adjusted (2 px orange), so a finished wall reads as pictures rather than boxes; an empty container keeps a faint grey outline (hidden in Present) until it's filled. A browsing container's badge is just `⇅`, without the `n / total` count (2026-09-29).
 
 ### Open decisions

@@ -4,10 +4,14 @@ Settings dialog (zoom step, saved between runs).
 """
 
 from harness import Check, Qt
+from bridge import project_controller as controller
 from bridge.app_settings import AppSettings
 from core.scene import Scene
 
 c = Check("commands")
+
+warnings = []
+controller.QMessageBox.warning = staticmethod(lambda parent, title, text: warnings.append(text))
 
 scene = Scene()
 a = scene.add_object("container", 60, 80)
@@ -60,4 +64,20 @@ def step_settings2():
     c.finish()
 
 
-c.run(scene, [(1500, step_actions), (1000, step_present), (1000, step_settings), (800, step_settings2)])
+def step_recent():
+    recent = c.js("appSettings.recentProjects")
+    c.check("the opened project is first in Open Recent",
+            bool(recent) and recent[0].endswith("commands.mediawall"), str(recent))
+    x, y, _, _ = c.center_of("recentButton")
+    c.click(x, y)
+    c.check("the ▾ beside Open shows the recent list", c.js("recentMenu.visible") and c.js("recentMenu.count") >= 3)
+    c.js("recentMenu.close()")
+    gone = "/no/such/folder/gone.mediawall"
+    c.js(f"appSettings.addRecentProject('{gone}')")
+    c.js(f"projectController.openRecent('{gone}')")
+    c.check("a missing recent project: a warning, and it leaves the list",
+            len(warnings) == 1 and gone not in c.js("appSettings.recentProjects"))
+
+
+c.run(scene, [(1500, step_actions), (1000, step_present), (1000, step_recent), (1000, step_settings),
+              (800, step_settings2)])

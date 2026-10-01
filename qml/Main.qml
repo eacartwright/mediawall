@@ -182,7 +182,69 @@ ApplicationWindow {
                 spacing: 8
 
                 Button { action: appActions.newWall }
-                Button { action: appActions.open }
+                // Open, with Open Recent on the ▾ beside it.
+                Row {
+                    spacing: 1
+
+                    Button { action: appActions.open }
+
+                    Button {
+                        id: recentButton
+                        objectName: "recentButton"     // found by tests/app
+                        width: 22
+                        text: "▾"
+                        onClicked: recentMenu.popup(recentButton, 0, recentButton.height)
+
+                        ToolTip.visible: hovered && !recentMenu.visible
+                        ToolTip.delay: 600
+                        ToolTip.text: "Open Recent"
+
+                        Menu {
+                            id: recentMenu
+
+                            // Wide enough for the folder paths.
+                            width: 480
+
+                            // One item per recent project, newest first:
+                            // the file name, then its folder.
+                            Instantiator {
+                                model: appSettings.recentProjects
+
+                                MenuItem {
+                                    required property string modelData
+                                    text: {
+                                        var parts = modelData.split(/[\\/]/)
+                                        var name = parts.pop()
+                                        return name + "    " + parts.join("/")
+                                    }
+                                    onTriggered: projectController.openRecent(modelData)
+                                }
+
+                                onObjectAdded: function(index, object) { recentMenu.insertItem(index, object) }
+                                onObjectRemoved: function(index, object) { recentMenu.removeItem(object) }
+                            }
+
+                            MenuItem {
+                                text: "No recent projects"
+                                enabled: false
+                                visible: appSettings.recentProjects.length === 0
+                                height: visible ? implicitHeight : 0
+                            }
+
+                            MenuSeparator {
+                                visible: appSettings.recentProjects.length > 0
+                                height: visible ? implicitHeight : 0
+                            }
+
+                            MenuItem {
+                                text: "Clear Recent"
+                                visible: appSettings.recentProjects.length > 0
+                                height: visible ? implicitHeight : 0
+                                onTriggered: appSettings.clearRecentProjects()
+                            }
+                        }
+                    }
+                }
                 Button { action: appActions.save }
                 Button { action: appActions.saveAs }
 

@@ -97,7 +97,7 @@ def main():
     app_settings = AppSettings()
     browser_backend = BrowserBackend()
     scene_model = SceneModel()
-    project_controller = ProjectController(scene_model)
+    project_controller = ProjectController(scene_model, app_settings)
 
     engine = QQmlApplicationEngine()
     context = engine.rootContext()

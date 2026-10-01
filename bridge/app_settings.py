@@ -15,6 +15,8 @@ import os
 
 from PySide6.QtCore import Property, QObject, QSettings, Signal, Slot
 
+from core.recent import with_recent, without_recent
+
 
 # Mouse-wheel zoom: percent larger per wheel notch.
 ZOOM_STEP_KEY = "zoom/stepPercent"
@@ -33,10 +35,15 @@ SPEED_MAX_DEFAULT = 3.0
 SPEED_MAX_RANGE = (1.0, 4.0)
 
 
+# Recently opened or saved projects (Open Recent), newest first.
+RECENT_KEY = "recent/projects"
+
+
 class AppSettings(QObject):
 
     zoomStepChanged = Signal()
     speedRangeChanged = Signal()
+    recentProjectsChanged = Signal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -140,3 +147,31 @@ class AppSettings(QObject):
     def resetSpeedRange(self):
         self._set_speed_min(SPEED_MIN_DEFAULT)
         self._set_speed_max(SPEED_MAX_DEFAULT)
+
+    # ---- Recent projects ----
+
+    def _get_recent_projects(self):
+        value = self._settings.value(RECENT_KEY, [])
+        # QSettings returns a single string for a one-item list (ini files).
+        if isinstance(value, str):
+            value = [value]
+        return [str(p) for p in (value or []) if p]
+
+    def _set_recent_projects(self, paths):
+        self._settings.setValue(RECENT_KEY, paths)
+        self._settings.sync()
+        self.recentProjectsChanged.emit()
+
+    recentProjects = Property(list, _get_recent_projects, notify=recentProjectsChanged)
+
+    @Slot(str)
+    def addRecentProject(self, path):
+        self._set_recent_projects(with_recent(self._get_recent_projects(), path))
+
+    @Slot(str)
+    def removeRecentProject(self, path):
+        self._set_recent_projects(without_recent(self._get_recent_projects(), path))
+
+    @Slot()
+    def clearRecentProjects(self):
+        self._set_recent_projects([])
