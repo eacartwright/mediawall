@@ -90,6 +90,11 @@ Item {
             if (containerId === root.objectId && root.hasContent)
                 root.adjusting = true
         }
+
+        function onBrowseFolderChosen(containerId) {
+            if (containerId === root.objectId)
+                root.startAtFirstFile = true
+        }
     }
 
     // Used by the context menu.
@@ -147,13 +152,22 @@ Item {
             .filter(function(e) { return e.type === "image" || e.type === "video" })
 
         // An empty container starts on the folder's first file, rather
-        // than sitting empty until the first step.
-        if (!hasContent && browseFiles.length > 0)
-            Qt.callLater(function() {
-                if (root.browseMode && !root.hasContent && root.browseFiles.length > 0)
-                    sceneModel.showInContainer(root.objectId, root.browseFiles[0].path,
-                                               root.browseFiles[0].type)
-            })
+        // than sitting empty until the first step. So does one given a
+        // new folder (Browse Folder…) that doesn't hold its current file.
+        // Decided once the model's changes have all arrived (browse mode
+        // and folder update one at a time).
+        if (!hasContent || startAtFirstFile)
+            Qt.callLater(showFirstFileIfNeeded)
+    }
+
+    // Set by Browse Folder… just before the folder changes.
+    property bool startAtFirstFile: false
+
+    function showFirstFileIfNeeded() {
+        var first = !hasContent || (startAtFirstFile && browseIndex < 0)
+        startAtFirstFile = false
+        if (first && browseMode && browseFiles.length > 0)
+            sceneModel.showInContainer(objectId, browseFiles[0].path, browseFiles[0].type)
     }
 
     onBrowseModeChanged: rescanBrowse()

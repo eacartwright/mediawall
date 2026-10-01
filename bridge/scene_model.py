@@ -202,6 +202,10 @@ class SceneModel(QAbstractListModel):
     # An audio track was added (the sidebar shows its Playback tab).
     audioTrackAdded = Signal(str)
 
+    # A container is about to browse a newly chosen folder: it should
+    # move to that folder's first file unless it already shows one.
+    browseFolderChosen = Signal(str)
+
     def __init__(self, scene=None, parent=None):
         super().__init__(parent)
         self._scene = scene if scene is not None else Scene()
@@ -943,6 +947,28 @@ class SceneModel(QAbstractListModel):
             folder = QFileDialog.getExistingDirectory(None, "Choose a Folder to Browse")
             if not folder:
                 return
+        if self._scene.set_browsing(container_id, True, folder):
+            self._emit_row(container_id, CONTAINER_ROLES)
+            self._changed(workspace_only=True)
+
+    @Slot(str)
+    def chooseBrowseFolder(self, container_id):
+        """
+        Browse Folder…: browse a folder chosen in a dialog, even when the
+        container is already showing something.
+        """
+        container = self._scene.get(container_id)
+        if container is None or container.type != "container":
+            return
+        content = self._scene.content_of(container_id)
+        source = self._scene.sources.get(content.source_id) if content else None
+        start = container.browse_folder or (str(Path(source.path).parent) if source else "")
+
+        folder = QFileDialog.getExistingDirectory(None, "Choose a Folder to Browse", start)
+        if not folder:
+            return
+        # Before the change, so the container's rescan knows to move on.
+        self.browseFolderChosen.emit(container_id)
         if self._scene.set_browsing(container_id, True, folder):
             self._emit_row(container_id, CONTAINER_ROLES)
             self._changed(workspace_only=True)

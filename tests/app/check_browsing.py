@@ -5,7 +5,9 @@ stepping, autoplay, empty containers, undo, and Present.
 
 import os
 
-from harness import (Check, MEDIA, PHOTO, Qt, folder_files, media)
+import shutil
+
+from harness import (Check, GIF, MEDIA, OUT, PHOTO, Qt, folder_files, media)
 from core.scene import FIT_CONTAIN, Scene
 
 c = Check("browsing")
@@ -168,14 +170,36 @@ def step_end():
     before = shown()
     c.click(360, 290, Qt.ForwardButton)
     c.check("after Stop Browsing, forward does nothing", shown() == before)
+    folder_answer[0] = str(OTHER)
+    c.sm.chooseBrowseFolder(box.id)                                 # Browse Folder… on a filled container
+
+
+def step_other_folder():
+    b = c.scene.get(box.id)
+    c.check("Browse Folder… on a filled container browses the chosen folder",
+            b.browse_mode and os.path.normcase(b.browse_folder) == os.path.normcase(str(OTHER)))
+    c.check("...and moves to its first file", shown() == GIF, str(shown()))
+    folder_answer[0] = str(MEDIA)
+    c.sm.chooseBrowseFolder(box.id)
+
+
+def step_other_folder2():
+    c.check("choosing another folder again: its first file", shown() == names[0], str(shown()))
     c.finish()
 
 
 # The folder dialog for the empty container: answer with tests/media.
 import bridge.scene_model as scene_model                            # noqa: E402
-scene_model.QFileDialog.getExistingDirectory = staticmethod(lambda *a, **k: str(MEDIA))
+folder_answer = [str(MEDIA)]
+scene_model.QFileDialog.getExistingDirectory = staticmethod(lambda *a, **k: folder_answer[0])
+
+# A second folder to browse, holding one file.
+OTHER = OUT / "other folder"
+OTHER.mkdir(parents=True, exist_ok=True)
+shutil.copy(media(GIF), OTHER / GIF)
 
 c.run(scene, [(1500, step_controls), (800, step_hold), (1300, step_pan_and_move), (1300, step_undo_and_reset),
               (1300, step_after_reset), (1800, step_autoplay), (1500, step_autoplay2),
               (1800, step_autoplay3), (1500, step_empty), (1500, step_present),
-              (1300, step_present2), (1300, step_end)])
+              (1300, step_present2), (1300, step_end), (1300, step_other_folder),
+              (1300, step_other_folder2)])

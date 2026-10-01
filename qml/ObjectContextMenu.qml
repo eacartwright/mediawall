@@ -260,9 +260,17 @@ Menu {
 
     MenuItem {
         text: "Browse This Folder"
-        visible: menu.isContainer && !menu.target.browseMode
+        visible: menu.isContainer && !menu.target.browseMode && menu.target.hasContent
         height: visible ? implicitHeight : 0
         onTriggered: sceneModel.startBrowsing(menu.targetId)
+    }
+
+    // Any container, filled or not: pick a folder to browse.
+    MenuItem {
+        text: "Browse Folder…"
+        visible: menu.isContainer
+        height: visible ? implicitHeight : 0
+        onTriggered: sceneModel.chooseBrowseFolder(menu.targetId)
     }
 
     MenuItem {
