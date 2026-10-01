@@ -50,6 +50,7 @@ def step_controls():
     c.sm.startBrowsing(second.id)
     step = c.js("appSettings.zoomStep") / 100
     f0, w0 = shown(), content().width
+    c.start_name = f0
     c.wheel(360, 290, 120)
     c.check("wheel zooms the picture, same file", shown() == f0 and abs(content().width / w0 - (1 + step)) < 1e-3)
     i0 = names.index(shown())
@@ -59,6 +60,26 @@ def step_controls():
     c.check("back button: previous file", shown() == names[i0], shown())
     audio = [e["name"] for e in folder_files(("audio",))]
     c.check("audio files are skipped", audio and not set(audio) & set(names), str(audio))
+    c.wheel(360, 290, 0, dx=-120)
+    c.check("tilting the wheel right: next file", shown() == names[(i0 + 1) % len(names)], shown())
+    c.wheel(360, 290, 0, dx=120)
+    c.check("tilting it left: previous file", shown() == names[i0], shown())
+    c.sm.select(box.id)
+    c.key(Qt.Key_Right)
+    c.check("Right arrow (selected): next file", shown() == names[(i0 + 1) % len(names)], shown())
+    c.key(Qt.Key_Left)
+    c.check("Left arrow: previous file", shown() == names[i0], shown())
+    c.press(360, 290, Qt.ForwardButton)                             # held until step_hold
+
+
+def step_hold():
+    c.release(360, 290, Qt.ForwardButton)
+    i0 = names.index(c.start_name)
+    moved = (names.index(shown()) - i0) % len(names)
+    c.check("holding the forward button keeps stepping", 2 <= moved < len(names) - 1, f"{moved} steps")
+    for _ in range(moved):                                          # back to where it was
+        c.key(Qt.Key_Left)
+    c.check("...and it stops when released", shown() == c.start_name, shown())
 
 
 def step_pan_and_move():
@@ -154,7 +175,7 @@ def step_end():
 import bridge.scene_model as scene_model                            # noqa: E402
 scene_model.QFileDialog.getExistingDirectory = staticmethod(lambda *a, **k: str(MEDIA))
 
-c.run(scene, [(1500, step_controls), (1300, step_pan_and_move), (1300, step_undo_and_reset),
+c.run(scene, [(1500, step_controls), (800, step_hold), (1300, step_pan_and_move), (1300, step_undo_and_reset),
               (1300, step_after_reset), (1800, step_autoplay), (1500, step_autoplay2),
               (1800, step_autoplay3), (1500, step_empty), (1500, step_present),
               (1300, step_present2), (1300, step_end)])

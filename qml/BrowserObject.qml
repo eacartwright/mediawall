@@ -234,6 +234,22 @@ Rectangle {
         )
     }
 
+    // Left/Right arrow keys (AppActions), thumb buttons, and the
+    // horizontal wheel all step through the files.
+    readonly property bool stepsFiles: true
+
+    function stepFiles(delta) {
+        if (delta < 0)
+            previousMedia()
+        else
+            nextMedia()
+    }
+
+    FileStepper {
+        id: fileStepper
+        step: root.stepFiles
+    }
+
     function previousMedia() {
         if (mediaFiles.length === 0)
             return
@@ -581,12 +597,8 @@ Rectangle {
             property point startPan
 
             onPressed: function(mouse) {
-                if (mouse.button === Qt.BackButton) {
-                    root.previousMedia()
-                    return
-                }
-                if (mouse.button === Qt.ForwardButton) {
-                    root.nextMedia()
+                if (mouse.button === Qt.BackButton || mouse.button === Qt.ForwardButton) {
+                    fileStepper.begin(mouse.button === Qt.BackButton ? -1 : 1)
                     return
                 }
 
@@ -610,6 +622,9 @@ Rectangle {
                 root.panY = startPan.y + (mouse.y - startMouse.y)
             }
 
+            onReleased: fileStepper.end()
+            onCanceled: fileStepper.end()
+
             onDoubleClicked: function(mouse) {
                 if (mouse.button === Qt.LeftButton)
                     root.addCurrentToCanvas()
@@ -617,6 +632,8 @@ Rectangle {
 
             // Audio has nothing to zoom or pan: it stays centered.
             onWheel: function(wheel) {
+                if (fileStepper.wheel(wheel.angleDelta))
+                    return
                 if (wheel.angleDelta.y !== 0 && !root.currentIsAudio)
                     root.zoomPreviewAt(wheel.x, wheel.y,
                                        Zoom.wheelFactor(wheel.angleDelta.y, appSettings.zoomStep))
@@ -675,6 +692,7 @@ Rectangle {
                         Layout.preferredHeight: 26
                         Layout.preferredWidth: 36     // leave room for the Add buttons
                         text: "◀"
+                        autoRepeat: true                // hold to keep stepping
                         enabled: root.mediaFiles.length > 0
                         onClicked: root.previousMedia()
                     }
@@ -683,6 +701,7 @@ Rectangle {
                         Layout.preferredHeight: 26
                         Layout.preferredWidth: 36     // leave room for the Add buttons
                         text: "▶"
+                        autoRepeat: true
                         enabled: root.mediaFiles.length > 0
                         onClicked: root.nextMedia()
                     }

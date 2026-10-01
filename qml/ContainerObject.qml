@@ -177,6 +177,19 @@ Item {
                || px > width - borderStrip || py > height - borderStrip
     }
 
+    // Left/Right arrow keys (AppActions), thumb buttons, and the
+    // horizontal wheel step through the folder while browsing.
+    readonly property bool stepsFiles: browseMode
+
+    function stepFiles(delta) {
+        browseStep(delta)
+    }
+
+    FileStepper {
+        id: fileStepper
+        step: root.browseStep
+    }
+
     // -1 = previous, +1 = next, wrapping around (as in a browser).
     function browseStep(delta) {
         var n = browseFiles.length
@@ -519,7 +532,7 @@ Item {
 
             if (mouse.button === Qt.BackButton || mouse.button === Qt.ForwardButton) {
                 if (root.browseMode)
-                    root.browseStep(mouse.button === Qt.BackButton ? -1 : 1)
+                    fileStepper.begin(mouse.button === Qt.BackButton ? -1 : 1)
                 else
                     mouse.accepted = false
                 return
@@ -564,7 +577,10 @@ Item {
             }
         }
 
+        onCanceled: fileStepper.end()
+
         onReleased: {
+            fileStepper.end()
             if (mode === "move")
                 root.commit()
             else if (mode === "pan")
@@ -593,6 +609,9 @@ Item {
         // (browsing: selected or not, and in Present). Otherwise, when
         // selected, scale the whole container like a free image.
         onWheel: function(wheel) {
+            if (root.browseMode && fileStepper.wheel(wheel.angleDelta))
+                return
+
             if (wheel.angleDelta.y === 0) {
                 wheel.accepted = false
                 return

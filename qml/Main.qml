@@ -73,6 +73,17 @@ ApplicationWindow {
 
     onPresentingChanged: if (presenting) sceneModel.select("")
 
+    // The canvas item (delegate) showing a top-level object, or null.
+    function objectItem(objectId) {
+        if (!objectId)
+            return null
+        var items = scene.children
+        for (var i = 0; i < items.length; i++)
+            if (items[i].objectId === objectId)
+                return items[i]
+        return null
+    }
+
     // Back one level: Present -> where you were; Full Screen -> window.
     function stepOut() {
         if (presenting)

@@ -125,6 +125,28 @@ Item {
         onTriggered: sceneModel.sendToBack(sceneModel.selectedId)
     }
 
+    // ---- Files (a selected browser or browsing container) ----
+
+    // The selected object, if it steps through a folder's files.
+    readonly property var fileStepper: {
+        var item = window.objectItem(sceneModel.selectedId)
+        return item && item.stepsFiles ? item : null
+    }
+
+    readonly property Action previousFile: Action {
+        text: "Previous File"
+        shortcut: "Left"
+        enabled: actions.fileStepper !== null
+        onTriggered: actions.fileStepper.stepFiles(-1)
+    }
+
+    readonly property Action nextFile: Action {
+        text: "Next File"
+        shortcut: "Right"
+        enabled: actions.fileStepper !== null
+        onTriggered: actions.fileStepper.stepFiles(1)
+    }
+
     // ---- Insert ----
 
     readonly property Action addBrowser: Action {

@@ -203,10 +203,17 @@ class Check:
     def key(self, key, modifiers=Qt.NoModifier):
         QTest.keyClick(self.win, key, modifiers)
 
-    def wheel(self, x, y, delta, buttons=Qt.NoButton):
+    def press(self, x, y, button=Qt.LeftButton):
+        QTest.mousePress(self.win, button, Qt.NoModifier, QPoint(round(x), round(y)))
+
+    def release(self, x, y, button=Qt.LeftButton):
+        QTest.mouseRelease(self.win, button, Qt.NoModifier, QPoint(round(x), round(y)))
+
+    def wheel(self, x, y, delta, buttons=Qt.NoButton, dx=0):
+        """A wheel event: delta is vertical, dx horizontal (tilt)."""
         pos = QPointF(x, y)
         QGuiApplication.sendEvent(self.win, QWheelEvent(
-            pos, self.win.mapToGlobal(pos), QPoint(), QPoint(0, delta),
+            pos, self.win.mapToGlobal(pos), QPoint(), QPoint(dx, delta),
             buttons, Qt.NoModifier, Qt.NoScrollPhase, False))
 
     def open_sidebar(self, tab="layersTab"):
