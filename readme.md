@@ -905,7 +905,7 @@ Every video instance (free, or a container's content) has its own, saved and und
 
 - **volume**, **mute**, **play/pause**, **loop** (as before)
 - **speed** (`speed`; the slider's range is set in Settings, default 0.5x to 3x, within core's 0.25x to 4x), and **Keep pitch** (`preserve_pitch`, off by default so pitch follows speed). `pitchCompensation` was confirmed available on Windows with PySide6 6.11.2.
-- an **A-B loop** (`loop_a` / `loop_b`, milliseconds, -1 = not set). Looping between them happens only when both are set; the points are kept in order, and points less than 0.1 s apart are rejected. Set them at the current position from the right-click menu (Set Loop Start (A) Here / Set Loop End (B) Here / Clear A–B Loop) or the Playback tab. The seek bar shows A and B markers and the looped span. Reaching B seeks back to A (deferred to the next event-loop turn: the FFmpeg backend ignores a seek made inside `positionChanged`).
+- an **A-B loop** (`loop_a` / `loop_b`, milliseconds, -1 = not set). Looping between them happens only when both are set; the points are kept in order, and points less than 0.1 s apart are rejected. Set them at the current position from the right-click menu (Set Loop Start (A) Here / Set Loop End (B) Here / Clear A–B Loop), the Playback tab, or the **A-B button** on a selected video's seek bar, which works as in VLC: the first press sets A, the second sets B, the third clears the loop (it reads "A-…" while waiting for B, and is orange once A is set). The seek bar shows A and B markers and the looped span. Reaching B seeks back to A (deferred to the next event-loop turn: the FFmpeg backend ignores a seek made inside `positionChanged`).
 
 The sidebar's **Playback** tab (next to Layers; named Audio before 0.9.2) lists every video instance, top first, each with Play/Pause, Mute, a volume slider (the mouse wheel over it changes the volume), a speed slider on a log scale (1x in the middle; double-click the value to reset), Keep pitch, Loop, and A/B buttons. Clicking a card selects the video (or the container holding it). The list is a real list model (`bridge/audio_model.py`) that updates rows in place, so sliders aren't recreated while being dragged.
 
@@ -2475,7 +2475,6 @@ Waiting on an answer or more information (2026-09-30):
 
 Proposed 2026-09-30:
 
-- **One-button A-B loop** on canvas video bars, as in VLC: press once for A, again for B, a third time to clear.
 - **Open Recent** dropdown on the Open button.
 - **Browse Folder…** on a filled container, replacing its content without removing it first.
 - **Type filter** (images / videos / audio) for browsers and browsing containers.
@@ -2726,6 +2725,7 @@ The following design decisions are currently established:
 - The publisher is **evans.tools** (the Windows installer's `AppPublisher`, shown in Installed apps; the `.deb`'s Maintainer, with the GitHub noreply address, since dpkg needs an email). evans.tools is the owner's domain for this and related projects (2026-09-30).
 - Converting a container's video to an audio track removes the container as well; an empty container left behind was just clutter. Undo brings back both (2026-09-30).
 - File stepping (browsers and browsing containers) also works by holding a thumb button (400 ms, then every 150 ms), by tilting the wheel (one step per notch; sideways trackpad swipes add up), and with the Left/Right arrow keys on the selected one (`previousFile` / `nextFile` in AppActions). Planned arrow-key nudging will apply to other objects (2026-09-30).
+- Canvas video bars got a one-button A-B loop, as in VLC (set A, set B, clear), next to the seek bar (2026-09-30).
 - Containers show no outline once filled unless selected (1 px green) or being adjusted (2 px orange), so a finished wall reads as pictures rather than boxes; an empty container keeps a faint grey outline (hidden in Present) until it's filled. A browsing container's badge is just `⇅`, without the `n / total` count (2026-09-29).
 
 ### Open decisions

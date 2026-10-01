@@ -722,6 +722,7 @@ Item {
         showButtons: false
 
         view: contentView
+        mediaId: root.contentId
         playing: root.contentPlaying
         muted: root.contentMuted
 

@@ -19,7 +19,7 @@ scene.add_media(photo.id, 40, 90)
 box = scene.add_object("container", 600, 90, width=320, height=200)
 scene.add_media_to_container(webm.id, box.id)
 clip = scene.add_media(video.id, 60, 330)            # topmost: first card in the Playback tab
-clip.width, clip.height = 300, 533
+clip.width, clip.height = 240, 427                  # bar (and A-B button) on screen
 
 
 def rows():
@@ -78,6 +78,26 @@ def step_loop2():
     c.js(f"scene.viewFor('{clip.id}').player.position = 20000")
 
 
+def step_ab_button():
+    def press():
+        x, y, _, _ = c.center_of("loopButton")
+        c.click(x, y)
+    def loop():
+        o = c.scene.get(clip.id)
+        return o.loop_a, o.loop_b
+    c.check("a selected video's bar has the A-B button", c.center_of("loopButton") is not None)
+    press()
+    a, b = loop()
+    c.check("first press sets A at the playhead", a >= 19000 and b == -1, f"{a}, {b}")
+    c.js(f"scene.viewFor('{clip.id}').seek(24000)")
+    press()
+    a2, b = loop()
+    c.check("second press sets B", a2 == a and b >= 23900, f"{a2}, {b}")
+    press()
+    c.check("third press clears the loop", loop() == (-1, -1), str(loop()))
+    c.js(f"scene.viewFor('{clip.id}').seek(20000)")
+
+
 def step_convert():
     c.js(f"objectMenu.openFor(scene.viewFor('{clip.id}').parent)")
     triggered = c.js("""(function() { for (var i = 0; i < objectMenu.count; i++) {
@@ -120,5 +140,5 @@ def step_files():
 
 
 c.run(scene, [(1500, step_list), (800, step_tab), (800, step_speed), (1000, step_loop),
-              (1500, step_loop2), (1500, step_convert), (1500, step_convert2),
+              (1500, step_loop2), (1000, step_ab_button), (800, step_convert), (1500, step_convert2),
               (2000, step_files)])

@@ -4,8 +4,9 @@ import QtQuick.Layouts
 
 // Play/pause, seek, time, and mute for a MediaView that plays video or audio.
 // Editor UI: shown on selected objects and in browser previews.
-// Canvas objects show only the seek bar and time (showButtons: false);
-// their play/pause and mute are in the right-click menu.
+// Canvas objects show only the seek bar, time, and A-B button
+// (showButtons: false); their play/pause and mute are in the
+// right-click menu.
 
 Rectangle {
     id: bar
@@ -19,6 +20,23 @@ Rectangle {
 
     // Show the Play/Pause and Mute buttons.
     property bool showButtons: true
+
+    // The media instance whose A-B loop the A-B button sets; empty
+    // (e.g. a browser preview) hides the button.
+    property string mediaId: ""
+
+    // One A-B button, as in VLC: first press sets A at the current
+    // position, the second sets B, the third clears the loop.
+    function cycleLoop() {
+        if (!view)
+            return
+        if (view.loopA < 0)
+            sceneModel.setLoopA(mediaId, view.position)
+        else if (view.loopB < 0)
+            sceneModel.setLoopB(mediaId, view.position)
+        else
+            sceneModel.clearLoop(mediaId)
+    }
 
     signal togglePlay()
     signal toggleMute()
@@ -142,6 +160,31 @@ Rectangle {
 
             color: "#cccccc"
             font.pixelSize: 11
+        }
+
+        Button {
+            id: loopButton
+            objectName: "loopButton"           // found by tests/app
+
+            Layout.preferredHeight: 26
+            Layout.preferredWidth: 40
+
+            visible: bar.mediaId !== ""
+
+            readonly property bool hasA: !!bar.view && bar.view.loopA >= 0
+            readonly property bool hasB: !!bar.view && bar.view.loopB >= 0
+
+            // "A-B" waiting for A, "A-…" waiting for B; orange while looping.
+            text: hasA && !hasB ? "A-…" : "A-B"
+            palette.buttonText: hasA ? "#e0a84c" : "#dddddd"
+
+            ToolTip.visible: hovered
+            ToolTip.delay: 600
+            ToolTip.text: !hasA ? "Set loop start (A) here"
+                          : !hasB ? "Set loop end (B) here"
+                          : "Clear the A-B loop"
+
+            onClicked: bar.cycleLoop()
         }
 
         Button {

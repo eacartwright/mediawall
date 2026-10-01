@@ -154,6 +154,7 @@ Item {
         showButtons: false
 
         view: view
+        mediaId: root.objectId
         playing: root.objPlaying
         muted: root.objMuted
 
