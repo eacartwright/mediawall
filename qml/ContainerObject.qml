@@ -51,6 +51,7 @@ Item {
     required property bool contentPreservePitch
     required property real contentLoopA
     required property real contentLoopB
+    required property bool contentMirrored
     required property string contentSourceId
     required property string contentSourceType
     required property string contentSourceUrl
@@ -109,6 +110,7 @@ Item {
     readonly property bool mediaLoop: contentLoop
     readonly property real mediaLoopA: contentLoopA
     readonly property real mediaLoopB: contentLoopB
+    readonly property bool mediaMirrored: contentMirrored
     readonly property var mediaView: contentView
 
     x: posX
@@ -380,6 +382,7 @@ Item {
             preservePitch: root.contentPreservePitch
             loopA: root.contentLoopA
             loopB: root.contentLoopB
+            mirrored: root.contentMirrored
             name: root.contentSourceName
 
             // Registered under the content's id (it changes when the

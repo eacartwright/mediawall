@@ -73,6 +73,7 @@ OBJECT_ROLE_NAMES = [
     "objPreservePitch",
     "objLoopA",
     "objLoopB",
+    "objMirrored",
     "folder",
     "currentIndex",
     "includeSubfolders",
@@ -95,7 +96,7 @@ CONTENT_ROLE_NAMES = (
     ["contentId", "contentX", "contentY", "contentWidth", "contentHeight",
      "contentRotation", "contentPlaying", "contentMuted", "contentVolume",
      "contentLoop", "contentSpeed", "contentPreservePitch", "contentLoopA",
-     "contentLoopB"]
+     "contentLoopB", "contentMirrored"]
     + ["contentSource" + f for f in SOURCE_FIELDS]
 )
 
@@ -114,7 +115,8 @@ BROWSER_ROLES = [ROLES[n] for n in
 Z_ROLES = [ROLES["objZ"]]
 PLAYBACK_ROLES = [ROLES[n] for n in
                   ("objPlaying", "objMuted", "objVolume", "objLoop",
-                   "objSpeed", "objPreservePitch", "objLoopA", "objLoopB")]
+                   "objSpeed", "objPreservePitch", "objLoopA", "objLoopB",
+                   "objMirrored")]
 SOURCE_ROLES = [ROLES["source" + f] for f in SOURCE_FIELDS]
 CONTAINER_ROLES = [ROLES[n] for n in
                    ("lockContent", "clipShape", "fitMode", "browseMode",
@@ -304,7 +306,7 @@ class SceneModel(QAbstractListModel):
                         "contentMuted": True, "contentLoop": True,
                         "contentVolume": 1.0, "contentSpeed": 1.0,
                         "contentPreservePitch": False, "contentLoopA": -1.0,
-                        "contentLoopB": -1.0}.get(name, 0.0)
+                        "contentLoopB": -1.0, "contentMirrored": False}.get(name, 0.0)
             return {
                 "contentId": content.id,
                 "contentX": content.x,
@@ -320,6 +322,7 @@ class SceneModel(QAbstractListModel):
                 "contentPreservePitch": content.preserve_pitch,
                 "contentLoopA": content.loop_a,
                 "contentLoopB": content.loop_b,
+                "contentMirrored": content.mirrored,
             }[name]
 
         if name.startswith("source"):
@@ -343,6 +346,7 @@ class SceneModel(QAbstractListModel):
             "objPreservePitch": obj.preserve_pitch,
             "objLoopA": obj.loop_a,
             "objLoopB": obj.loop_b,
+            "objMirrored": obj.mirrored,
             "folder": obj.folder,
             "currentIndex": obj.current_index,
             "includeSubfolders": obj.include_subfolders,
@@ -1067,6 +1071,11 @@ class SceneModel(QAbstractListModel):
     @Slot(str, bool)
     def setLoop(self, object_id, loop):
         self._set_media_option(object_id, "loop", loop)
+
+    @Slot(str, bool)
+    def setMirrored(self, object_id, mirrored):
+        """Flip a picture horizontally (free media or a container's content)."""
+        self._set_media_option(object_id, "mirrored", mirrored)
 
     @Slot(str, float)
     def setVolume(self, object_id, volume):

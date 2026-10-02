@@ -63,7 +63,26 @@ def step_tilted():
     c.sm.select(picture.id)
 
 
+def mirror_via_menu(obj_id):
+    c.js(f"""(function() {{ var k = scene.children; for (var i = 0; i < k.length; i++)
+            if (k[i].objectId === '{obj_id}') objectMenu.openFor(k[i]) }})()""")
+    found = c.js("""(function() { for (var i = 0; i < objectMenu.count; i++) {
+        var it = objectMenu.itemAt(i)
+        if (it && it.text === 'Flip Horizontally' && it.visible) { it.triggered(); return true } }
+        return false })()""")
+    c.js("objectMenu.close()")
+    return found
+
+
 def step_image():
+    c.check("the menu offers Flip Horizontally for an image", mirror_via_menu(picture.id))
+    c.check("...which mirrors it", get(picture).mirrored is True)
+    c.check("...on screen too", c.js(f"scene.viewFor('{picture.id}').mirrored") is True)
+    c.sm.undo()
+    c.check("...undoably", get(picture).mirrored is False)
+    c.check("a container's picture can be flipped too", mirror_via_menu(full.id)
+            and c.scene.content_of(full.id).mirrored is True)
+    c.sm.undo()
     o = get(picture)
     aspect = o.width / o.height
     c.drag((o.x + o.width / 2, o.y + o.height - 6), (o.x + o.width / 2, o.y + o.height + 39))

@@ -68,6 +68,30 @@ class SceneTests(unittest.TestCase):
         self.assertFalse(self.scene.select("nope"))
 
 
+class MirrorTests(unittest.TestCase):
+
+    def test_mirror_is_saved_and_duplicated(self):
+        from core.project import scene_from_dict, scene_to_dict
+
+        scene = Scene()
+        src = scene.add_source("/p/a.jpg", "image", 400, 200)
+        free = scene.add_media(src.id, 0, 0)
+        box = scene.add_object("container", 0, 0)
+        inner, _ = scene.add_media_to_container(src.id, box.id)
+
+        self.assertTrue(scene.set_media_option(free.id, "mirrored", True))
+        self.assertTrue(scene.set_media_option(inner.id, "mirrored", True))
+        self.assertFalse(scene.set_media_option(free.id, "mirrored", True))   # unchanged
+
+        loaded, warnings = scene_from_dict(scene_to_dict(scene))
+        self.assertEqual(warnings, [])
+        self.assertTrue(loaded.get(free.id).mirrored)
+        self.assertTrue(loaded.content_of(box.id).mirrored)
+
+        copy = scene.duplicate_object(free.id)
+        self.assertTrue(copy.mirrored)
+
+
 class LayerTests(unittest.TestCase):
     """Browsers always stack above other objects (their own group)."""
 

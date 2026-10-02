@@ -41,7 +41,7 @@ COMMON_FIELDS = ["id", "type", "x", "y", "width", "height", "rotation", "z"]
 
 TYPE_FIELDS = {
     "media": ["source_id", "playing", "parent_id", "muted", "volume", "loop",
-              "speed", "preserve_pitch", "loop_a", "loop_b"],
+              "speed", "preserve_pitch", "loop_a", "loop_b", "mirrored"],
     "browser": ["folder", "current_index", "include_subfolders", "media_filter"],
     "container": ["lock_content", "clip_shape", "fit_mode",
                   "browse_mode", "browse_folder", "browse_subfolders",

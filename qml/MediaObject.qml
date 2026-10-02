@@ -24,6 +24,7 @@ Item {
     required property bool objPreservePitch
     required property real objLoopA
     required property real objLoopB
+    required property bool objMirrored
     required property string sourceId
     required property string sourceType
     required property string sourceUrl
@@ -55,6 +56,7 @@ Item {
     readonly property bool mediaLoop: objLoop
     readonly property real mediaLoopA: objLoopA
     readonly property real mediaLoopB: objLoopB
+    readonly property bool mediaMirrored: objMirrored
     readonly property string playbackId: objectId
     readonly property bool isFreeMedia: true
     readonly property var mediaView: view
@@ -119,6 +121,7 @@ Item {
         preservePitch: root.objPreservePitch
         loopA: root.objLoopA
         loopB: root.objLoopB
+        mirrored: root.objMirrored
         name: root.sourceName
         path: root.sourcePath
 

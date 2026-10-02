@@ -185,6 +185,7 @@ class SceneObject:
     source_id: Optional[str] = None
     playing: bool = True          # animated images and video
     parent_id: Optional[str] = None   # container holding this instance
+    mirrored: bool = False        # flipped horizontally (any media)
 
     # video (per instance)
     muted: bool = True            # canvas videos start silent
@@ -706,12 +707,12 @@ class Scene:
 
     def set_media_option(self, object_id, name, value) -> bool:
         """
-        Set a per-instance playback option: muted, loop, volume, speed,
-        or preserve_pitch.
+        Set a per-instance option: muted, loop, volume, speed,
+        preserve_pitch, or mirrored (flipped horizontally).
         """
         obj = self.get(object_id)
         if obj is None or obj.type not in PLAYABLE_TYPES or name not in (
-                "muted", "loop", "volume", "speed", "preserve_pitch"):
+                "muted", "loop", "volume", "speed", "preserve_pitch", "mirrored"):
             return False
 
         if name == "volume":

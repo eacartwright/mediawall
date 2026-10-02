@@ -25,6 +25,9 @@ Item {
     // A-B loop in milliseconds (-1 = not set); active when both are set.
     property real loopA: -1
     property real loopB: -1
+
+    // Flipped horizontally (the picture only, not overlays).
+    property bool mirrored: false
     readonly property bool abLooping: loopA >= 0 && loopB > loopA
 
     property string name: ""
@@ -109,6 +112,11 @@ Item {
         id: loader
 
         anchors.fill: parent
+
+        transform: Scale {
+            origin.x: loader.width / 2
+            xScale: view.mirrored ? -1 : 1
+        }
 
         // Don't try to load a file we already know is missing.
         active: !view.missing && view._url !== ""

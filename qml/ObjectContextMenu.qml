@@ -375,6 +375,27 @@ Menu {
     }
 
 
+    // ---- Mirror (the picture: a free image/video, or a container's) ----
+
+    MenuItem {
+        id: mirrorItem
+
+        text: "Flip Horizontally"
+
+        checkable: true
+        checked: menu.target !== null && menu.target.mediaMirrored === true
+
+        visible: menu.isFreeMedia || menu.containerHasContent
+        height: visible ? implicitHeight : 0
+
+        onTriggered: {
+            sceneModel.setMirrored(menu.target.playbackId, !menu.target.mediaMirrored)
+            mirrorItem.checked = Qt.binding(function() {
+                return menu.target !== null && menu.target.mediaMirrored === true
+            })
+        }
+    }
+
     // ---- Rotation (also: double-click the orange knob) ----
 
     MenuItem {
