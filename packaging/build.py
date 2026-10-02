@@ -13,7 +13,7 @@ Steps:
 2. The app folder: dist/MediaWall/ (PyInstaller, packaging/mediawall.spec).
 3. The installer, in dist/:
    Windows  MediaWall-<version>-Setup.exe  (packaging/windows/mediawall.iss)
-   Linux    mediawall_<version>_<arch>.deb (files in packaging/linux/)
+   Linux    MediaWall_<version>_<arch>.deb (files in packaging/linux/)
 
 `--app-only` stops after step 2 (to try dist/MediaWall/ directly).
 Each platform's installer must be built on that platform.
@@ -189,7 +189,9 @@ def build_deb():
         else:
             path.chmod(0o644)
 
-    out = DIST / f"mediawall_{VERSION}_{arch}.deb"
+    # The package name must be lowercase (Debian rule), but the file name
+    # is free: capitalised to match the Windows installer.
+    out = DIST / f"MediaWall_{VERSION}_{arch}.deb"
     subprocess.run(["dpkg-deb", "--root-owner-group", "--build", str(tree), str(out)], check=True)
     return out
 

@@ -37,7 +37,7 @@ It runs on Linux (Mint/Ubuntu, the primary platform) and Windows, built with Pyt
 Installers bundle everything MediaWall needs (Python, Qt, FFmpeg), so nothing else has to be installed first.
 
 - **Windows:** run `MediaWall-<version>-Setup.exe`. It installs for your user account without an admin prompt, adds a Start Menu entry (and optionally a desktop shortcut), and can make `.mediawall` files open in MediaWall. Uninstall from Settings › Apps.
-- **Linux (Mint/Ubuntu):** `sudo apt install ./mediawall_<version>_amd64.deb`, or double-click the file. It adds MediaWall to the menu and the `mediawall` command, and apt fetches the few system libraries it needs if any are missing. Remove it with `sudo apt remove mediawall`.
+- **Linux (Mint/Ubuntu):** `sudo apt install ./MediaWall_<version>_amd64.deb`, or double-click the file. It adds MediaWall to the menu and the `mediawall` command, and apt fetches the few system libraries it needs if any are missing. Remove it with `sudo apt remove mediawall`.
 
 Settings and logs are kept per user and survive an uninstall. To build the installers yourself: `packaging/build.py`, run on each platform (section 37, Installers).
 
@@ -1804,7 +1804,7 @@ With names (e.g. `run.py browsing layers`) only those run. Each check gets its o
 
 ```text
 Windows:  venv\Scripts\python.exe packaging\build.py      -> dist\MediaWall-<version>-Setup.exe
-Linux:    venv/bin/python packaging/build.py                -> dist/mediawall_<version>_amd64.deb
+Linux:    venv/bin/python packaging/build.py                -> dist/MediaWall_<version>_amd64.deb
 ```
 
 One-time setup: `pip install -r requirements-build.txt` (PyInstaller), plus Inno Setup 6 on Windows (`winget install JRSoftware.InnoSetup`); Linux needs `dpkg-deb`, which Mint and Ubuntu already have. Each platform's installer has to be built on that platform. `--app-only` stops after the app folder (`dist/MediaWall/`), which runs without installing. `build/` and `dist/` are gitignored. The version comes from `core/version.py`.
@@ -1815,7 +1815,7 @@ How it works:
 2. PyInstaller (`packaging/mediawall.spec`) makes `dist/MediaWall/`: Python, PySide6/Qt, Qt's FFmpeg libraries, the QML files, and the icon, so nothing needs to be installed first. Parts of Qt MediaWall doesn't use (web engine, 3D, charts, PDF, other Controls styles, and so on) are left out by name in the spec; if a new QML import is added, check it isn't on that list. QtMultimedia is named as a hidden import because only QML uses it.
 3. The installer:
    - **Windows:** Inno Setup (`packaging/windows/mediawall.iss`) makes one `Setup.exe` (about 40 MB). It installs per user without an admin prompt (or for everyone, if chosen), adds a Start Menu shortcut, an optional desktop shortcut, an uninstaller, and (optional, on by default) makes `.mediawall` files open in MediaWall. The app folder has two programs: `MediaWall.exe`, a small windowed launcher, starts `MediaWall-app.exe` (the app, a console program) with a hidden console, for the same reason as `launcher.pyw` (section 37, Launchers).
-   - **Linux:** a `.deb` that installs the app in `/opt/mediawall`, `mediawall` on the PATH, a menu entry, the icon, and the `.mediawall` file type (`packaging/linux/`). Its `Depends` lists the few system libraries PySide6 doesn't bundle (e.g. `libxcb-cursor0`), so installing it with `sudo apt install ./mediawall_<version>_amd64.deb` (or double-clicking it) fetches any that are missing.
+   - **Linux:** a `.deb` that installs the app in `/opt/mediawall`, `mediawall` on the PATH, a menu entry, the icon, and the `.mediawall` file type (`packaging/linux/`). Its `Depends` lists the few system libraries PySide6 doesn't bundle (e.g. `libxcb-cursor0`), so installing it with `sudo apt install ./MediaWall_<version>_amd64.deb` (or double-clicking it) fetches any that are missing.
 
 The installers bundle their own Python and libraries rather than installing Python on the user's machine: that is the usual approach for Python desktop apps, it needs no internet or admin rights, and it can't break on a mismatched system Python. Settings (QSettings) and logs are per user and survive an uninstall.
 
@@ -1824,7 +1824,7 @@ The installers bundle their own Python and libraries rather than installing Pyth
 ```text
 git tag -a v<version> -m "MediaWall <version>"  &&  git push origin v<version>
 gh release create v<version> dist/MediaWall-<version>-Setup.exe --title "MediaWall <version>" --notes "..."
-gh release upload v<version> dist/mediawall_<version>_amd64.deb      # later, from Linux
+gh release upload v<version> dist/MediaWall_<version>_amd64.deb      # later, from Linux
 ```
 
 Do not depend on any other project's virtual environment (for example ComfyUI's). MediaWall has its own environment and dependency set.
@@ -2728,6 +2728,7 @@ The following design decisions are currently established:
 - Containers' right-click menu has **Browse Folder…** (choose a folder) beside Browse This Folder (the shown file's folder, now only offered when there is one), so a filled container can switch folders without being emptied first (2026-09-30).
 - Type filter for browsers and browsing containers: one saved field, `media_filter` ("all" or a media type; containers can't choose audio), set from the right-click menu. A ComboBox in the browser header was tried and dropped: it crowded the folder name out (2026-09-30).
 - Linux: if Qt's default UI font is fixed-width, the app uses the system's sans-serif font instead (`bridge/ui_font.py`). Only a fixed-width default is replaced, so a desktop font the user chose is kept (2026-10-01; confirmed on Mint).
+- The `.deb` file is named `MediaWall_<version>_<arch>.deb` to match the Windows installer; the package inside stays `mediawall`, since Debian package names must be lowercase (so it's still `sudo apt remove mediawall`) (2026-10-02).
 - Containers show no outline once filled unless selected (1 px green) or being adjusted (2 px orange), so a finished wall reads as pictures rather than boxes; an empty container keeps a faint grey outline (hidden in Present) until it's filled. A browsing container's badge is just `⇅`, without the `n / total` count (2026-09-29).
 
 ### Open decisions
