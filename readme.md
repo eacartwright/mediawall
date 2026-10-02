@@ -2439,7 +2439,7 @@ The prototype currently provides:
 - z-order and Delete through a right-click menu, plus shortcuts
 - a Layers panel (right-edge flyout): every object top first, selection linked both ways, Top/Up/Down/Bottom, drag to reorder
 - unit tests for `core/`, and app checks that drive the real app (section 37)
-- installers: a Windows `Setup.exe` and a Linux `.deb`, built by `packaging/build.py` (section 37); 0.9.4 released on GitHub (Windows installer; the `.deb` is still to be built on Linux)
+- installers: a Windows `Setup.exe` and a Linux `.deb`, built by `packaging/build.py` (section 37); 0.9.5 released on GitHub (Windows installer; the `.deb` is still to be built on Linux)
 
 ### How interactions reach the model
 
