@@ -2439,7 +2439,7 @@ The prototype currently provides:
 - z-order and Delete through a right-click menu, plus shortcuts
 - a Layers panel (right-edge flyout): every object top first, selection linked both ways, Top/Up/Down/Bottom, drag to reorder
 - unit tests for `core/`, and app checks that drive the real app (section 37)
-- installers: a Windows `Setup.exe` and a Linux `.deb`, built by `packaging/build.py` (section 37); 0.9.5 released on GitHub (Windows installer; the `.deb` is still to be built on Linux)
+- installers: a Windows `Setup.exe` and a Linux `.deb`, built by `packaging/build.py` (section 37); 0.9.5 released on GitHub (Windows installer, and the first `.deb`, built and installed on Linux Mint)
 
 ### How interactions reach the model
 
@@ -2483,6 +2483,7 @@ Done since the review: browsing containers (section 6.4), layouts (section 17), 
 
 - Arrow keys to nudge the selected object (Shift for bigger steps). Left/Right step through files instead when a browser or browsing container is selected.
 - **Continue play** in browsing containers: when a video ends, go on to the next file unless the video is looped (probably a per-container option).
+- **Trim the Linux build**: the `.deb` installs 237 MB against about 140 MB on Windows. `UNUSED_QT` in `packaging/mediawall.spec` probably misses Qt parts under their Linux file names (`libQt6*.so*`, plugins). List the largest files in `dist/MediaWall/_internal` on Linux, add what isn't used, and check the app still runs.
 - **Duplicate by mouse**, e.g. Alt+drag. A double right-click is awkward, since the first right-click already opens the menu.
 
 ### Later (kept on the roadmap)
