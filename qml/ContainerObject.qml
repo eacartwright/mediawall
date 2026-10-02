@@ -4,16 +4,17 @@ import "Zoom.js" as Zoom
 
 // Container: a viewport holding one media instance, clipped to its shape.
 //
-// Normal mode:  drag moves the container, corner resizes, knob rotates.
-// Adjust mode:  drag pans the content, wheel zooms, knob rotates the
-//               content. The part outside the frame shows as a ghost.
-//               Enter by double-clicking or from the right-click menu.
-// Browsing:     like a picture viewer (qView): left-drag pans, the
-//               wheel zooms, back/forward mouse buttons step through the
-//               folder's media, double-click resets the zoom. The border
-//               strip or a middle-button drag moves the container.
-//               (Right-click > Browse This Folder.) Also works in
-//               Present: a hand-driven slideshow.
+// Every container works like a picture viewer (qView): left-drag pans
+// the picture, the wheel zooms it, double-click resets the zoom. The
+// border strip (move cursor) moves the container on a left-drag and
+// scales it on the wheel; a middle-button drag moves it too. An empty
+// container moves and scales from anywhere. Handles resize; the knob
+// rotates (with Ctrl: the picture inside). Pan and zoom also work in
+// Present.
+// Browsing:     back/forward mouse buttons (and more) step through a
+//               folder's media (right-click > Browse This Folder).
+// Adjust mode:  (right-click > Adjust Content...) the knob turns the
+//               picture, and the part outside the frame shows as a ghost.
 //
 // Content geometry is in the container's local coordinates
 // (0, 0 = top-left of the unrotated container).
@@ -63,12 +64,12 @@ Item {
     // Shared right-click menu (ObjectContextMenu in Main.qml).
     property var contextMenu
 
-    // Present mode: view-only, never shown as selected. Disabled items
-    // let clicks through to the canvas (double-click there exits). A
-    // browsing container stays enabled for the wheel, but takes no
-    // clicks (see the MouseArea below).
+    // Present mode: never shown as selected, and the container can't be
+    // moved or scaled, but its picture still zooms and pans (and a
+    // browsing one steps through files). An empty one is disabled, so
+    // clicks reach the canvas (double-click there exits).
     readonly property bool presenting: sceneItem ? sceneItem.presenting : false
-    enabled: !presenting || browseMode
+    enabled: !presenting || hasContent
 
     readonly property bool selected:
         !presenting && sceneModel.selectedId === objectId
@@ -505,7 +506,12 @@ Item {
 
 
     // -------------------------------------------------
-    // Mouse: move (normal) or pan/zoom (adjusting)
+    // Mouse (qView-style, browsing or not): left-drag pans the picture,
+    // the wheel zooms it around the pointer, double-click resets it to
+    // the Fit/Fill framing. The container itself moves by its border
+    // strip (move cursor) or a middle-button drag, and the wheel on the
+    // border strip scales it. An empty container moves and scales from
+    // anywhere. None of this needs the container to be selected.
     // -------------------------------------------------
 
     MouseArea {
@@ -515,23 +521,29 @@ Item {
 
         z: 10
 
-        // Browsing (qView-style): left-drag pans the picture, the wheel
-        // zooms it, back/forward mouse buttons change file, double-click
-        // resets the zoom. The container itself moves by its border
-        // strip or a middle-button drag. In Present a browsing container
-        // keeps pan, zoom, and back/forward; nothing else responds.
+        // Browsing containers also step through files with the
+        // back/forward buttons. In Present only pan, zoom, and stepping
+        // respond.
         acceptedButtons: {
             if (root.presenting)
-                return root.browseMode ? Qt.LeftButton | Qt.BackButton | Qt.ForwardButton
-                                       : Qt.NoButton
+                return Qt.LeftButton
+                       | (root.browseMode ? Qt.BackButton | Qt.ForwardButton : 0)
             return Qt.LeftButton | Qt.RightButton | Qt.MiddleButton
                    | Qt.BackButton | Qt.ForwardButton
         }
 
-        // Show a move cursor over a browsing container's border strip.
-        hoverEnabled: root.browseMode && !root.presenting
-        cursorShape: hoverEnabled && !root.adjusting && root.inBorderStrip(mouseX, mouseY)
+        // The move cursor shows where a left-drag moves the container
+        // (and the wheel scales it).
+        hoverEnabled: !root.presenting
+        cursorShape: hoverEnabled && movesAt(mouseX, mouseY)
                      ? Qt.SizeAllCursor : Qt.ArrowCursor
+
+        // Over the border strip, or anywhere on an empty container
+        // (never while adjusting, where every drag pans).
+        function movesAt(px, py) {
+            return !root.adjusting && !root.presenting
+                   && (!root.hasContent || root.inBorderStrip(px, py))
+        }
 
         property string mode: ""      // "move" | "pan" | ""
         property point startMouse
@@ -578,13 +590,10 @@ Item {
             }
 
             // Left button
-            if (root.adjusting)
-                startPan(mouse)
-            else if (root.browseMode && root.hasContent
-                     && (root.presenting || !root.inBorderStrip(mouse.x, mouse.y)))
-                startPan(mouse)
-            else if (!root.presenting)
+            if (movesAt(mouse.x, mouse.y))
                 startMove(mouse)
+            else if (root.hasContent)
+                startPan(mouse)
         }
 
         onPositionChanged: function(mouse) {
@@ -612,26 +621,23 @@ Item {
             mode = ""
         }
 
-        // Browsing: reset the zoom (the container's Fit/Fill framing).
-        // Otherwise: Adjust mode.
+        // Reset the zoom (the container's Fit/Fill framing). Empty (and
+        // not yet browsing a folder): choose one to browse.
         onDoubleClicked: function(mouse) {
             if (mouse.button !== Qt.LeftButton)
                 return
-            // Empty (and not yet browsing a folder): choose one to browse.
             if (!root.hasContent) {
                 if (!root.presenting && !(root.browseMode && root.browseFolder !== ""))
                     sceneModel.startBrowsing(root.objectId)
                 return
             }
-            if (root.browseMode && !root.adjusting)
+            if (!movesAt(mouse.x, mouse.y))
                 sceneModel.resetContentFraming(root.objectId)
-            else if (!root.presenting)
-                root.adjusting = true
         }
 
-        // Adjusting or browsing: zoom the content around the pointer
-        // (browsing: selected or not, and in Present). Otherwise, when
-        // selected, scale the whole container like a free image.
+        // Zoom the picture around the pointer; on the border strip (or
+        // an empty container), scale the whole container like a free
+        // image.
         onWheel: function(wheel) {
             if (root.browseMode && fileStepper.wheel(wheel.angleDelta))
                 return
@@ -643,13 +649,11 @@ Item {
 
             var f = Zoom.wheelFactor(wheel.angleDelta.y, appSettings.zoomStep)
 
-            if (root.adjusting || (root.browseMode && root.hasContent)) {
-                root.zoomAt(wheel.x, wheel.y, f)
-                return
-            }
-
-            if (!root.selected) {
-                wheel.accepted = false
+            if (!movesAt(wheel.x, wheel.y)) {
+                if (root.hasContent)
+                    root.zoomAt(wheel.x, wheel.y, f)
+                else
+                    wheel.accepted = false
                 return
             }
 
@@ -694,33 +698,40 @@ Item {
 
 
     // -------------------------------------------------
-    // Rotation handle: rotates the container, or the content
-    // while adjusting.
+    // Rotation handle: rotates the container, or the content while
+    // adjusting or when grabbed with Ctrl held.
     // -------------------------------------------------
 
     RotationHandle {
+        id: rotationHandle
+
         visible: root.selected
 
         target: root
         sceneItem: root.sceneItem
 
+        function turnsContent() {
+            return root.hasContent
+                   && (root.adjusting || (pressModifiers & Qt.ControlModifier) !== 0)
+        }
+
         pivot: function() {
-            return root.adjusting
+            return turnsContent()
                    ? root.mapToItem(root.sceneItem, cg.cx, cg.cy)
                    : root.mapToItem(root.sceneItem, root.width / 2, root.height / 2)
         }
         currentRotation: function() {
-            return root.adjusting ? cg.rot : root.rotation
+            return turnsContent() ? cg.rot : root.rotation
         }
         applyRotation: function(r) {
-            if (root.adjusting)
+            if (turnsContent())
                 cg.rot = r
             else
                 root.rotation = r
         }
 
         onFinished: {
-            if (root.adjusting)
+            if (turnsContent())
                 root.commitContent()
             else
                 root.commit()
@@ -787,93 +798,15 @@ Item {
 
 
     // -------------------------------------------------
-    // Adjust-mode toolbar
-    //
-    // Lives in scene coordinates rather than inside the (rotated)
-    // container, so it stays upright and readable. It sits below the
-    // container's on-screen bounds, or above them if there's no room,
-    // and is kept inside the visible canvas.
+    // Adjust mode (right-click > Adjust Content..., or Crop / Zoom
+    // Inside): the knob turns the picture, and the part outside the
+    // frame shows as a ghost. Enter / Space, Esc, or clicking elsewhere
+    // finish.
     // -------------------------------------------------
 
-    // Enter / Space finish adjusting, like Done.
     Shortcut {
         enabled: root.adjusting
         sequences: ["Return", "Enter", "Space"]
         onActivated: root.adjusting = false
-    }
-
-    Rectangle {
-        id: adjustBar
-
-        parent: root.sceneItem
-
-        // Axis-aligned bounds of the rotated container, in scene
-        // coordinates (rotation is about the container's center).
-        readonly property real rad: root.rotation * Math.PI / 180
-        readonly property real halfW:
-            Math.abs(root.width / 2 * Math.cos(rad)) + Math.abs(root.height / 2 * Math.sin(rad))
-        readonly property real halfH:
-            Math.abs(root.width / 2 * Math.sin(rad)) + Math.abs(root.height / 2 * Math.cos(rad))
-        readonly property real centerX: root.x + root.width / 2
-        readonly property real centerY: root.y + root.height / 2
-
-        readonly property real gap: 10
-        readonly property real edge: 4
-        readonly property real sceneW: parent ? parent.width : 0
-        readonly property real sceneH: parent ? parent.height : 0
-
-        x: Math.max(edge, Math.min(sceneW - width - edge, centerX - width / 2))
-        y: {
-            var below = centerY + halfH + gap
-            if (below + height <= sceneH - edge)
-                return below
-
-            var above = centerY - halfH - gap - height
-            if (above >= edge)
-                return above
-
-            // Neither fits (container fills the view): pin to the bottom.
-            return Math.max(edge, sceneH - height - edge)
-        }
-
-        width: toolRow.implicitWidth + 12
-        height: toolRow.implicitHeight + 10
-
-        visible: root.adjusting
-
-        color: "#303030"
-        border.color: "#e0a84c"
-        radius: 4
-
-        // Above every object on the canvas.
-        z: 2000000
-
-        // Absorb clicks between buttons so they don't deselect.
-        MouseArea {
-            anchors.fill: parent
-        }
-
-        Row {
-            id: toolRow
-
-            anchors.centerIn: parent
-
-            spacing: 4
-
-            Button {
-                text: "Fit"
-                onClicked: sceneModel.fitContent(root.objectId, false)
-            }
-
-            Button {
-                text: "Fill"
-                onClicked: sceneModel.fitContent(root.objectId, true)
-            }
-
-            Button {
-                text: "Done"
-                onClicked: root.adjusting = false
-            }
-        }
     }
 }

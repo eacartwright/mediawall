@@ -18,6 +18,8 @@ picture = scene.add_media(photo.id, 100, 150)
 picture.width, picture.height = 400, 225
 browser = scene.add_object("browser", 700, 120, width=460, height=380)
 browser.folder = str(MEDIA)
+frame = scene.add_object("container", 100, 450, width=400, height=250)    # not browsing
+scene.add_media_to_container(photo.id, frame.id)
 
 
 def win_state():
@@ -40,6 +42,11 @@ def step_present():
     i0 = c.scene.get(browser.id).current_index
     c.click(930, 300, Qt.ForwardButton)
     c.check("Present: the browser still works", c.scene.get(browser.id).current_index == (i0 + 1) % len(names))
+    f0, w0 = c.scene.get(frame.id).x, c.scene.content_of(frame.id).width
+    c.wheel(300, 575, 120)
+    c.drag((300, 575), (340, 600))
+    c.check("Present: any container's picture still zooms (the container stays put)",
+            c.scene.content_of(frame.id).width > w0 and c.scene.get(frame.id).x == f0)
     c.sm.select(browser.id)
     c.key(Qt.Key_Delete)
     c.check("Present: Delete is off", c.scene.get(browser.id) is not None)

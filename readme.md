@@ -379,7 +379,7 @@ The default should be aspect-ratio preserving.
 ## 5.2 Zoom and crop (implemented)
 
 - **Scaling:** the mouse wheel over a *selected* free image scales it around the pointer, keeping its aspect ratio (by the **zoom step** set in Settings, default 10% per wheel notch, proportional for trackpads; the same step is used for all wheel zoom). This is an accelerator for the resize handle. Unselected objects ignore the wheel, so scrolling over the canvas never resizes things by accident.
-- **Cropping / zooming inside:** right-click → **Crop / Zoom Inside…** replaces the image with a container of exactly the same box, rotation, and stacking position, holding the image, and opens it in Adjust mode. Nothing visibly changes until you zoom or pan. Cropping is container behavior, so there is only one implementation of pan/zoom/crop.
+- **Cropping / zooming inside:** right-click → **Crop / Zoom Inside…** replaces the image with a container of exactly the same box, rotation, and stacking position, holding the image, and opens it in Adjust mode (pan, zoom, and turn it; Enter when done). Nothing visibly changes until you zoom or pan. Cropping is container behavior, so there is only one implementation of pan/zoom/crop.
 - Containers made this way start with **Scale Content with Container off**, so dragging the frame's corner crops the image instead of scaling it. **Release Content** turns it back into a plain free image.
 
 ---
@@ -485,10 +485,11 @@ This should be a property of the media/container relationship.
 - A container holds at most one media instance. The instance is an ordinary media object whose `parent_id` is the container, with its geometry in the container's local, unrotated coordinates (0, 0 = the container's top-left).
 - Moving media into or out of a container re-parents that same instance, so its state (e.g. paused) carries over.
 - Media gets into a container by dragging a free image onto it (the container highlights; holding Shift places the image on top instead), or by selecting the container and using a browser's **Add to Container** button. Only an empty container accepts media: a full one doesn't highlight as a drop target (the media lands on the canvas instead), and Add to Container is disabled for it. To change what a container holds, release or remove its content first.
-- New content is framed with the container's **Fit/Fill** mode (`fit_mode`, default Fill = cover). **Fit Content** and **Fill Container** (menu, or Fit/Fill in Adjust mode) re-frame it, reset its rotation, and set the mode the container remembers for new content.
-- **Browsing containers** (right-click → **Browse This Folder**; section 13): the container steps through the images and videos in a folder, by default the folder of the file it shows (an empty container asks for a folder; **double-clicking an empty container** does the same). **Browse Folder…** picks any folder, for any container, even a filled or already browsing one: it moves to that folder's first file unless the file it shows is in that folder, keeping the same media instance (volume, loop, and so on). A browsing container's menu can also limit it to **images only** or **videos only** (`media_filter`; moving to the first matching file if the one shown is filtered out). Subfolders can be included (**Browse Subfolders Too**). It works like a picture viewer (qView), whether or not it's selected: **left-drag pans** the picture, the **mouse wheel zooms** it around the pointer, the **back/forward mouse buttons** (thumb buttons) go to the previous/next file (wrapping around; hold one to keep stepping, after a short pause), as do **tilting the wheel** left/right and, while it's selected, the **Left/Right arrow keys**, and **double-click resets the zoom** to the Fit/Fill framing. The container itself is moved by dragging its **border strip** (about 10 px inside its edge; a move cursor shows there; resize handles take priority) or with a **middle-button drag** anywhere on it. In Present all of this keeps working except moving the container. An empty browsing container starts on the folder's first file as soon as the folder is scanned (after choosing it, or when a project or layout is opened), instead of waiting at "0 / n". Each file replaces the content in place (same instance, volume, mute, loop, and speed; A-B points cleared) and **starts playing**, even if the previous one was paused, framed with the container's Fit/Fill mode. When selected, a small `⇅` badge marks it as browsing (no position count: it cluttered the wall). **Stop Browsing** keeps whatever is showing. Browse settings, and while browsing the content itself (which file, its pan and zoom, and the Fit/Fill mode), are workspace state: saved, but never changed by Undo (section 47).
-- **Adjust mode** (double-click, or right-click → Adjust Content) turns dragging into panning, the mouse wheel into zoom around the pointer, and the rotation knob into content rotation. The part of the content outside the frame shows as a faint ghost (a live texture of the content itself, so video and GIF ghosts stay in sync and nothing is loaded twice), and a small toolbar offers Fit, Fill, and Done. The toolbar stays upright whatever the rotation, sits below the container (or above it when there's no room), and stays inside the visible canvas. Enter or Space also finishes adjusting, as do clicking elsewhere and Escape.
-- The mouse wheel over a *selected* container (outside Adjust mode) scales the whole container around the pointer, content included, so the view inside the frame doesn't change. This happens whether or not "Scale Content with Container" is on; that setting only affects the resize handles.
+- New content is framed with the container's **Fit/Fill** mode (`fit_mode`, default Fill = cover). **Fit Content** and **Fill Container** (right-click menu) re-frame it, reset its rotation, and set the mode the container remembers for new content.
+- **Every container works like a picture viewer (qView)**, browsing or not, selected or not: **left-drag pans** the picture, the **mouse wheel zooms** it around the pointer, and **double-click resets** it to the Fit/Fill framing. The **border strip** (about 10 px inside the edge; a move cursor shows there; resize handles take priority when selected) moves the container on a left-drag and **scales it on the wheel**, around the pointer and content included, so the view inside doesn't change (whether or not "Scale Content with Container" is on; that setting only affects the resize handles). A **middle-button drag** moves it from anywhere. An **empty** container moves and scales from anywhere, which makes building layouts quick. In Present, every container's picture still pans and zooms; nothing moves or scales. Panning and zooming are undoable, except in browsing containers (workspace state, below).
+- **Rotating the picture inside**: drag the rotation knob with **Ctrl** held (otherwise the knob turns the container), or use Adjust mode.
+- **Browsing containers** (right-click → **Browse This Folder**; section 13): the container steps through the images and videos in a folder, by default the folder of the file it shows (an empty container asks for a folder; **double-clicking an empty container** does the same). **Browse Folder…** picks any folder, for any container, even a filled or already browsing one: it moves to that folder's first file unless the file it shows is in that folder, keeping the same media instance (volume, loop, and so on). A browsing container's menu can also limit it to **images only** or **videos only** (`media_filter`; moving to the first matching file if the one shown is filtered out). Subfolders can be included (**Browse Subfolders Too**). On top of the usual container controls (pan, zoom, double-click reset; above), the **back/forward mouse buttons** (thumb buttons) go to the previous/next file (wrapping around; hold one to keep stepping, after a short pause), as do **tilting the wheel** left/right and, while it's selected, the **Left/Right arrow keys**. In Present all of this keeps working (a hand-driven slideshow). An empty browsing container starts on the folder's first file as soon as the folder is scanned (after choosing it, or when a project or layout is opened), instead of waiting at "0 / n". Each file replaces the content in place (same instance, volume, mute, loop, and speed; A-B points cleared) and **starts playing**, even if the previous one was paused, framed with the container's Fit/Fill mode. When selected, a small `⇅` badge marks it as browsing (no position count: it cluttered the wall). **Stop Browsing** keeps whatever is showing. Browse settings, and while browsing the content itself (which file, its pan and zoom, and the Fit/Fill mode), are workspace state: saved, but never changed by Undo (section 47).
+- **Adjust mode** (right-click → Adjust Content, or Crop / Zoom Inside) is for framing with free rotation: the rotation knob turns the content, every drag pans (the border strip too), and the part of the content outside the frame shows as a faint ghost (a live texture of the content itself, so video and GIF ghosts stay in sync and nothing is loaded twice). It has an orange outline and no toolbar (Fit and Fill are in the right-click menu). Enter or Space finishes, as do clicking elsewhere and Escape.
 - **Release Content** turns the content back into a free object at the position, size, and rotation it currently appears on the canvas. **Remove Content** deletes it. Deleting a container deletes its content.
 - Only top-level objects take part in z-order; content has none of its own.
 - Clipping is rectangular (`clip_shape: "rect"`, stored per container). Other shapes will replace the rectangular clip with a mask without changing the object model.
@@ -970,7 +971,7 @@ There are two full-screen modes, both window state only (not saved):
 
 In Present, **browsing containers** keep their viewer controls (the hand-driven slideshow: e.g. two half-screen containers flipped independently): pan, wheel zoom, back/forward buttons, and double-click to reset the zoom; they can't be moved. Nothing else on the canvas responds.
 
-Leaving: Esc (in Full Screen, Esc first deselects), F11 / F5 again, double-clicking the canvas (in Present, anywhere except a browser or a browsing container), or the ✕ in the top-right corner, which appears when the mouse moves and fades after about two seconds. In Full Screen (editing), a ▶ button beside it goes straight to Present (like F5); it appears and fades together with the ✕. In Present, the mouse pointer hides along with it and comes back when the mouse moves. (Only a real change of position counts as movement: Qt also re-sends hover updates every frame while something animates.) Leaving Present returns to where you were (window or Full Screen).
+Leaving: Esc (in Full Screen, Esc first deselects), F11 / F5 again, double-clicking the canvas (in Present, anywhere except a browser or a container with content), or the ✕ in the top-right corner, which appears when the mouse moves and fades after about two seconds. In Full Screen (editing), a ▶ button beside it goes straight to Present (like F5); it appears and fades together with the ✕. In Present, the mouse pointer hides along with it and comes back when the mouse moves. (Only a real change of position counts as movement: Qt also re-sends hover updates every frame while something animates.) Leaving Present returns to where you were (window or Full Screen).
 
 The toolbar overlays the canvas instead of pushing it down, so objects keep exactly the same screen positions when entering or leaving full screen: what you arrange is what you present.
 
@@ -1387,7 +1388,7 @@ The **Settings** button on the toolbar opens app-wide settings (not per project;
 
 Settings so far:
 
-- **Mouse-wheel zoom step**: percent per wheel notch, 1 to 50, default 10. Used by every wheel zoom: free images and containers, browsing containers, Adjust mode, and browser previews.
+- **Mouse-wheel zoom step**: percent per wheel notch, 1 to 50, default 10. Used by every wheel zoom: free images, containers and their pictures, and browser previews.
 - **Playback speed range**: the slowest and fastest speed offered by the Playback tab's speed slider, default **0.5× to 3×** (slowest 0.25–1×, fastest 1–4×, in 0.25× steps). Core's limits (`SPEED_MIN` / `SPEED_MAX`, 0.25× to 4×) remain the outer bounds any saved speed is kept within; a video already set outside the chosen range keeps its speed.
 
 ### Context menus
@@ -2379,16 +2380,17 @@ Ctrl+Shift+Up     bring to front
 Ctrl+Up           bring forward
 Ctrl+Down         send backward
 Ctrl+Shift+Down   send to back
-Mouse wheel       zoom around the pointer: a browser preview, a browsing
-                  container (also in Present), or a container in Adjust
-                  mode; scale a selected free image or container
+Mouse wheel       zoom around the pointer: a browser preview, or the
+                  picture in any container (also in Present); scale a
+                  container (on its border strip, or anywhere on an
+                  empty one) or a selected free image
 Back / Forward    previous/next file (thumb buttons; over a browser
   mouse buttons   preview or a browsing container, also in Present)
-Left-drag         pan (a zoomed browser preview; a browsing container,
-                  except its border strip, which moves it)
-Middle-drag       move a container (useful for browsing containers)
-Double-click      enter Adjust mode (on a container with content);
-                  reset the zoom (on a browsing container);
+Left-drag         pan (a zoomed browser preview; a container's picture,
+                  except on its border strip, which moves it)
+Middle-drag       move a container from anywhere on it
+Ctrl + knob drag  turn a container's picture instead of the container
+Double-click      reset the zoom (on a container with content);
                   add the current file to the canvas (on a browser preview);
                   reset rotation to 0° (on the orange rotation knob)
 ```
@@ -2431,7 +2433,7 @@ The prototype currently provides:
 - browsing containers: viewer-style (qView) controls: pan, wheel zoom, back/forward buttons, double-click reset; moved by the border strip or middle-drag; also in Present (section 6.4); containers remember Fit/Fill
 - layouts: Save Layout (containers only), New from Layout, Add Layout to Wall (section 17)
 - audio previews in browsers
-- containers: move, resize, rotate; hold one clipped media instance with its own pan, zoom, and rotation (Adjust mode); fit/fill; locked or independent scaling; release/remove content
+- containers: move, resize, rotate, wheel-scale on the border strip; hold one clipped media instance with its own pan and zoom (qView-style, every container) and rotation (Ctrl + knob, or Adjust mode); fit/fill; locked or independent scaling; release/remove content
 - media can be dragged into empty containers, or added from a browser to a selected empty container
 - containers: scroll-wheel scaling around the pointer (when selected), content included
 - free images: scroll-wheel scaling around the pointer (when selected), and Crop / Zoom Inside, which wraps the image in a matching container
@@ -2469,7 +2471,6 @@ New errors (with the Log window's output), requested changes, and feature ideas 
 Waiting on an answer or more information (2026-09-30):
 
 - **Speed/pitch copied on duplicate**: Duplicate copies an instance's whole playback state today, by design. Which case should start fresh: duplicating a browsing container, adding a file from a browser, or every duplicate?
-- **Zooming a filled container's media**: today, the wheel zooms the content in Adjust mode (double-click) and in browsing containers; on a selected, normal container the wheel scales the whole container. Is the request a way to zoom the content without entering Adjust mode?
 - **Adding single files**: does this mean adding a file from a file dialog, with no browser (needed if the browser is folded into containers)?
 - **Linux: no sound until the app is restarted** (other apps play fine; nothing in the log). Watching; next time, note what was playing and copy the Log window.
 
@@ -2686,7 +2687,7 @@ The following design decisions are currently established:
 - Only top-level objects take part in z-order.
 - Browsers form their own stacking group above everything else; z-order operations never move an object across groups (2026-09-26).
 - Rotation handles rotate relative to where they are grabbed, so objects never jump when the knob is clicked.
-- Double-clicking the rotation knob resets rotation to 0° (the content's rotation, in Adjust mode). The same resets are in the right-click menu (Reset Rotation / Reset Content Rotation), shown only when something is rotated.
+- Double-clicking the rotation knob resets rotation to 0° (the content's rotation, in Adjust mode or with Ctrl). The same resets are in the right-click menu (Reset Rotation / Reset Content Rotation), shown only when something is rotated.
 - Every object has four corner resize handles and, at the middle of each side, a thin edge bar (shared `ResizeHandles` component). Dragging a corner pins the opposite corner; dragging an edge moves only that side and keeps the opposite side in place; both work on rotated objects. Images keep their aspect ratio (an edge drag changes the other dimension too, centered); containers and browsers resize freely. Edge bars hide on objects too small for them (2026-09-26).
 - **Double-clicking a container's edge bar** stretches it into the free space along that axis (top/bottom: vertically; left/right: horizontally), like double-clicking a window's top edge in Windows, but stopping at neighbours: other containers and media whose span overlaps its own (not browsers, and not anything already overlapping it), or the canvas edge (the canvas top, under the toolbar while editing). It only grows, only applies to unrotated containers, and is one undo step; content follows the usual resize rules (`Scene.fill_along`) (2026-09-29).
 - Cropping a free image is done by wrapping it in a container (Crop / Zoom Inside), not by giving free media its own crop state. Such containers start with locked scaling off.
@@ -2730,6 +2731,7 @@ The following design decisions are currently established:
 - Type filter for browsers and browsing containers: one saved field, `media_filter` ("all" or a media type; containers can't choose audio), set from the right-click menu. A ComboBox in the browser header was tried and dropped: it crowded the folder name out (2026-09-30).
 - Linux: if Qt's default UI font is fixed-width, the app uses the system's sans-serif font instead (`bridge/ui_font.py`). Only a fixed-width default is replaced, so a desktop font the user chose is kept (2026-10-01; confirmed on Mint).
 - The `.deb` file is named `MediaWall_<version>_<arch>.deb` to match the Windows installer; the package inside stays `mediawall`, since Debian package names must be lowercase (so it's still `sudo apt remove mediawall`) (2026-10-02).
+- **All containers behave the same, like qView** (2026-10-02): pan and wheel-zoom the picture, double-click to reset, in every container, browsing or not, selected or not, and in Present. The wheel on the border strip (or anywhere on an empty container) scales the container, with no selection needed, so layouts are quick to build. Double-click no longer enters Adjust mode. Adjust mode stays (from the right-click menu) for free content rotation, without its Fit/Fill/Done toolbar; Ctrl + knob also turns the content, so both ways can be tried.
 - Containers show no outline once filled unless selected (1 px green) or being adjusted (2 px orange), so a finished wall reads as pictures rather than boxes; an empty container keeps a faint grey outline (hidden in Present) until it's filled. A browsing container's badge is just `⇅`, without the `n / total` count (2026-09-29).
 
 ### Open decisions

@@ -25,6 +25,10 @@ Item {
 
     signal finished()
 
+    // Keyboard modifiers held when the knob was grabbed, so the owner
+    // can choose what turns (a container: Ctrl turns its content).
+    property int pressModifiers: Qt.NoModifier
+
     width: 11
     height: 20
 
@@ -71,6 +75,7 @@ Item {
             }
 
             onPressed: function(mouse) {
+                handle.pressModifiers = mouse.modifiers
                 center = handle.pivot()
                 startAngle = angleTo(mouse)
                 startRotation = handle.currentRotation()
@@ -85,7 +90,8 @@ Item {
 
             onReleased: handle.finished()
 
-            onDoubleClicked: {
+            onDoubleClicked: function(mouse) {
+                handle.pressModifiers = mouse.modifiers
                 handle.applyRotation(0)
                 handle.finished()
             }

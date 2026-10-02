@@ -101,27 +101,62 @@ def step_fill2():
 
 
 def step_container_wheel():
+    c.sm.select("")                                                 # none of this needs a selection
     o, content = get(full), c.scene.content_of(full.id)
     w0, cw0, cx0 = o.width, content.width, content.x
-    c.wheel(o.x + o.width / 2, o.y + o.height / 2, 120)
+    c.wheel(o.x + 4, o.y + o.height / 2, 120)                       # on the border strip
     step = c.js("appSettings.zoomStep") / 100
     o, content = get(full), c.scene.content_of(full.id)
-    c.check("wheel scales a selected container with its content (even unlocked)",
+    c.check("wheel on the border strip scales the container with its content (even unlocked)",
             abs(o.width / w0 - (1 + step)) < 1e-3 and abs(content.width / cw0 - (1 + step)) < 1e-3
             and abs(content.x - cx0 * (1 + step)) < 0.5)
+    w0, cw0 = o.width, content.width
+    c.wheel(o.x + o.width / 2, o.y + o.height / 2, 120)             # inside
+    c.check("wheel inside zooms only the picture (not browsing, not selected)",
+            get(full).width == w0 and abs(c.scene.content_of(full.id).width / cw0 - (1 + step)) < 1e-3)
+    o, content = get(full), c.scene.content_of(full.id)
+    x0, cx0 = o.x, content.x
+    c.drag((o.x + o.width / 2, o.y + o.height / 2), (o.x + o.width / 2 - 30, o.y + o.height / 2))
+    c.check("left-drag inside pans the picture; the container stays",
+            get(full).x == x0 and abs(c.scene.content_of(full.id).x - (cx0 - 30)) < 0.5)
+    c.sm.undo()
+    c.check("...undoably", abs(c.scene.content_of(full.id).x - cx0) < 0.5)
+    e = get(box)                                                    # empty
+    w0 = e.width
+    c.sm.select("")
+    c.wheel(e.x + e.width / 2, e.y + e.height / 2, 120)
+    c.check("an empty container scales from anywhere, unselected",
+            abs(get(box).width / w0 - (1 + step)) < 1e-3, f"{get(box).width:.0f} vs {w0:.0f}")
+    c.sm.undo()
+    c.sm.select(full.id)
+
+
+def knob(o):
+    return o.x + o.width / 2, o.y - 14                              # above the top edge's middle
+
+
+def step_ctrl_knob():
+    o = get(full)
+    r0, cr0 = o.rotation, c.scene.content_of(full.id).rotation
+    c.drag(knob(o), (o.x + o.width, o.y + o.height / 2), modifiers=Qt.ControlModifier)
+    r1, cr1 = get(full).rotation, c.scene.content_of(full.id).rotation
+    c.check("Ctrl + knob turns the picture, not the container",
+            r1 == r0 and abs(cr1 - cr0) > 30, f"{r1}, {cr1:.0f}")
+    c.sm.undo()
     c.sm.adjustRequested.emit(full.id)
 
 
 def step_adjust():
-    o, content = get(full), c.scene.content_of(full.id)
-    w0, cw0 = o.width, content.width
-    c.wheel(o.x + o.width / 2, o.y + o.height / 2, 120)
-    step = c.js("appSettings.zoomStep") / 100
-    c.check("in Adjust mode the wheel zooms only the content",
-            get(full).width == w0 and abs(c.scene.content_of(full.id).width / cw0 - (1 + step)) < 1e-3)
+    o = get(full)
+    r0, cr0 = o.rotation, c.scene.content_of(full.id).rotation
+    c.drag(knob(o), (o.x + o.width, o.y + o.height / 2))
+    r1, cr1 = get(full).rotation, c.scene.content_of(full.id).rotation
+    c.check("in Adjust mode the knob turns the picture",
+            r1 == r0 and abs(cr1 - cr0) > 30, f"{r1}, {cr1:.0f}")
     c.key(Qt.Key_Return)
     c.finish()
 
 
 c.run(scene, [(1500, step_edges), (1000, step_tilted), (1000, step_image), (1000, step_fill),
-              (1000, step_fill2), (1000, step_container_wheel), (1000, step_adjust)])
+              (1000, step_fill2), (1000, step_container_wheel), (1000, step_ctrl_knob),
+              (1000, step_adjust)])

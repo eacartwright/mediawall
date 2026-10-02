@@ -69,8 +69,8 @@ Dialog {
         Label {
             Layout.fillWidth: true
             wrapMode: Text.WordWrap
-            text: "How much each notch of the mouse wheel zooms: free images and "
-                  + "containers, browsing containers, Adjust mode, and browser previews."
+            text: "How much each notch of the mouse wheel zooms: free images, "
+                  + "containers and their pictures, and browser previews."
             color: "#999999"
             font.pixelSize: 12
         }

@@ -190,12 +190,12 @@ class Check:
     def double_click(self, x, y, button=Qt.LeftButton):
         QTest.mouseDClick(self.win, button, Qt.NoModifier, QPoint(round(x), round(y)))
 
-    def drag(self, start, end, button=Qt.LeftButton, steps=8):
-        QTest.mousePress(self.win, button, Qt.NoModifier, QPoint(round(start[0]), round(start[1])))
+    def drag(self, start, end, button=Qt.LeftButton, steps=8, modifiers=Qt.NoModifier):
+        QTest.mousePress(self.win, button, modifiers, QPoint(round(start[0]), round(start[1])))
         for i in range(1, steps + 1):
             QTest.mouseMove(self.win, QPoint(round(start[0] + (end[0] - start[0]) * i / steps),
                                              round(start[1] + (end[1] - start[1]) * i / steps)))
-        QTest.mouseRelease(self.win, button, Qt.NoModifier, QPoint(round(end[0]), round(end[1])))
+        QTest.mouseRelease(self.win, button, modifiers, QPoint(round(end[0]), round(end[1])))
 
     def move(self, x, y):
         QTest.mouseMove(self.win, QPoint(round(x), round(y)))
