@@ -2468,7 +2468,7 @@ New errors (with the Log window's output), requested changes, and feature ideas 
 
 Waiting on an answer or more information (2026-09-30):
 
-- **Linux UI font** looked better before the monospace change. Only the Log window is set to monospace (the system fixed-width font), so the rest of the UI change has another cause, possibly the Fusion style switch picking a different default font. Needs a screenshot from Mint to compare.
+- **Linux UI font** came out fixed-width on Mint (screenshot, 2026-10-01). Qt's default font there is a monospace face; the app's code sets no UI font. `bridge/ui_font.py` now swaps a fixed-width default for fontconfig's sans-serif (or Ubuntu / Noto Sans / DejaVu Sans), and logs the choice ("UI font: …" at the top of the Log). To confirm on Mint, then remove this item.
 - **Speed/pitch copied on duplicate**: Duplicate copies an instance's whole playback state today, by design. Which case should start fresh: duplicating a browsing container, adding a file from a browser, or every duplicate?
 - **Zooming a filled container's media**: today, the wheel zooms the content in Adjust mode (double-click) and in browsing containers; on a selected, normal container the wheel scales the whole container. Is the request a way to zoom the content without entering Adjust mode?
 - **Adding single files**: does this mean adding a file from a file dialog, with no browser (needed if the browser is folded into containers)?
@@ -2728,6 +2728,7 @@ The following design decisions are currently established:
 - Open Recent is a ▾ button beside Open, rather than a separate toolbar button or a split button, until the planned menu bar (UI pass) gives it a File menu home (2026-09-30).
 - Containers' right-click menu has **Browse Folder…** (choose a folder) beside Browse This Folder (the shown file's folder, now only offered when there is one), so a filled container can switch folders without being emptied first (2026-09-30).
 - Type filter for browsers and browsing containers: one saved field, `media_filter` ("all" or a media type; containers can't choose audio), set from the right-click menu. A ComboBox in the browser header was tried and dropped: it crowded the folder name out (2026-09-30).
+- Linux: if Qt's default UI font is fixed-width, the app uses the system's sans-serif font instead (`bridge/ui_font.py`). Only a fixed-width default is replaced, so a desktop font the user chose is kept (2026-10-01).
 - Containers show no outline once filled unless selected (1 px green) or being adjusted (2 px orange), so a finished wall reads as pictures rather than boxes; an empty container keeps a faint grey outline (hidden in Present) until it's filled. A browsing container's badge is just `⇅`, without the `n / total` count (2026-09-29).
 
 ### Open decisions

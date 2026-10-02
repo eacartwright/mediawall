@@ -18,6 +18,7 @@ from bridge.app_settings import AppSettings
 from bridge.log_capture import LogCapture
 from bridge.project_controller import ProjectController
 from bridge.scene_model import SceneModel
+from bridge.ui_font import fix_linux_ui_font
 from core.media_browser import MediaBrowser
 
 
@@ -88,6 +89,9 @@ def main():
 
     app = QApplication(sys.argv)
     app.setWindowIcon(QIcon(str(ICON_PATH)))
+
+    # Some Linux setups hand Qt a fixed-width UI font (bridge/ui_font.py).
+    fix_linux_ui_font(app)
 
     # One Qt Quick Controls style on every platform, so Windows and Linux
     # look and behave the same. (The native Windows style also drew the
