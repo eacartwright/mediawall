@@ -1791,7 +1791,7 @@ python -m unittest
 
 The tests cover `core/` only and need no display or Qt, so they run in milliseconds. Run them after any change to `core/`.
 
-**App checks** (`tests/app/`): each `check_*.py` starts the real MediaWall on a project it builds and drives it with mouse, keyboard, and wheel events, checking the results (about 110 checks: browsing containers, the Browser, Present, Layers, resizing, audio, layouts, commands and settings, undo history, video sizing). They need a display and the sample media in `tests/media/`, take about a minute and a half, and are kept apart from the unit tests (they're named `check_*`, so `python -m unittest` doesn't run them):
+**App checks** (`tests/app/`): each `check_*.py` starts the real MediaWall on a project it builds and drives it with mouse, keyboard, and wheel events, checking the results (about 150 checks: browsing containers, the Browser, Present, Layers, resizing, audio, layouts, commands and settings, undo history, video sizing). They need a display and the sample media in `tests/media/`, take about a minute and a half, and are kept apart from the unit tests (they're named `check_*`, so `python -m unittest` doesn't run them):
 
 ```text
 Windows:  venv\Scripts\python.exe tests\app\run.py [name ...]
@@ -1799,6 +1799,18 @@ Linux:    venv/bin/python tests/app/run.py [name ...]
 ```
 
 With names (e.g. `run.py browsing layers`) only those run. Each check gets its own scratch settings file (`MEDIAWALL_SETTINGS`), so real settings are never touched. `tests/app/harness.py` holds the shared setup; a few QML items carry an `objectName` so checks can find them regardless of font sizes. Run them after changes to QML or the bridge.
+
+### Testing in a VM
+
+A clean VM is the way to check that a fresh clone sets up and passes on its own, with nothing left over from a development machine:
+
+1. Clone the repository and create the venv as above (Linux Mint / Ubuntu or Windows). Never copy `venv/` in from another machine.
+2. Copy the sample media into `tests/media/` (it is gitignored, so a clone doesn't have it). Without it every app check prints `SKIP` instead of running.
+3. Run the unit tests, then the app checks, from a terminal *inside the VM's desktop session*. The app checks open real windows, so they won't run over SSH without a display.
+4. Leave the VM alone while the app checks run. Input is sent straight to the window, but keyboard checks need it to stay the active window; if it never becomes active the check prints `NOTE  window never became active` and keyboard steps may fail.
+5. If the window is blank or video doesn't draw, turn on 3D acceleration in the VM's display settings (or give the VM more video memory) and try again. If a failure looks environmental, read `logs/mediawall.log` and the screenshots in the scratch folder `run.py` prints at the end.
+
+Results so far: Windows 11 (fresh venv, Python 3.13, PySide6 6.11.2), 2026-10-03: 110/110 unit tests, 148/148 app checks. Linux Mint VM: not yet run.
 
 ### Installers
 
