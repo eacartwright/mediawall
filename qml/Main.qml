@@ -100,6 +100,64 @@ ApplicationWindow {
 
     SettingsDialog {
         id: settingsDialog
+        actions: appActions
+    }
+
+    // Opening a project (projectController.openWithProgress): a modal
+    // popup that blocks the app until the new wall is ready. The spinner
+    // is a RotationAnimator, which runs on the render thread, so it keeps
+    // turning while the load blocks the UI thread (where the system uses
+    // a render thread; otherwise it just stands still).
+    Popup {
+        id: loadingPopup
+
+        anchors.centerIn: Overlay.overlay
+        modal: true
+        closePolicy: Popup.NoAutoClose
+        visible: projectController.loading
+
+        padding: 20
+
+        background: Rectangle {
+            color: loadingPopup.palette.window
+            border.color: loadingPopup.palette.midlight
+            radius: 4
+        }
+
+        contentItem: RowLayout {
+            spacing: 14
+
+            Shape {
+                Layout.preferredWidth: 28
+                Layout.preferredHeight: 28
+                preferredRendererType: Shape.CurveRenderer
+
+                ShapePath {
+                    strokeColor: "#5da9ff"
+                    strokeWidth: 3
+                    fillColor: "transparent"
+                    capStyle: ShapePath.RoundCap
+                    PathAngleArc {
+                        centerX: 14; centerY: 14
+                        radiusX: 11; radiusY: 11
+                        startAngle: 0
+                        sweepAngle: 270
+                    }
+                }
+
+                RotationAnimator on rotation {
+                    from: 0
+                    to: 360
+                    duration: 900
+                    loops: Animation.Infinite
+                    running: loadingPopup.visible
+                }
+            }
+
+            Label {
+                text: "Opening " + projectController.loadingName + "…"
+            }
+        }
     }
 
 
@@ -528,7 +586,8 @@ ApplicationWindow {
                 id: hideTimer
                 interval: 2000
                 onTriggered: {
-                    if (exitArea.containsMouse || presentArea.containsMouse)
+                    if (exitArea.containsMouse || presentArea.containsMouse
+                            || saveArea.containsMouse)
                         restart()
                     else
                         exitButton.opacity = 0
@@ -605,6 +664,66 @@ ApplicationWindow {
 
             ToolTip.visible: presentArea.containsMouse
             ToolTip.text: "Present (F5)"
+            ToolTip.delay: 500
+        }
+
+        // Full Screen (editing) only: Save, left of Present. Fades with
+        // the exit button too.
+        Rectangle {
+            id: saveButton
+
+            anchors.top: exitButton.top
+            anchors.right: presentButton.left
+            anchors.rightMargin: 8
+
+            width: 40
+            height: 40
+            radius: 20
+
+            z: 3000000
+
+            color: saveArea.containsMouse ? "#e0404040" : "#b0202020"
+            border.color: "#80ffffff"
+
+            opacity: exitButton.opacity
+            visible: window.fullScreenEditing && !window.presenting && opacity > 0
+
+            // A down arrow into a tray, drawn like the play triangle.
+            Shape {
+                anchors.centerIn: parent
+                width: 16
+                height: 16
+                preferredRendererType: Shape.CurveRenderer
+
+                ShapePath {
+                    strokeColor: "#ffffff"
+                    strokeWidth: 2
+                    fillColor: "transparent"
+                    capStyle: ShapePath.RoundCap
+                    joinStyle: ShapePath.RoundJoin
+                    // The arrow.
+                    startX: 8; startY: 1
+                    PathLine { x: 8; y: 10 }
+                    PathMove { x: 4; y: 6 }
+                    PathLine { x: 8; y: 10 }
+                    PathLine { x: 12; y: 6 }
+                    // The tray.
+                    PathMove { x: 1; y: 11 }
+                    PathLine { x: 1; y: 15 }
+                    PathLine { x: 15; y: 15 }
+                    PathLine { x: 15; y: 11 }
+                }
+            }
+
+            MouseArea {
+                id: saveArea
+                anchors.fill: parent
+                hoverEnabled: true
+                onClicked: appActions.save.trigger()
+            }
+
+            ToolTip.visible: saveArea.containsMouse
+            ToolTip.text: "Save (" + appSettings.shortcutText(appActions.save.shortcut) + ")"
             ToolTip.delay: 500
         }
     }

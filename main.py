@@ -15,11 +15,13 @@ from PySide6.QtQuickControls2 import QQuickStyle
 from PySide6.QtWidgets import QApplication, QFileDialog
 
 from bridge.app_settings import AppSettings
+from bridge.key_release import KeyReleaseWatcher
 from bridge.log_capture import LogCapture
 from bridge.project_controller import ProjectController
 from bridge.scene_model import SceneModel
 from bridge.ui_font import fix_linux_ui_font
 from core.media_browser import MediaBrowser
+from core.version import VERSION
 
 
 # An installed build (PyInstaller, see packaging/) is "frozen": its
@@ -99,6 +101,10 @@ def main():
     QQuickStyle.setStyle("Fusion")
 
     app_settings = AppSettings()
+
+    # Held Left/Right step at the app's pace (bridge/key_release.py).
+    key_release = KeyReleaseWatcher()
+    app.installEventFilter(key_release)
     browser_backend = BrowserBackend()
     scene_model = SceneModel()
     project_controller = ProjectController(scene_model, app_settings)
@@ -110,6 +116,9 @@ def main():
     context.setContextProperty("projectController", project_controller)
     context.setContextProperty("appLog", log_capture.model)
     context.setContextProperty("appSettings", app_settings)
+    context.setContextProperty("keyRelease", key_release)
+    context.setContextProperty("appVersion", VERSION)
+    context.setContextProperty("appIconUrl", QUrl.fromLocalFile(str(ICON_PATH)))
     context.setContextProperty(
         "fixedFontFamily",
         QFontDatabase.systemFont(QFontDatabase.FixedFont).family(),
@@ -123,7 +132,7 @@ def main():
     # Optional: open a project given on the command line,
     # e.g.  python main.py ~/walls/japan.mediawall
     if len(sys.argv) > 1:
-        project_controller.openPath(sys.argv[1])
+        project_controller.openWithProgress(sys.argv[1])
 
     exit_code = app.exec()
 

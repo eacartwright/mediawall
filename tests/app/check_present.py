@@ -76,14 +76,23 @@ def step_full_screen():
 
 def step_present_button():
     c.check("Full Screen: a Present button beside the exit button",
-            c.js("presentButton.visible") and c.js("exitButton.visible"))
+            c.js("presentButton.visible") and c.js("exitButton.visible")
+            and c.js("saveButton.visible"))
+    c.grab("full-screen-buttons.png")
+    c.js("sceneModel.addContainer(900, 600)")                       # something to save
+    dirty = c.js("projectController.dirty")
+    c.click(c.win.width() - 12 - 40 - 8 - 40 - 8 - 20, 12 + 20)     # the Save button
+    c.check("...and a Save button beside that, which saves",
+            dirty and not c.js("projectController.dirty"))
+    c.js("sceneModel.undo()")
     c.click(c.win.width() - 12 - 40 - 8 - 20, 12 + 20)             # the Present button
 
 
 def step_present_button2():
     c.check("the Present button starts Present", c.win.property("presenting") is True)
     c.move(c.win.width() // 2 + 30, c.win.height() // 2)
-    c.check("in Present only the exit button shows", not c.js("presentButton.visible"))
+    c.check("in Present only the exit button shows",
+            not c.js("presentButton.visible") and not c.js("saveButton.visible"))
     c.key(Qt.Key_Escape)
 
 

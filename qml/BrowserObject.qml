@@ -265,6 +265,16 @@ Rectangle {
         step: root.stepFiles
     }
 
+    // Held Left/Right (AppActions): step, pause, keep stepping until
+    // the key is let go.
+    function beginStepping(delta) {
+        fileStepper.begin(delta)
+    }
+
+    function endStepping() {
+        fileStepper.end()
+    }
+
     function previousMedia() {
         if (mediaFiles.length === 0)
             return
@@ -708,6 +718,8 @@ Rectangle {
                         Layout.preferredWidth: 36     // leave room for the Add buttons
                         text: "◀"
                         autoRepeat: true                // hold to keep stepping
+                        autoRepeatDelay: appSettings.stepRepeatDelay
+                        autoRepeatInterval: appSettings.stepRepeatInterval
                         enabled: root.mediaFiles.length > 0
                         onClicked: root.previousMedia()
                     }
@@ -717,6 +729,8 @@ Rectangle {
                         Layout.preferredWidth: 36     // leave room for the Add buttons
                         text: "▶"
                         autoRepeat: true
+                        autoRepeatDelay: appSettings.stepRepeatDelay
+                        autoRepeatInterval: appSettings.stepRepeatInterval
                         enabled: root.mediaFiles.length > 0
                         onClicked: root.nextMedia()
                     }

@@ -972,7 +972,7 @@ There are two full-screen modes, both window state only (not saved):
 
 In Present, **browsing containers** keep their viewer controls (the hand-driven slideshow: e.g. two half-screen containers flipped independently): pan, wheel zoom, back/forward buttons, and double-click to reset the zoom; they can't be moved. Nothing else on the canvas responds.
 
-Leaving: Esc (in Full Screen, Esc first deselects), F11 / F5 again, double-clicking the canvas (in Present, anywhere except a browser or a container with content), or the ✕ in the top-right corner, which appears when the mouse moves and fades after about two seconds. In Full Screen (editing), a ▶ button beside it goes straight to Present (like F5); it appears and fades together with the ✕. In Present, the mouse pointer hides along with it and comes back when the mouse moves. (Only a real change of position counts as movement: Qt also re-sends hover updates every frame while something animates.) Leaving Present returns to where you were (window or Full Screen).
+Leaving: Esc (in Full Screen, Esc first deselects), F11 / F5 again, double-clicking the canvas (in Present, anywhere except a browser or a container with content), or the ✕ in the top-right corner, which appears when the mouse moves and fades after about two seconds. In Full Screen (editing), a ▶ button beside it goes straight to Present (like F5), and a save button (a down arrow into a tray) left of that saves the project (like Ctrl+S); they appear and fade together with the ✕. In Present, the mouse pointer hides along with it and comes back when the mouse moves. (Only a real change of position counts as movement: Qt also re-sends hover updates every frame while something animates.) Leaving Present returns to where you were (window or Full Screen).
 
 The toolbar overlays the canvas instead of pushing it down, so objects keep exactly the same screen positions when entering or leaving full screen: what you arrange is what you present.
 
@@ -1381,7 +1381,7 @@ Persistent or dockable audio controls.
 
 ### Commands (actions)
 
-Every app command is defined once in `qml/AppActions.qml` as a Qt Quick `Action`: its name, keyboard shortcut, and when it's available (canvas-editing commands are off in Present). Toolbar buttons, the Layout menu, the right-click menu's arrange/Duplicate/Delete items, and the Layers panel's Top/Up/Down/Bottom all point at these (`Button { action: appActions.undo }`), so a command is wired in one place. New commands should be added there too; a later UI pass (menu bar, icons; section 51) then only rearranges them. Esc and Redo's second key (Ctrl+Y) stay plain `Shortcut`s in `Main.qml`.
+Every app command is defined once in `qml/AppActions.qml` as a Qt Quick `Action`: its name, keyboard shortcut, and when it's available (canvas-editing commands are off in Present). Toolbar buttons, the Layout menu, the right-click menu's arrange/Duplicate/Delete items, and the Layers panel's Top/Up/Down/Bottom all point at these (`Button { action: appActions.undo }`), so a command is wired in one place. New commands should be added there too; a later UI pass (menu bar, icons; section 51) then only rearranges them. Esc and Redo's second key (Ctrl+Y) stay plain `Shortcut`s in `Main.qml`. Left/Right are `Shortcut`s in AppActions that ignore key repeats: the press starts the selected object's `FileStepper`, and the key's real release (reported by `bridge/key_release.py`, an app-wide event filter that only watches) stops it, so a held arrow steps at the Settings pace rather than the system's key-repeat rate.
 
 ### Settings
 
@@ -1391,6 +1391,9 @@ Settings so far:
 
 - **Mouse-wheel zoom step**: percent per wheel notch, 1 to 50, default 10. Used by every wheel zoom: free images, containers and their pictures, and browser previews.
 - **Playback speed range**: the slowest and fastest speed offered by the Playback tab's speed slider, default **0.5× to 3×** (slowest 0.25–1×, fastest 1–4×, in 0.25× steps). Core's limits (`SPEED_MIN` / `SPEED_MAX`, 0.25× to 4×) remain the outer bounds any saved speed is kept within; a video already set outside the chosen range keeps its speed.
+- **Holding previous / next file**: holding Left/Right, a thumb button, a sideways wheel tilt, or a browser's ◀ ▶ steps once, waits (default **400 ms**, 100–2000), then steps every **150 ms** (30–1000) until let go. A held tilt arrives as whole notches at the mouse driver's pace; `FileStepper` paces those the same way, so it can't step faster than the driver sends (trackpad swipes, in small deltas, are left alone).
+
+The dialog has three tabs: **General** (the settings above), **Shortcuts** (every key and modifier the app responds to; command keys are read from `AppActions`, so the list can't drift from the real bindings, and are shown in the platform's spelling via `appSettings.shortcutText`), and **About** (the icon, version from `core/version.py`, and a link to evans.tools).
 
 ### Context menus
 
@@ -2021,7 +2024,7 @@ Implement:
 - container relationships
 - missing-file detection
 
-Done: JSON project files (`.mediawall`) with a format name and version number; stable IDs; media sources saved once with original, current, and project-relative paths; transforms, z-order, playback state, and browser state; atomic saves; tolerant loading; missing files shown as an error state on the canvas; unsaved-changes prompts on New, Open, and close. Container relationships will be added with Phase 3.
+Done: JSON project files (`.mediawall`) with a format name and version number; stable IDs; media sources saved once with original, current, and project-relative paths; transforms, z-order, playback state, and browser state; atomic saves; tolerant loading; missing files shown as an error state on the canvas; unsaved-changes prompts on New, Open, and close. Container relationships will be added with Phase 3. Opening (Open, Open Recent, or a file on the command line) shows a modal **Opening <name>…** popup with a spinner until the wall is ready (`ProjectController.openWithProgress`).
 
 ---
 
@@ -2397,6 +2400,8 @@ Mouse wheel       zoom around the pointer: a browser preview, or the
                   picture in any container (also in Present); scale a
                   container (on its border strip, or anywhere on an
                   empty one) or a selected free image
+Left / Right      previous/next file (a selected browser or browsing
+                  container; hold to keep stepping, at the Settings pace)
 Back / Forward    previous/next file (thumb buttons; over a browser
   mouse buttons   preview or a browsing container, also in Present)
 Left-drag         pan (a zoomed browser preview; a container's picture,
@@ -2424,9 +2429,9 @@ Exact bindings can still change.
 The prototype currently provides:
 
 - a canvas with a toolbar (New, Open with Open Recent ▾, Save, Save As, Undo, Redo, Add Browser, Add Container, Full Screen, Present, Log)
-- Full Screen (editing) and Present (view-only canvas, browsers still usable) modes (section 15)
+- Full Screen (editing) and Present (view-only canvas, browsers still usable) modes (section 15); Full Screen has ✕, ▶ (Present), and Save buttons in the corner
 - a right-click menu on empty canvas (Add Browser Here, Add Container Here)
-- project save/load to `.mediawall` files, with unsaved-changes prompts and the project name in the window title
+- project save/load to `.mediawall` files, with unsaved-changes prompts and the project name in the window title; a modal "Opening…" popup while a project opens
 - missing media shown as a "Missing file" box that keeps its size and position; undecodable files shown as "Can't display file"
 - Locate Missing File (right-click), which also relinks other missing files from the same old folder if they're found in the new one
 - undo/redo for every scene change (section 47)
@@ -2440,7 +2445,7 @@ The prototype currently provides:
 - animated GIF and WebP playback, on the canvas and in browser previews; each instance can be paused or played from its right-click menu
 - video on the canvas, in containers, and in browser previews, with per-instance play/pause, mute, and loop (right-click menu), and an on-object seek bar when selected
 - per-video speed (0.5x to 3x by default; the range is a setting), Keep pitch, and A-B loop; an Playback tab in the sidebar with every video's sound and playback settings (section 14.5)
-- a Settings dialog (toolbar): the mouse-wheel zoom step and the speed range (section 25)
+- a Settings dialog (toolbar): the mouse-wheel zoom step, the speed range, and the hold-to-step pace; a Shortcuts tab listing every key; an About tab with the version (section 25)
 - audio tracks added from a browser (double-click or Add to Audio), controlled in the Playback tab
 - video as audio: Convert to Audio Track (right-click a video), or Add to Audio for a video in a browser (section 14.2)
 - browsing containers: viewer-style (qView) controls: pan, wheel zoom, back/forward buttons, double-click reset; moved by the border strip or middle-drag; also in Present (section 6.4); containers remember Fit/Fill
@@ -2738,6 +2743,8 @@ The following design decisions are currently established:
 - The publisher is **evans.tools** (the Windows installer's `AppPublisher`, shown in Installed apps; the `.deb`'s Maintainer, with the GitHub noreply address, since dpkg needs an email). evans.tools is the owner's domain for this and related projects (2026-09-30).
 - Converting a container's video to an audio track removes the container as well; an empty container left behind was just clutter. Undo brings back both (2026-09-30).
 - File stepping (browsers and browsing containers) also works by holding a thumb button (400 ms, then every 150 ms; two fixed-interval timers, since changing a running Timer's interval stopped its repeating), by tilting the wheel (one step per notch; sideways trackpad swipes add up), and with the Left/Right arrow keys on the selected one (`previousFile` / `nextFile` in AppActions). Planned arrow-key nudging will apply to other objects (2026-09-30).
+- The hold-to-step pace is a setting (Settings → General; default 400 ms, then every 150 ms) and applies to every way of stepping: thumb buttons, ◀ ▶, held Left/Right (no longer the system's key repeat), and a held wheel tilt (whole notches paced; trackpad swipes untouched). The Settings dialog got Shortcuts and About tabs; Full Screen got a Save button beside ▶ (2026-10-03).
+- Opening a project shows a modal "Opening <name>…" popup that blocks the app. Building the wall is only part of the wait: on a test wall of 65 objects, `openPath` took ~350 ms and the first frames after it blocked the UI thread for another ~550–800 ms (textures, video players starting). So the popup is drawn first (100 ms before the load starts), and closes only when a 50 ms timer fires on time twice in a row. Its spinner is a `RotationAnimator`, which runs on the render thread and keeps turning while the UI thread is blocked (where Qt uses a threaded render loop). The `openPath` slot stays synchronous for the app checks (2026-10-03).
 - Canvas video bars got a one-button A-B loop, as in VLC (set A, set B, clear), next to the seek bar (2026-09-30).
 - Open Recent is a ▾ button beside Open, rather than a separate toolbar button or a split button, until the planned menu bar (UI pass) gives it a File menu home (2026-09-30).
 - Containers' right-click menu has **Browse Folder…** (choose a folder) beside Browse This Folder (the shown file's folder, now only offered when there is one), so a filled container can switch folders without being emptied first (2026-09-30).

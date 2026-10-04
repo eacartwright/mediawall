@@ -5,9 +5,10 @@ unsaved-changes prompts, and the window title.
 The file format itself lives in core/project.py.
 """
 
+import time
 from pathlib import Path
 
-from PySide6.QtCore import Property, QObject, Signal, Slot
+from PySide6.QtCore import Property, QObject, QTimer, Signal, Slot
 from PySide6.QtWidgets import QFileDialog, QMessageBox
 
 from core.history_file import load_history, save_history
@@ -28,11 +29,21 @@ LAYOUT_FILTER = f"MediaWall Layout (*{LAYOUT_EXTENSION});;All Files (*)"
 # Warnings beyond this many are summarized as "...and N more".
 MAX_LISTED_WARNINGS = 8
 
+# Opening with the "Opening…" popup (openWithProgress): time for the
+# popup to be drawn before the load blocks the UI thread, and how the end
+# is detected. Building a big wall's objects is only part of the wait:
+# the first frames after it (textures, video players starting) block the
+# UI thread too, so the popup stays until a short timer fires on time twice in a row.
+PAINT_BEFORE_LOAD_MS = 100
+SETTLE_TICK_MS = 50
+SETTLE_LATE_S = 0.1
+
 
 class ProjectController(QObject):
 
     titleChanged = Signal()
     dirtyChanged = Signal()
+    loadingChanged = Signal()
 
     def __init__(self, scene_model, app_settings=None, parent=None):
         super().__init__(parent)
@@ -41,6 +52,7 @@ class ProjectController(QObject):
         self._path = ""
         self._dirty = False
         self._last_dir = str(Path.home())
+        self._loading = ""                  # the file being opened, or ""
 
         scene_model.modified.connect(self._on_modified)
 
@@ -65,6 +77,22 @@ class ProjectController(QObject):
             self._dirty = dirty
             self.dirtyChanged.emit()
             self.titleChanged.emit()
+
+    def _get_loading(self):
+        return self._loading != ""
+
+    # True while a project opens: Main.qml shows a modal "Opening…" popup.
+    loading = Property(bool, _get_loading, notify=loadingChanged)
+
+    def _get_loading_name(self):
+        return self._loading
+
+    loadingName = Property(str, _get_loading_name, notify=loadingChanged)
+
+    def _set_loading(self, name):
+        if name != self._loading:
+            self._loading = name
+            self.loadingChanged.emit()
 
     def _set_path(self, path):
         self._path = path
@@ -163,7 +191,7 @@ class ProjectController(QObject):
         if not path:
             return
 
-        self.openPath(path)
+        self.openWithProgress(path)
 
     @Slot(str)
     def openRecent(self, path):
@@ -179,7 +207,36 @@ class ProjectController(QObject):
             return
 
         if self._confirm_discard():
+            self.openWithProgress(path)
+
+    @Slot(str)
+    def openWithProgress(self, path):
+        """
+        openPath with the modal "Opening…" popup: show it, let it be
+        drawn, open (which blocks the UI thread), and close it once the
+        UI thread has caught up with the new wall.
+        """
+        if self._loading:
+            return
+        self._set_loading(Path(path).name)
+        QTimer.singleShot(PAINT_BEFORE_LOAD_MS, lambda: self._open_then_settle(path))
+
+    def _open_then_settle(self, path):
+        try:
             self.openPath(path)
+        finally:
+            self._settle()
+
+    def _settle(self, due=None, calm=0):
+        # Tick until two ticks in a row arrive on time: then the UI
+        # thread is free.
+        now = time.perf_counter()
+        calm = calm + 1 if due is not None and now - due <= SETTLE_LATE_S else 0
+        if calm >= 2:
+            self._set_loading("")
+            return
+        QTimer.singleShot(SETTLE_TICK_MS,
+                          lambda: self._settle(now + SETTLE_TICK_MS / 1000, calm))
 
     @Slot(str, result=bool)
     def openPath(self, path):

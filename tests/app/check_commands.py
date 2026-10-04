@@ -57,6 +57,23 @@ def step_settings():
 def step_settings2():
     c.check("the dialog shows the new value", c.item_js("zoomStepBox", "item.value") == 25)
     c.grab("settings.png")
+    c.js("appSettings.stepRepeatInterval = 90")
+    c.check("the hold-to-step pace is a setting, read back after a restart",
+            AppSettings().stepRepeatInterval == 90)
+    c.js("appSettings.resetStepRepeat()")
+    c.check("Default restores 400 / 150 ms",
+            (c.js("appSettings.stepRepeatDelay"), c.js("appSettings.stepRepeatInterval")) == (400, 150))
+    c.item_js("settingsTabs", "item.currentIndex = 1")
+    rows = c.item_js("shortcutsList", "item.rows") or []
+    keys = {r[1]: r[2] for r in rows}
+    c.check("Shortcuts tab: keys read from the commands",
+            keys.get("Duplicate") == "Ctrl+D" and "Ctrl+Y" in keys.get("Redo", "")
+            and keys.get("Present") == "F5", str(keys))
+    c.grab("settings-shortcuts.png")
+    c.item_js("settingsTabs", "item.currentIndex = 2")
+    from core.version import VERSION
+    c.check("About tab: the version", c.item_js("aboutVersion", "item.text") == "Version " + VERSION)
+    c.grab("settings-about.png")
     c.js("settingsDialog.close()")
     c.check("a new settings object (a restart) reads it back", AppSettings().zoomStep == 25.0)
     c.js("appSettings.resetZoomStep()")
@@ -79,5 +96,23 @@ def step_recent():
             len(warnings) == 1 and gone not in c.js("appSettings.recentProjects"))
 
 
-c.run(scene, [(1500, step_actions), (1000, step_present), (1000, step_recent), (1000, step_settings),
+def step_open_progress():
+    c.js("sceneModel.addContainer(500, 500)")                       # an unsaved change, to be replaced
+    c.pc.openWithProgress(str(c.pc._path))
+    c.check("Opening a project shows the modal Opening… popup",
+            c.js("projectController.loading") and c.js("loadingPopup.visible")
+            and c.js("loadingPopup.modal"))
+    x, y, _, _ = c.center_of("recentButton")
+    c.click(x, y)
+    c.check("...which blocks the app", not c.js("recentMenu.visible"))
+
+
+def step_open_progress2():
+    c.check("...and goes away once the project is open",
+            not c.js("projectController.loading") and not c.js("loadingPopup.visible")
+            and len(c.scene.objects) == 2 and not c.js("projectController.dirty"),
+            f"{len(c.scene.objects)} objects")
+
+
+c.run(scene, [(1500, step_actions), (1000, step_present), (1000, step_recent), (500, step_open_progress), (2000, step_open_progress2), (1000, step_settings),
               (800, step_settings2)])

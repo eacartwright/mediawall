@@ -14,6 +14,7 @@ everywhere at once, and is saved immediately.
 import os
 
 from PySide6.QtCore import Property, QObject, QSettings, Signal, Slot
+from PySide6.QtGui import QKeySequence
 
 from core.recent import with_recent, without_recent
 
@@ -35,6 +36,17 @@ SPEED_MAX_DEFAULT = 3.0
 SPEED_MAX_RANGE = (1.0, 4.0)
 
 
+# Holding a key or button that steps through files (Left/Right arrows,
+# thumb buttons, a held wheel tilt, the browser's arrow buttons): one
+# step, a pause, then a step every interval until released. In ms.
+STEP_DELAY_KEY = "stepping/repeatDelay"
+STEP_DELAY_DEFAULT = 400
+STEP_DELAY_RANGE = (100, 2000)
+STEP_INTERVAL_KEY = "stepping/repeatInterval"
+STEP_INTERVAL_DEFAULT = 150
+STEP_INTERVAL_RANGE = (30, 1000)
+
+
 # Recently opened or saved projects (Open Recent), newest first.
 RECENT_KEY = "recent/projects"
 
@@ -43,6 +55,7 @@ class AppSettings(QObject):
 
     zoomStepChanged = Signal()
     speedRangeChanged = Signal()
+    stepRepeatChanged = Signal()
     recentProjectsChanged = Signal()
 
     def __init__(self, parent=None):
@@ -147,6 +160,60 @@ class AppSettings(QObject):
     def resetSpeedRange(self):
         self._set_speed_min(SPEED_MIN_DEFAULT)
         self._set_speed_max(SPEED_MAX_DEFAULT)
+
+    # ---- Hold to step through files ----
+
+    def _get_step_delay(self):
+        return int(self._read(STEP_DELAY_KEY, STEP_DELAY_DEFAULT, *STEP_DELAY_RANGE))
+
+    def _set_step_delay(self, value):
+        self._write(STEP_DELAY_KEY, int(value), STEP_DELAY_DEFAULT, *STEP_DELAY_RANGE,
+                    self.stepRepeatChanged)
+
+    # ms from the first step to the second while held.
+    stepRepeatDelay = Property(int, _get_step_delay, _set_step_delay,
+                               notify=stepRepeatChanged)
+
+    def _get_step_interval(self):
+        return int(self._read(STEP_INTERVAL_KEY, STEP_INTERVAL_DEFAULT,
+                              *STEP_INTERVAL_RANGE))
+
+    def _set_step_interval(self, value):
+        self._write(STEP_INTERVAL_KEY, int(value), STEP_INTERVAL_DEFAULT,
+                    *STEP_INTERVAL_RANGE, self.stepRepeatChanged)
+
+    # ms between the steps after that.
+    stepRepeatInterval = Property(int, _get_step_interval, _set_step_interval,
+                                  notify=stepRepeatChanged)
+
+    def _get_step_delay_default(self):
+        return STEP_DELAY_DEFAULT
+
+    stepRepeatDelayDefault = Property(int, _get_step_delay_default, constant=True)
+
+    def _get_step_interval_default(self):
+        return STEP_INTERVAL_DEFAULT
+
+    stepRepeatIntervalDefault = Property(int, _get_step_interval_default, constant=True)
+
+    @Slot()
+    def resetStepRepeat(self):
+        self._set_step_delay(STEP_DELAY_DEFAULT)
+        self._set_step_interval(STEP_INTERVAL_DEFAULT)
+
+    # ---- Shortcut display (the Settings dialog's Shortcuts tab) ----
+
+    @Slot("QVariant", result=str)
+    def shortcutText(self, shortcut):
+        """
+        An Action's shortcut as the platform writes it: a key string
+        ("Ctrl+D") or a StandardKey number (QML passes those as ints).
+        """
+        if isinstance(shortcut, (int, float)) and not isinstance(shortcut, bool):
+            seq = QKeySequence(QKeySequence.StandardKey(int(shortcut)))
+        else:
+            seq = QKeySequence(str(shortcut or ""))
+        return seq.toString(QKeySequence.NativeText)
 
     # ---- Recent projects ----
 

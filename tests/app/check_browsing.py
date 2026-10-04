@@ -10,6 +10,7 @@ import shutil
 from harness import (Check, GIF, MEDIA, OUT, PHOTO, Qt, folder_files, media)
 from core.scene import FIT_CONTAIN, Scene
 from PySide6.QtCore import QTimer
+from PySide6.QtTest import QTest
 
 c = Check("browsing")
 names = [e["name"] for e in folder_files()]
@@ -89,6 +90,35 @@ def step_hold():
     for _ in range(moved):                                          # back to where it was
         c.key(Qt.Key_Left)
     c.check("...and it stops when released", shown() == c.start_name, shown())
+    # Holding Right: the app's pace (Settings), not the system's key repeat.
+    c.sm.select(box.id)
+    QTest.keyPress(c.win, Qt.Key_Right)
+    c.held = []
+    for t in range(0, 1100, 50):
+        QTimer.singleShot(t, lambda: c.held.append(shown()))
+
+
+def step_hold_key():
+    QTest.keyRelease(c.win, Qt.Key_Right)
+    steps = sum(1 for a, b in zip(c.held, c.held[1:]) if a != b)
+    c.check("holding Right keeps stepping at the Settings pace", steps >= 5, f"{steps} steps, window active: {c.win.isActive()}: {c.held}")
+    c.after_key = shown()
+    QTimer.singleShot(400, lambda: setattr(c, "later", shown()))
+
+
+def step_hold_key2():
+    c.check("...and stops when the key is let go", c.later == c.after_key, f"{c.after_key} -> {c.later}")
+    # A held tilt: the mouse sends a notch every 30 ms; Settings paces it.
+    for t in range(0, 1000, 30):
+        QTimer.singleShot(t, lambda: (c.wheel(360, 290, 0, dx=-120), c.tilted.append(shown())))
+    c.tilted = [shown()]
+
+
+def step_hold_tilt():
+    moved = sum(1 for a, b in zip(c.tilted, c.tilted[1:]) if a != b)
+    # 33 notches; at once, after 400 ms, then every 150 ms: about 5-6 steps.
+    c.check("a held tilt steps at the Settings pace, not once per notch",
+            4 <= moved <= 7, f"{moved} steps: {c.tilted}")
 
 
 def step_pan_and_move():
@@ -223,7 +253,7 @@ OTHER = OUT / "other folder"
 OTHER.mkdir(parents=True, exist_ok=True)
 shutil.copy(media(GIF), OTHER / GIF)
 
-c.run(scene, [(1500, step_controls), (1150, step_hold), (1300, step_pan_and_move), (1300, step_undo_and_reset),
+c.run(scene, [(1500, step_controls), (1150, step_hold), (1150, step_hold_key), (600, step_hold_key2), (1200, step_hold_tilt), (1300, step_pan_and_move), (1300, step_undo_and_reset),
               (1300, step_after_reset), (1800, step_autoplay), (1500, step_autoplay2),
               (1800, step_autoplay3), (1500, step_empty), (1500, step_present),
               (1300, step_present2), (1300, step_end), (1300, step_other_folder),

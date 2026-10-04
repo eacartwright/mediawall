@@ -133,18 +133,73 @@ Item {
         return item && item.stepsFiles ? item : null
     }
 
+    // One step each. Their keys, Left and Right, are the Shortcuts below.
     readonly property Action previousFile: Action {
         text: "Previous File"
-        shortcut: "Left"
         enabled: actions.fileStepper !== null
         onTriggered: actions.fileStepper.stepFiles(-1)
     }
 
     readonly property Action nextFile: Action {
         text: "Next File"
-        shortcut: "Right"
         enabled: actions.fileStepper !== null
         onTriggered: actions.fileStepper.stepFiles(1)
+    }
+
+    // Holding Left/Right keeps stepping at the pace set in Settings, not
+    // the system's key repeat: the press starts the object's
+    // FileStepper (repeats are ignored), and the key's real release
+    // (keyRelease, bridge/key_release.py) stops it.
+    property var heldStepper: null
+
+    function holdStep(delta) {
+        stopHeldStep()
+        heldStepper = fileStepper
+        heldStepper.beginStepping(delta)
+    }
+
+    function stopHeldStep() {
+        if (heldStepper)
+            heldStepper.endStepping()
+        heldStepper = null
+    }
+
+    // Another object selected. (The binding also re-runs, with the same
+    // object, when the step itself changes the model.)
+    onFileStepperChanged: {
+        if (heldStepper && heldStepper !== fileStepper)
+            stopHeldStep()
+    }
+
+    Shortcut {
+        sequence: "Left"
+        autoRepeat: false
+        enabled: actions.previousFile.enabled
+        onActivated: actions.holdStep(-1)
+    }
+
+    Shortcut {
+        sequence: "Right"
+        autoRepeat: false
+        enabled: actions.nextFile.enabled
+        onActivated: actions.holdStep(1)
+    }
+
+    Connections {
+        target: keyRelease
+        function onReleased(key) {
+            if (key === Qt.Key_Left || key === Qt.Key_Right)
+                actions.stopHeldStep()
+        }
+    }
+
+    // A key let go in another window never reaches this one.
+    Connections {
+        target: actions.window
+        function onActiveChanged() {
+            if (!actions.window.active)
+                actions.stopHeldStep()
+        }
     }
 
     // ---- Insert ----

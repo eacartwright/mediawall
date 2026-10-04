@@ -217,6 +217,16 @@ Item {
         step: root.browseStep
     }
 
+    // Held Left/Right (AppActions): step, pause, keep stepping until
+    // the key is let go.
+    function beginStepping(delta) {
+        fileStepper.begin(delta)
+    }
+
+    function endStepping() {
+        fileStepper.end()
+    }
+
     // -1 = previous, +1 = next, wrapping around (as in a browser).
     function browseStep(delta) {
         var n = browseFiles.length
