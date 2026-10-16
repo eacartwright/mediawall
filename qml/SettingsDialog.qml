@@ -365,8 +365,24 @@ Dialog {
                     Layout.topMargin: 6
                     horizontalAlignment: Text.AlignHCenter
                     wrapMode: Text.WordWrap
-                    text: "Arrange images, GIFs, video, and viewports freely on a canvas."
+                    text: "Arrange images, GIFs, video, audio, and text freely on a canvas."
                     color: "#999999"
+                }
+
+                // Highlights of this version (update with core/version.py).
+                Label {
+                    Layout.fillWidth: true
+                    Layout.topMargin: 4
+                    Layout.leftMargin: 24
+                    Layout.rightMargin: 24
+                    wrapMode: Text.WordWrap
+                    textFormat: Text.StyledText
+                    color: "#999999"
+                    text: "<b>New in 0.9.8</b><br>"
+                          + "• Text: WordArt-style titles with presets, outline, 3D depth, and shadow<br>"
+                          + "• Animated images: double-click to restart, Speed menu, Animated Only filter<br>"
+                          + "• The Wall Features panel (Layers, Playback, Text) is on the left<br>"
+                          + "• Save button in Present"
                 }
 
                 Label {

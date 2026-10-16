@@ -2490,7 +2490,7 @@ The prototype currently provides:
 - a Wall Features panel (left-edge flyout) with Layers, Playback, and Text tabs; Layers: every object top first, selection linked both ways, Top/Up/Down/Bottom, drag to reorder
 - browser and browsing-container filters: all, images, videos, audio (browsers), or animated GIF/WebP only
 - unit tests for `core/`, and app checks that drive the real app (section 37)
-- installers: a Windows `Setup.exe` and a Linux `.deb`, built by `packaging/build.py` (section 37); 0.9.7 released on GitHub (Windows installer and `.deb`, both tested)
+- installers: a Windows `Setup.exe` and a Linux `.deb`, built by `packaging/build.py` (section 37); 0.9.8 built (Windows installer; the `.deb` is built on Linux Mint)
 
 ### How interactions reach the model
 
