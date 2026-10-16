@@ -31,6 +31,95 @@ def is_animatable(path):
     return Path(path).suffix.lower() in ANIMATABLE_EXTENSIONS
 
 
+# ---- Is it actually animated? (the "Animated Only" filter) ----
+# GIF and WebP files can be animated or still. Telling them apart means
+# reading the file: a GIF is animated if it holds more than one frame,
+# a WebP if its header sets the animation flag. Results are cached by
+# path, size, and modification time, so a rescan doesn't read again.
+
+_animated_cache = {}
+
+
+def _gif_frames_over_one(f):
+    """Walk a GIF's blocks; True as soon as a second frame appears."""
+    header = f.read(13)                  # signature + logical screen descriptor
+    if len(header) < 13 or header[:3] != b"GIF":
+        return False
+    if header[10] & 0x80:                # global color table
+        f.seek(3 * (2 << (header[10] & 7)), 1)
+
+    def skip_sub_blocks():
+        while True:
+            size = f.read(1)
+            if not size or size[0] == 0:
+                return
+            f.seek(size[0], 1)
+
+    frames = 0
+    while True:
+        block = f.read(1)
+        if not block:
+            return False
+        if block[0] == 0x2C:             # image descriptor: a frame
+            frames += 1
+            if frames > 1:
+                return True
+            desc = f.read(9)
+            if len(desc) < 9:
+                return False
+            if desc[8] & 0x80:           # local color table
+                f.seek(3 * (2 << (desc[8] & 7)), 1)
+            f.read(1)                    # LZW minimum code size
+            skip_sub_blocks()
+        elif block[0] == 0x21:           # extension: label, then sub-blocks
+            f.read(1)
+            skip_sub_blocks()
+        else:                            # trailer (0x3B), or damaged
+            return False
+
+
+def _webp_animated(f):
+    header = f.read(21)
+    # RIFF....WEBP, then an extended-format (VP8X) chunk whose flags
+    # byte has the animation bit.
+    return (len(header) == 21 and header[:4] == b"RIFF" and header[8:12] == b"WEBP"
+            and header[12:16] == b"VP8X" and bool(header[20] & 0x02))
+
+
+def is_animated(path):
+    """True if a GIF or WebP file really is animated (more than one frame)."""
+    suffix = Path(path).suffix.lower()
+    if suffix not in ANIMATABLE_EXTENSIONS:
+        return False
+    try:
+        st = os.stat(path)
+    except OSError:
+        return False
+    key = (str(path), st.st_size, st.st_mtime_ns)
+    if key in _animated_cache:
+        return _animated_cache[key]
+    try:
+        with open(path, "rb") as f:
+            result = _gif_frames_over_one(f) if suffix == ".gif" else _webp_animated(f)
+    except OSError:
+        result = False
+    _animated_cache[key] = result
+    return result
+
+
+def matches_filter(entry, media_filter):
+    """
+    True if a scanned entry passes a browser or container's filter:
+    "all", a type ("image", "video", "audio"), or "animated" (animated
+    GIF/WebP only).
+    """
+    if media_filter in ("all", "", None):
+        return True
+    if media_filter == "animated":
+        return entry["animatable"] and is_animated(entry["path"])
+    return entry["type"] == media_filter
+
+
 def natural_key(text):
     """Sort "IMG_2" before "IMG_10", case-insensitively."""
     return [
@@ -63,7 +152,7 @@ def _sort_key(entry):
 
 class MediaBrowser:
 
-    def scan_folder(self, folder, recursive=False):
+    def scan_folder(self, folder, recursive=False, media_filter="all"):
         """
         Return supported media files in a folder as a list of dicts:
 
@@ -76,7 +165,8 @@ class MediaBrowser:
                 "animatable": True for GIF/WebP
             }
 
-        With recursive=True, subfolders are included. Hidden folders
+        With recursive=True, subfolders are included. media_filter keeps
+        only matching files (matches_filter). Hidden folders
         (names starting with ".") are skipped, symlinked folders are
         not followed (avoids loops), and unreadable folders are skipped
         rather than failing the whole scan.
@@ -116,5 +206,6 @@ class MediaBrowser:
                 if media_type_for(item) is not None:
                     entries.append(_entry(item, root))
 
+        entries = [e for e in entries if matches_filter(e, media_filter)]
         entries.sort(key=_sort_key)
         return entries

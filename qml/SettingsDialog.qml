@@ -267,8 +267,11 @@ Dialog {
                             "Tilt the wheel left / right"])
                     cmd("View", a.fullScreen)
                     cmd("View", a.present)
-                    r.push(["View", "Leave Present / Full Screen",
+                    r.push(["View", "Leave Present", dialog.keys("Esc")])
+                    r.push(["View", "Leave Full Screen",
                             dialog.keys("Esc") + ",  double-click the canvas"])
+                    r.push(["Animated images", "Start the animation over (also unfreezes it)",
+                            "Double-click it (in a container too)"])
                     r.push(["Adjust mode (a container)", "Finish adjusting",
                             dialog.keys("Return") + ",  " + dialog.keys("Space") + ",  "
                             + dialog.keys("Esc")])

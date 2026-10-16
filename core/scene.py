@@ -15,6 +15,8 @@ Structure (see readme section 52):
                   - "browser": workspace object with folder/index state
                   - "container": a viewport that can hold one media
                     instance and clips it to its shape
+                  - "text": a line of styled text ("WordArt"), drawn
+                    to fill its box
 
 Coordinates:
 
@@ -37,7 +39,7 @@ from pathlib import Path
 from typing import Optional
 
 
-OBJECT_TYPES = {"media", "browser", "container", "audio"}
+OBJECT_TYPES = {"media", "browser", "container", "audio", "text"}
 
 # Objects with a player and per-instance playback settings.
 PLAYABLE_TYPES = {"media", "audio"}
@@ -51,6 +53,7 @@ DEFAULT_SIZES = {
     "browser": (420.0, 300.0),
     "container": (360.0, 260.0),
     "audio": (0.0, 0.0),
+    "text": (420.0, 120.0),
 }
 
 DEFAULT_MEDIA_WIDTH = 300.0
@@ -66,10 +69,11 @@ FIT_COVER = "cover"         # container completely filled, edges cropped
 FIT_MODES = {FIT_CONTAIN, FIT_COVER}
 
 # Which files a browser or browsing container steps through: every
-# kind it shows, or one type. Containers show no audio.
+# kind it shows, one type, or animated GIF/WebP only
+# (core/media_browser.py, matches_filter). Containers show no audio.
 MEDIA_FILTERS = {
-    "browser": ("all", "image", "video", "audio"),
-    "container": ("all", "image", "video"),
+    "browser": ("all", "image", "video", "audio", "animated"),
+    "container": ("all", "image", "video", "animated"),
 }
 
 # Object types that always stack above the others (workspace tools).
@@ -112,6 +116,63 @@ def _bounding_box(obj):
 
 def clamp_speed(value) -> float:
     return round(min(SPEED_MAX, max(SPEED_MIN, float(value))), 2)
+
+
+# ---- Text style ("WordArt"; readme section 5.4) ----
+# Sizes are in the units of text drawn 100 px tall; the text is then
+# scaled to fill its box, so they scale with it.
+
+TEXT_STYLE_DEFAULTS = {
+    "font": "",                 # font family; "" = the app's own font
+    "bold": True,
+    "italic": False,
+    "fill": "#ffffff",
+    "fill2": "",                # set: a top-to-bottom gradient fill -> fill2
+    "outline": "#000000",
+    "outline_width": 3.0,       # 0 .. TEXT_OUTLINE_MAX
+    "depth": 0,                 # 3D extrusion, 0 .. TEXT_DEPTH_MAX
+    "depth_color": "#404040",
+    "shadow": False,
+    "stretch": False,           # fill the box exactly, not keeping proportions
+}
+
+TEXT_OUTLINE_MAX = 20.0
+TEXT_DEPTH_MAX = 40
+
+_COLOR = re.compile(r"#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})")
+
+
+def normalized_text_style(raw) -> dict:
+    """
+    A complete, valid text style from any input: unknown keys dropped,
+    missing or bad values replaced by the defaults.
+    """
+    raw = raw if isinstance(raw, dict) else {}
+    style = dict(TEXT_STYLE_DEFAULTS)
+
+    for key, default in TEXT_STYLE_DEFAULTS.items():
+        value = raw.get(key, default)
+        if isinstance(default, bool):
+            ok = isinstance(value, bool)
+        elif isinstance(default, (int, float)):
+            ok = isinstance(value, (int, float)) and not isinstance(value, bool)
+        elif key in ("fill", "outline", "depth_color"):
+            ok = isinstance(value, str) and _COLOR.fullmatch(value) is not None
+        elif key == "fill2":
+            ok = isinstance(value, str) and (value == "" or _COLOR.fullmatch(value) is not None)
+        else:
+            ok = isinstance(value, str)
+        if ok:
+            style[key] = value
+
+    style["outline_width"] = round(min(TEXT_OUTLINE_MAX, max(0.0, float(style["outline_width"]))), 2)
+    style["depth"] = int(min(TEXT_DEPTH_MAX, max(0, round(style["depth"]))))
+    return style
+
+
+def one_line(text: str) -> str:
+    """Text objects hold a single line."""
+    return text.replace("\r\n", " ").replace("\r", " ").replace("\n", " ")
 
 
 def normalized_loop(loop_a, loop_b):
@@ -223,6 +284,11 @@ class SceneObject:
     # browser and browsing container: "all" or one media type
     # (MEDIA_FILTERS). Workspace state.
     media_filter: str = "all"
+
+    # text: what it says (one line), and how it looks
+    # (TEXT_STYLE_DEFAULTS; always complete, see normalized_text_style)
+    text: str = ""
+    text_style: dict = field(default_factory=dict)
 
     @property
     def center(self):
@@ -440,6 +506,33 @@ class Scene:
             width=width, height=width / aspect, source_id=source_id,
             pending_size=source.aspect <= 0,
         )
+
+    def add_text(self, x, y, text="Text", style=None) -> SceneObject:
+        """Add a text object (readme section 5.4)."""
+        return self.add_object(
+            "text", x, y, text=one_line(text), text_style=normalized_text_style(style),
+        )
+
+    def set_text(self, object_id, text) -> bool:
+        obj = self.get(object_id)
+        if obj is None or obj.type != "text" or not isinstance(text, str):
+            return False
+        text = one_line(text)
+        if obj.text == text:
+            return False
+        obj.text = text
+        return True
+
+    def set_text_style(self, object_id, changes) -> bool:
+        """Change some of a text object's style (the rest stays)."""
+        obj = self.get(object_id)
+        if obj is None or obj.type != "text" or not isinstance(changes, dict):
+            return False
+        style = normalized_text_style({**obj.text_style, **changes})
+        if style == obj.text_style:
+            return False
+        obj.text_style = style       # a new dict: duplicates never share one
+        return True
 
     def add_audio_track(self, source_id) -> SceneObject:
         """
@@ -1122,6 +1215,9 @@ class Scene:
         if obj.type == "browser":
             parts = [p for p in re.split(r"[\\/]", obj.folder) if p]
             return "Browser · " + parts[-1] if parts else "Browser"
+
+        if obj.type == "text":
+            return "Text · " + (obj.text.strip() or "(empty)")
 
         return obj.type
 

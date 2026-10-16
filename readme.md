@@ -10,7 +10,8 @@ It runs on Linux (Mint/Ubuntu, the primary platform) and Windows, built with Pyt
 - Place images, GIFs/animated WebP, and videos anywhere; move, resize (corners or edge bars), rotate, and scale with the mouse wheel.
 - Double-click an edge bar to stretch an object until it meets its neighbours or the canvas edge.
 - Layer objects freely, from the right-click menu, shortcuts, or the Layers panel (drag to reorder).
-- Undo and redo every change, with the history kept between sessions.
+- Add text in WordArt-style looks: gradient fill, outline, 3D depth, and shadow, from presets or by hand.
+- Undo and redo every change, for as long as the app is open.
 
 **Browsers**
 - Open a folder in a floating Browser, step through it, preview with zoom and pan, and add files to the canvas with a double-click (they land beside the browser).
@@ -384,6 +385,29 @@ The default should be aspect-ratio preserving.
 
 ---
 
+## 5.3 Animated images (GIF, WebP)
+
+- GIF and WebP files play when they have more than one frame. Each instance can be paused from its right-click menu (**Pause / Play Animation**).
+- **Double-click** an animated image to start it over from its first frame (and play it, if paused). This also works inside a container (where a double-click on a still picture resets the zoom instead) and in Present. It is window state only: nothing is saved and there is no undo step. It is also the fix for animations that freeze, which happens now and then on Linux Mint (cause unknown; pausing and playing again unsticks them too, `MediaView.restartAnimation`).
+- **Speed ▸** in the right-click menu (animated images and video): 0.25× to 4×, saved per instance like a video's speed (it is the same `speed` field; the Playback tab's slider is for video and audio).
+- Browsers and browsing containers can show **Animated Only (GIF, WebP)** (right-click; `media_filter` "animated"). A file's format isn't enough, since both formats can be still, so the file is read: a GIF is animated if it has a second frame, a WebP if its header has the animation flag (`core/media_browser.py`, `is_animated`; cached by path, size, and modification time). Files are read only when this filter is on.
+
+---
+
+## 5.4 Text objects ("WordArt")
+
+A text object is one line of styled text that fills its box. It is a top-level object of type `text` (fields `text` and `text_style`), moved, resized, rotated, scaled with the wheel, layered, duplicated, and deleted like a free image.
+
+- **Adding:** **Add Text** (the Text tab, or right-click the canvas → **Add Text Here**). The new object is selected and the Text tab opens with the words selected, ready to type.
+- **Editing:** double-click it (or right-click → **Edit Text…**) to open the **Text** tab of the Wall Features panel: the words, eight **style presets** (Classic, Sunset, Ocean, Candy, Chrome, Gold, Neon, Plain; each sets the colors, outline, depth, and shadow, keeping the font), the **font** (any installed family; Default is the app's font), Bold / Italic, the **fill** color with an optional **fade to** a second color (top to bottom), the **outline** color and width, **3D depth** (an extrusion down and to the right) and its color, **Shadow**, and **Stretch to box**.
+- **Sizing:** by default the letters keep their proportions, centered in the box, and the corner handles keep the box's proportions. After an edit that changes the text's shape (new words, font, outline, depth), the box keeps its height and its width follows (keeping its left edge, or its center if rotated), in the same undo step as the edit. Undo and loading never resize anything. **Stretch to box** fills the box exactly instead, and the handles resize freely.
+- **Undo:** every change is undoable; a run of typing or one slider drag is one step.
+- **Drawing** (`qml/TextArt.qml`): the glyphs are vector shapes (`Shape` + `PathText`, curve renderer) drawn 100 px tall and then scaled, so they stay sharp at any size. The outline is the path's stroke, the fade a `LinearGradient` fill, the depth that many copies of the text stepped down and right (farthest first, darker toward the back), and the shadow a `MultiEffect` on a layer rendered at the on-screen size. Style sizes (outline width, depth) are in units of the 100 px text, so they scale with the box. The box size comes from the shape's measured bounds (`Shape.boundingRect`; `PathText`'s own width is too small for some fonts).
+- **Saved style** (`TEXT_STYLE_DEFAULTS` in `core/scene.py`): font, bold, italic, fill, fill2 (empty: no fade), outline, outline_width (0–20), depth (0–40), depth_color, shadow, stretch. Loading repairs a damaged style value by value (`normalized_text_style`).
+- Not yet: more than one line, text along a curve, perspective tilt, glow. See section 51.
+
+---
+
 # 6. Container Object
 
 A Container is a viewport.
@@ -489,7 +513,7 @@ This should be a property of the media/container relationship.
 - **Every container works like a picture viewer (qView)**, browsing or not, selected or not: **left-drag pans** the picture, the **mouse wheel zooms** it around the pointer, and **double-click resets** it to the Fit/Fill framing. The **border strip** (about 10 px inside the edge; a move cursor shows there; resize handles take priority when selected) moves the container on a left-drag and **scales it on the wheel**, around the pointer and content included, so the view inside doesn't change (whether or not "Scale Content with Container" is on; that setting only affects the resize handles). A **middle-button drag** moves it from anywhere. An **empty** container moves and scales from anywhere, which makes building layouts quick. In Present, every container's picture still pans and zooms; nothing moves or scales. Panning and zooming are undoable, except in browsing containers (workspace state, below).
 - **Rotating the picture inside**: drag the rotation knob with **Ctrl** held (otherwise the knob turns the container), or use Adjust mode.
 - **Flip Horizontally** (right-click; checkable) mirrors the picture of a free image or video, or a container's picture, without moving it (`mirrored` on the media instance; saved, undoable, copied by Duplicate). In a browsing container it stays on as the files change, since it belongs to the instance. There's no vertical flip: that's a horizontal flip plus a 180° turn.
-- **Browsing containers** (right-click → **Browse This Folder**; section 13): the container steps through the images and videos in a folder, by default the folder of the file it shows (an empty container asks for a folder; **double-clicking an empty container** does the same). **Browse Folder…** picks any folder, for any container, even a filled or already browsing one: it moves to that folder's first file unless the file it shows is in that folder, keeping the same media instance (volume, loop, and so on). A browsing container's menu can also limit it to **images only** or **videos only** (`media_filter`; moving to the first matching file if the one shown is filtered out). Subfolders can be included (**Browse Subfolders Too**). On top of the usual container controls (pan, zoom, double-click reset; above), the **back/forward mouse buttons** (thumb buttons) go to the previous/next file (wrapping around; hold one to keep stepping, after a short pause), as do **tilting the wheel** left/right and, while it's selected, the **Left/Right arrow keys**. In Present all of this keeps working (a hand-driven slideshow). An empty browsing container starts on the folder's first file as soon as the folder is scanned (after choosing it, or when a project or layout is opened), instead of waiting at "0 / n". Each file replaces the content in place (same instance, volume, mute, loop, and speed; A-B points cleared) and **starts playing**, even if the previous one was paused, framed with the container's Fit/Fill mode. When selected, a small `⇅` badge marks it as browsing (no position count: it cluttered the wall). **Stop Browsing** keeps whatever is showing. Browse settings, and while browsing the content itself (which file, its pan and zoom, and the Fit/Fill mode), are workspace state: saved, but never changed by Undo (section 47).
+- **Browsing containers** (right-click → **Browse This Folder**; section 13): the container steps through the images and videos in a folder, by default the folder of the file it shows (an empty container asks for a folder; **double-clicking an empty container** does the same). **Browse Folder…** picks any folder, for any container, even a filled or already browsing one: it moves to that folder's first file unless the file it shows is in that folder, keeping the same media instance (volume, loop, and so on). A browsing container's menu can also limit it to **images only**, **videos only**, or **animated only** (GIF/WebP that really move; `media_filter`, section 5.3; moving to the first matching file if the one shown is filtered out). Subfolders can be included (**Browse Subfolders Too**). On top of the usual container controls (pan, zoom, double-click reset; above), the **back/forward mouse buttons** (thumb buttons) go to the previous/next file (wrapping around; hold one to keep stepping, after a short pause), as do **tilting the wheel** left/right and, while it's selected, the **Left/Right arrow keys**. In Present all of this keeps working (a hand-driven slideshow). An empty browsing container starts on the folder's first file as soon as the folder is scanned (after choosing it, or when a project or layout is opened), instead of waiting at "0 / n". Each file replaces the content in place (same instance, volume, mute, loop, and speed; A-B points cleared) and **starts playing**, even if the previous one was paused, framed with the container's Fit/Fill mode. When selected, a small `⇅` badge marks it as browsing (no position count: it cluttered the wall). **Stop Browsing** keeps whatever is showing. Browse settings, and while browsing the content itself (which file, its pan and zoom, and the Fit/Fill mode), are workspace state: saved, but never changed by Undo (section 47).
 - **Adjust mode** (right-click → Adjust Content, or Crop / Zoom Inside) is for framing with free rotation: the rotation knob turns the content, every drag pans (the border strip too), and the part of the content outside the frame shows as a faint ghost (a live texture of the content itself, so video and GIF ghosts stay in sync and nothing is loaded twice). It has an orange outline and no toolbar (Fit and Fill are in the right-click menu). Enter or Space finishes, as do clicking elsewhere and Escape.
 - **Release Content** turns the content back into a free object at the position, size, and rotation it currently appears on the canvas. **Remove Content** deletes it. Deleting a container deletes its content.
 - Only top-level objects take part in z-order; content has none of its own.
@@ -972,7 +996,7 @@ There are two full-screen modes, both window state only (not saved):
 
 In Present, **browsing containers** keep their viewer controls (the hand-driven slideshow: e.g. two half-screen containers flipped independently): pan, wheel zoom, back/forward buttons, and double-click to reset the zoom; they can't be moved. Nothing else on the canvas responds.
 
-Leaving: Esc (in Full Screen, Esc first deselects), F11 / F5 again, double-clicking the canvas (in Present, anywhere except a browser or a container with content), or the ✕ in the top-right corner, which appears when the mouse moves and fades after about two seconds. In Full Screen (editing), a ▶ button beside it goes straight to Present (like F5), and a save button (a down arrow into a tray) left of that saves the project (like Ctrl+S); they appear and fade together with the ✕. In Present, the mouse pointer hides along with it and comes back when the mouse moves. (Only a real change of position counts as movement: Qt also re-sends hover updates every frame while something animates.) Leaving Present returns to where you were (window or Full Screen).
+Leaving: Esc (in Full Screen, Esc first deselects), F11 / F5 again, double-clicking the empty canvas (Full Screen only: in Present a double-click restarts an animated image instead, section 5.3), or the ✕ in the top-right corner, which appears when the mouse moves and fades after about two seconds. In Full Screen (editing), a ▶ button beside it goes straight to Present (like F5). A save button (a down arrow into a tray) saves the project (like Ctrl+S), in both modes: left of ▶ in Full Screen, left of the ✕ in Present. They appear and fade together with the ✕. In Present, the mouse pointer hides along with it and comes back when the mouse moves. (Only a real change of position counts as movement: Qt also re-sends hover updates every frame while something animates.) Leaving Present returns to where you were (window or Full Screen).
 
 The toolbar overlays the canvas instead of pushing it down, so objects keep exactly the same screen positions when entering or leaving full screen: what you arrange is what you present.
 
@@ -1302,7 +1326,7 @@ Potential future properties:
 ### Implemented (2026-09-26)
 
 - Stacking has two groups: ordinary objects below, and browsers (workspace tools, `OVERLAY_TYPES` in `core/scene.py`) always above. Each group is ordered by `z`, and every z-order operation moves an object only within its own group, so "Bring to Front" on an image puts it at the top of the images, still below any browser. `Scene.is_at_front()` / `is_at_back()` answer per group; the right-click menu and the Layers panel use them.
-- The **Layers panel** is a flyout on the right edge (the "Layers" tab opens and closes it; it's hidden in Present). It lists every top-level object, top first, with a type badge and a name (`Scene.display_name`: the file name, `Container · <file>` or `Container (empty)`, `Browser · <folder>`). The selected object is highlighted and kept in view; clicking a row selects that object on the canvas. **Top / Up / Down / Bottom** buttons move the selected object, and rows can be **dragged** up or down to reorder (a line shows where the row will land; dropping among the other group puts it at the nearest end of its own group, `Scene.move_to_layer_position`). Visibility and locking are not done yet.
+- The **Layers panel** is the first tab of the **Wall Features** flyout on the left edge (the "Wall Features" tab on its right side opens and closes it; it's hidden in Present). It was on the right edge until 2026-10-15, where in Full Screen its tabs collided with the ✕ / ▶ / Save buttons. Its other tabs are Playback (section 14.5) and Text (section 5.4). It lists every top-level object, top first, with a type badge and a name (`Scene.display_name`: the file name, `Container · <file>` or `Container (empty)`, `Browser · <folder>`). The selected object is highlighted and kept in view; clicking a row selects that object on the canvas. **Top / Up / Down / Bottom** buttons move the selected object, and rows can be **dragged** up or down to reorder (a line shows where the row will land; dropping among the other group puts it at the nearest end of its own group, `Scene.move_to_layer_position`). Visibility and locking are not done yet.
 
 ---
 
@@ -1397,7 +1421,7 @@ The dialog has three tabs: **General** (the settings above), **Shortcuts** (ever
 
 ### Context menus
 
-Right-clicking an object opens a menu of the actions that apply to it (currently z-order, Delete, and Pause/Play for animated images). Items that don't apply to an object are hidden, not just disabled. This is the primary way to reach object actions.
+Right-clicking an object opens a menu of the actions that apply to it (e.g. z-order, Delete, Pause/Play and Speed for animated images and video, Edit Text for text). Items that don't apply to an object are hidden, not just disabled. This is the primary way to reach object actions.
 
 The exact UI arrangement can evolve, subject to one rule:
 
@@ -1794,7 +1818,7 @@ python -m unittest
 
 The tests cover `core/` only and need no display or Qt, so they run in milliseconds. Run them after any change to `core/`.
 
-**App checks** (`tests/app/`): each `check_*.py` starts the real MediaWall on a project it builds and drives it with mouse, keyboard, and wheel events, checking the results (about 150 checks: browsing containers, the Browser, Present, Layers, resizing, audio, layouts, commands and settings, undo history, video sizing). They need a display and the sample media in `tests/media/`, take about a minute and a half, and are kept apart from the unit tests (they're named `check_*`, so `python -m unittest` doesn't run them):
+**App checks** (`tests/app/`): each `check_*.py` starts the real MediaWall on a project it builds and drives it with mouse, keyboard, and wheel events, checking the results (about 180 checks: browsing containers, the Browser, Present, Layers, resizing, audio, layouts, commands and settings, undo history, video sizing, animated images, text). They need a display and the sample media in `tests/media/`, take about a minute and a half, and are kept apart from the unit tests (they're named `check_*`, so `python -m unittest` doesn't run them):
 
 ```text
 Windows:  venv\Scripts\python.exe tests\app\run.py [name ...]
@@ -1865,7 +1889,6 @@ mediawall/
 │   ├── scene.py            MediaSource, SceneObject, Scene
 │   ├── project.py          project save/load (JSON)
 │   ├── history.py          undo/redo history (scene snapshots)
-│   ├── history_file.py     undo history saved next to the project
 │   ├── layout.py           layouts: containers only, saved for reuse
 │   ├── version.py          the app's version number
 │   └── media_browser.py    folder scanning, media type detection
@@ -1881,6 +1904,9 @@ mediawall/
 ├── qml/
 │   ├── Main.qml            window, toolbar, scene, shortcuts
 │   ├── MediaObject.qml     free media instance
+│   ├── TextObject.qml      text object ("WordArt", section 5.4)
+│   ├── TextArt.qml         draws styled text (canvas and style previews)
+│   ├── TextPanel.qml       the Text tab: add text, edit words and style
 │   ├── BrowserObject.qml   Browse Object
 │   ├── ContainerObject.qml container (viewport with clipped content)
 │   ├── AudioTrackObject.qml audio track (a player with no canvas item)
@@ -1893,7 +1919,7 @@ mediawall/
 │   ├── ObjectContextMenu.qml  shared right-click menu
 │   ├── SettingsDialog.qml  the Settings dialog
 │   ├── LogWindow.qml       the Log window
-│   ├── Sidebar.qml         right-edge flyout: Layers and Playback tabs
+│   ├── Sidebar.qml         Wall Features flyout (left edge): Layers, Playback, Text tabs
 │   └── Zoom.js             shared mouse-wheel zoom step
 │
 ├── assets/
@@ -1917,7 +1943,7 @@ mediawall/
     ├── test_project.py
     ├── test_containers.py
     ├── test_history.py
-    ├── test_history_file.py
+    ├── test_text.py
     ├── test_layout.py
     ├── test_video.py
     └── app/                app checks: run.py, harness.py, check_*.py
@@ -2349,7 +2375,7 @@ The application should degrade gracefully.
 - Applying an undo announces only the rows that actually appear or disappear, so untouched objects keep their on-screen state: browsers don't rescan and GIFs keep playing.
 - Selection is not part of undo.
 - History is cleared on New.
-- **History is kept between sessions** in a file next to the project, `<project>.history` (e.g. `japan.mediawall.history`; `core/history_file.py`), written whenever the project is saved and read when it is opened. It holds the last 50 undo steps (and up to 50 redo steps), each a whole scene in the same form as a project file. The file records a fingerprint (SHA-256) of the project as saved; if the project doesn't match when opened (it was edited elsewhere, or saved without its history), the history is ignored and the Log says why. It's kept out of the project file on purpose: the project stays small and readable, and a lost or damaged history can't affect it. If there's nothing to undo or redo when saving, a leftover history file is removed.
+- History is cleared on Open too, and lasts **for the session only**: it lives in memory and is never written to disk, so each wall is a single `.mediawall` file. (From 2026-09-26 to 2026-10-15 it was also saved next to the project as `<project>.history`; that was dropped, see section 55. Old `.history` files are ignored and can be deleted.)
 
 ---
 
@@ -2408,9 +2434,12 @@ Left-drag         pan (a zoomed browser preview; a container's picture,
                   except on its border strip, which moves it)
 Middle-drag       move a container from anywhere on it
 Ctrl + knob drag  turn a container's picture instead of the container
-Double-click      reset the zoom (on a container with content);
+Double-click      restart an animated image (free, in a container, or in
+                  Present); reset the zoom (on a container showing a still
+                  picture or video); edit a text object (opens the Text tab);
                   add the current file to the canvas (on a browser preview);
-                  reset rotation to 0° (on the orange rotation knob)
+                  reset rotation to 0° (on the orange rotation knob);
+                  leave Full Screen (on the empty canvas)
 ```
 
 Planned:
@@ -2429,12 +2458,12 @@ Exact bindings can still change.
 The prototype currently provides:
 
 - a canvas with a toolbar (New, Open with Open Recent ▾, Save, Save As, Undo, Redo, Add Browser, Add Container, Full Screen, Present, Log)
-- Full Screen (editing) and Present (view-only canvas, browsers still usable) modes (section 15); Full Screen has ✕, ▶ (Present), and Save buttons in the corner
+- Full Screen (editing) and Present (view-only canvas, browsers still usable) modes (section 15); Full Screen has ✕, ▶ (Present), and Save buttons in the corner, Present has ✕ and Save
 - a right-click menu on empty canvas (Add Browser Here, Add Container Here)
 - project save/load to `.mediawall` files, with unsaved-changes prompts and the project name in the window title; a modal "Opening…" popup while a project opens
 - missing media shown as a "Missing file" box that keeps its size and position; undecodable files shown as "Can't display file"
 - Locate Missing File (right-click), which also relinks other missing files from the same old folder if they're found in the new one
-- undo/redo for every scene change (section 47)
+- undo/redo for every scene change, for the session (section 47)
 - Duplicate (section 48)
 - a Python scene model that owns all object state; QML renders it
 - one `MediaSource` per file, referenced by media objects through `source_id`
@@ -2442,9 +2471,10 @@ The prototype currently provides:
 - Browse Objects: choose folder, optional subfolders, previous/next, preview with temporary zoom/pan, Add to Canvas (or double-click), New Container, close button; always drawn above other objects, with a see-through preview (section 26)
 - free media objects: move, aspect-locked resize, rotate
 - EXIF orientation applied to photos, on the canvas and in browser previews
-- animated GIF and WebP playback, on the canvas and in browser previews; each instance can be paused or played from its right-click menu
+- animated GIF and WebP playback, on the canvas and in browser previews; each instance can be paused or played and its speed set from its right-click menu, and double-clicking one starts it over (section 5.3)
+- text objects ("WordArt"): one line of text with presets, font, gradient fill, outline, 3D depth, and shadow, edited in the Text tab (section 5.4)
 - video on the canvas, in containers, and in browser previews, with per-instance play/pause, mute, and loop (right-click menu), and an on-object seek bar when selected
-- per-video speed (0.5x to 3x by default; the range is a setting), Keep pitch, and A-B loop; an Playback tab in the sidebar with every video's sound and playback settings (section 14.5)
+- per-video speed (0.5x to 3x by default; the range is a setting), Keep pitch, and A-B loop; a Playback tab in the Wall Features panel with every video's sound and playback settings (section 14.5)
 - a Settings dialog (toolbar): the mouse-wheel zoom step, the speed range, and the hold-to-step pace; a Shortcuts tab listing every key; an About tab with the version (section 25)
 - audio tracks added from a browser (double-click or Add to Audio), controlled in the Playback tab
 - video as audio: Convert to Audio Track (right-click a video), or Add to Audio for a video in a browser (section 14.2)
@@ -2457,7 +2487,8 @@ The prototype currently provides:
 - free images: scroll-wheel scaling around the pointer (when selected), and Crop / Zoom Inside, which wraps the image in a matching container
 - single selection; clicking empty canvas deselects
 - z-order and Delete through a right-click menu, plus shortcuts
-- a Layers panel (right-edge flyout): every object top first, selection linked both ways, Top/Up/Down/Bottom, drag to reorder
+- a Wall Features panel (left-edge flyout) with Layers, Playback, and Text tabs; Layers: every object top first, selection linked both ways, Top/Up/Down/Bottom, drag to reorder
+- browser and browsing-container filters: all, images, videos, audio (browsers), or animated GIF/WebP only
 - unit tests for `core/`, and app checks that drive the real app (section 37)
 - installers: a Windows `Setup.exe` and a Linux `.deb`, built by `packaging/build.py` (section 37); 0.9.7 released on GitHub (Windows installer and `.deb`, both tested)
 
@@ -2492,9 +2523,14 @@ Waiting on an answer or more information (2026-09-30):
 - **Adding single files**: does this mean adding a file from a file dialog, with no browser (needed if the browser is folded into containers)?
 - **Linux: no sound until the app is restarted** (other apps play fine; nothing in the log). Watching; next time, note what was playing and copy the Log window.
 
+Waiting on an answer (2026-10-15):
+
+- **Remove Adjust Content?** It may no longer be needed: every container pans and zooms, and Ctrl + knob turns the content. Removing it would also change Crop / Zoom Inside (it opens the new container in Adjust mode). On hold while deciding.
+- **GIFs freezing on Linux Mint** (pausing and playing fixed it). Double-click now restarts an animation (section 5.3). Watching: if it keeps happening, an automatic restart could be added when a playing animation's frame stops advancing, logged so it shows how often.
+
 ### Next
 
-Nothing queued. The 2026-09-30 batch (file stepping, one-button A-B, Open Recent, Browse Folder…, type filter) is done.
+Nothing queued. The 2026-10-15 batch is done: Save in Present, the Wall Features panel moved to the left edge, session-only undo (no `.history` file), double-click to restart animations (double-click no longer leaves Present), a Speed submenu for animated images, the Animated Only filter, and a first pass of text objects (section 5.4).
 
 Done since the review: browsing containers (section 6.4), layouts (section 17), video as audio (section 14.2), drag-to-reorder in the Layers panel, edge resize handles, the Adjust-mode ghost for video, hiding the idle pointer in Present, and undo history kept between sessions (section 47).
 
@@ -2509,6 +2545,7 @@ Done since the review: browsing containers (section 6.4), layouts (section 17), 
 
 - **Fold the browser into browsing containers** (open decision, section 55), with double-clicking the empty canvas creating a container.
 - **Multi-select**: drag a selection box on the empty canvas to select several free media and containers, and move them as a group (resize and rotate later). Selection is a single id today, so this touches the model, the handles, and undo.
+- **Text, next steps** (section 5.4): more than one line; text along an arc (each letter placed separately); perspective tilt (a `Rotation` about the X or Y axis); a glow (shadow without offset, in the fill's color); typing directly on the canvas; an Add Text button on the toolbar once the UI pass makes room.
 
 - **Inspector** (Phase 11): exact position, size, and rotation.
 - **UI pass**, once the functionality has settled (decided 2026-09-29): a traditional **menu bar** (e.g. File / Edit / View / Wall / Help) instead of only a row of buttons; **icons** instead of text on toolbar buttons, from one bundled SVG icon set so Windows and Linux match (Qt has no consistent icon theme on Windows; candidates: Lucide, Material Symbols; check licenses); a compact toolbar for the most-used commands (it already barely fits at 1280 px). The groundwork is done: every command is an `Action` in `qml/AppActions.qml` (section 25), so the menu bar and toolbar can be built from the same actions without rewiring. Reference points: XnView MP, qView, qBittorrent (all Qt applications).
@@ -2728,7 +2765,7 @@ The following design decisions are currently established:
 - Phone videos stored sideways with a rotation flag get their displayed (upright) size: MediaView reports the stored size in the orientation actually drawn, once it has settled; a size report that is the old one turned sideways re-sizes (fits within its box) and re-frames everything already placed, which also repairs older walls (2026-09-26).
 - Speed changes pitch by default (Keep pitch off), as in Celluloid (2026-09-26).
 - The application's name is written **MediaWall** (one word) everywhere (2026-09-26).
-- Undo history is kept between sessions in a separate `<project>.history` file (last 50 steps), matched to the project by fingerprint, not inside the project file (2026-09-26).
+- Undo history is kept between sessions in a separate `<project>.history` file (last 50 steps), matched to the project by fingerprint, not inside the project file (2026-09-26). **Superseded 2026-10-15:** dropped. Undo across sessions was rarely needed, and one file per wall is preferred; storing it inside the project file was rejected, since every step is a whole scene and the file would grow. History now lasts for the session (in memory).
 - Free media always keeps its aspect ratio; no Contain/Cover/Free/Stretch modes for it (2026-09-26).
 - No audio solo, and no choosing between audio streams in one file (2026-09-26).
 - The wall is not scaled to the screen: a larger screen shows more canvas, with the wall at the same size in the top-left; multi-monitor walls use one MediaWall instance per screen (2026-09-26).
@@ -2754,6 +2791,12 @@ The following design decisions are currently established:
 - **All containers behave the same, like qView** (2026-10-02): pan and wheel-zoom the picture, double-click to reset, in every container, browsing or not, selected or not, and in Present. The wheel on the border strip (or anywhere on an empty container) scales the container, with no selection needed, so layouts are quick to build. Double-click no longer enters Adjust mode. Adjust mode stays (from the right-click menu) for free content rotation, without its Fit/Fill/Done toolbar; Ctrl + knob also turns the content, so both ways can be tried.
 - Mirroring is one per-instance flag (`mirrored`), horizontal only, applied to the picture in `MediaView` (not to overlays such as error boxes) (2026-10-02).
 - Containers show no outline once filled unless selected (1 px green) or being adjusted (2 px orange), so a finished wall reads as pictures rather than boxes; an empty container keeps a faint grey outline (hidden in Present) until it's filled. A browsing container's badge is just `⇅`, without the `n / total` count (2026-09-29).
+- The sidebar is now the **Wall Features** panel, on the **left** edge: on the right, its tabs collided with the Full Screen corner buttons. Its tab reads just "Wall Features" (no ◂ ▸ arrows), and it has a third tab, **Text** (2026-10-15).
+- Present has a **Save** button too (left of the ✕). **Double-click no longer leaves Present** (Esc, F5, and the ✕ do); in Present a double-click restarts an animated image. Double-clicking the empty canvas still leaves Full Screen (2026-10-15).
+- **Double-click on an animated image restarts it**, in a container as well, where it replaces the zoom reset for animated content (a still picture or video still resets). It is the quick fix for GIFs that freeze on Mint, rather than a right-click item, which was too clunky (2026-10-15).
+- Animated images get a **Speed** submenu (0.25×–4×) in the right-click menu, reusing the per-instance `speed` field; no slider in the Playback tab, which would fill up on GIF-heavy walls. The menu builds the submenu in or out per object, since a Qt Quick submenu can't be hidden like an item (2026-10-15).
+- **Animated Only** filter (`media_filter` "animated") for browsers and browsing containers: animation is detected by reading the file (a GIF's second frame, a WebP's animation flag), so still GIFs and WebPs are left out. Filtering moved into `MediaBrowser.scan_folder` (the QML passes the filter) (2026-10-15).
+- **Text objects** ("WordArt"; section 5.4), first pass: one top-level type `text` with `text` and a single `text_style` dict (one role and one setter, `setTextStyle(id, changes)`, rather than a field and role per style value), drawn as vector shapes scaled to the box, edited in the Text tab rather than on the canvas. The box follows the text's proportions only after the user's own edits (`SceneModel.textEdited`), merged into the same undo step, so undo and loading never resize anything (2026-10-15).
 
 ### Open decisions
 

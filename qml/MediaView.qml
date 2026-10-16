@@ -77,6 +77,9 @@ Item {
         loader.item.frameCount !== undefined &&
         loader.item.frameCount > 1
 
+    // The AnimatedImage, for animated images only (null otherwise).
+    readonly property var animation: isAnimated ? loader.item : null
+
     // The file exists but couldn't be decoded or played.
     readonly property bool failed:
         loader.item !== null &&
@@ -99,6 +102,18 @@ Item {
             player.position = 0
             player.play()
         }
+    }
+
+    // Start an animated image over from its first frame. Also unsticks
+    // one that has frozen (seen on Linux Mint), as pausing and playing
+    // it does. Window state only: nothing saved, no undo step.
+    function restartAnimation() {
+        var item = animation
+        if (!item)
+            return
+        item.playing = false
+        item.currentFrame = 0
+        item.playing = Qt.binding(function() { return view.playing })
     }
 
     // Emitted once the media's natural size is known.
@@ -161,6 +176,7 @@ Item {
             mipmap: true            // calmer GIF dither patterns when scaled down
 
             playing: view.playing
+            speed: view.speed
 
             onStatusChanged: {
                 if (status === Image.Ready)

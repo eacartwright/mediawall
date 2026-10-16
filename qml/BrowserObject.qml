@@ -172,7 +172,8 @@ Rectangle {
 
     // With a filter (right-click menu), it says which type, e.g. "2 / 3 videos".
     readonly property string positionText: {
-        var kind = { "image": "images", "video": "videos", "audio": "audio files" }[mediaFilter]
+        var kind = { "image": "images", "video": "videos", "audio": "audio files",
+                     "animated": "animated" }[mediaFilter]
         if (mediaFiles.length === 0)
             return kind ? "No " + kind : "No media"
         return (displayIndex + 1) + " / " + mediaFiles.length + (kind ? " " + kind : "")
@@ -203,10 +204,8 @@ Rectangle {
         // doesn't throw you back to the first file.
         var previousPath = currentEntry ? currentEntry.path : ""
 
-        var filter = mediaFilter
         mediaFiles = folder !== ""
-                     ? browserBackend.scanFolder(folder, includeSubfolders)
-                         .filter(function(e) { return filter === "all" || e.type === filter })
+                     ? browserBackend.scanFolder(folder, includeSubfolders, mediaFilter)
                      : []
 
         if (previousPath === "")

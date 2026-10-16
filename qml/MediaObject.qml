@@ -41,10 +41,10 @@ Item {
     // Shared right-click menu (ObjectContextMenu in Main.qml).
     property var contextMenu
 
-    // Present mode: view-only, never shown as selected. Disabled items
-    // let clicks through to the canvas (double-click there exits).
+    // Present mode: view-only, never shown as selected. Clicks go
+    // through to the canvas, except on animated images (double-click
+    // restarts them).
     readonly property bool presenting: sceneItem ? sceneItem.presenting : false
-    enabled: !presenting
 
     readonly property bool selected:
         !presenting && sceneModel.selectedId === objectId
@@ -57,6 +57,7 @@ Item {
     readonly property real mediaLoopA: objLoopA
     readonly property real mediaLoopB: objLoopB
     readonly property bool mediaMirrored: objMirrored
+    readonly property real mediaSpeed: objSpeed
     readonly property string playbackId: objectId
     readonly property bool isFreeMedia: true
     readonly property var mediaView: view
@@ -81,6 +82,14 @@ Item {
     function commit() {
         sceneModel.commitGeometry(objectId, x, y, width, height, rotation)
         rebind()
+    }
+
+    // Double-click on an animated image: start it over (and play it if
+    // paused).
+    function restartAnimation() {
+        if (!objPlaying)
+            sceneModel.setPlaying(objectId, true)
+        view.restartAnimation()
     }
 
     function rebind() {
@@ -195,7 +204,9 @@ Item {
 
         z: 2
 
-        acceptedButtons: Qt.LeftButton | Qt.RightButton
+        acceptedButtons: !root.presenting ? Qt.LeftButton | Qt.RightButton
+                         : root.isAnimated ? Qt.LeftButton
+                         : Qt.NoButton
 
         // True only while a left-button drag is in progress.
         property bool dragging: false
@@ -208,6 +219,11 @@ Item {
         property point startPos
 
         onPressed: function(mouse) {
+            if (root.presenting) {              // only double-click applies
+                dragging = false
+                return
+            }
+
             if (mouse.button === Qt.RightButton) {
                 dragging = false
                 sceneModel.select(root.objectId)
@@ -245,6 +261,11 @@ Item {
             sceneModel.setDropTarget(
                 shift ? "" : sceneModel.containerAt(p.x, p.y, "")
             )
+        }
+
+        onDoubleClicked: function(mouse) {
+            if (mouse.button === Qt.LeftButton && root.isAnimated)
+                root.restartAnimation()
         }
 
         onReleased: {

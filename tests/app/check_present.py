@@ -1,7 +1,7 @@
 """
 Full Screen and Present (readme section 15): entering and leaving, the
-view-only canvas, browsers still working, the idle pointer, and the
-Present button in Full Screen.
+view-only canvas, browsers still working, the idle pointer, the Present
+button in Full Screen, and the Save button in both.
 """
 
 from PySide6.QtGui import QWindow
@@ -64,7 +64,14 @@ def step_idle2():
 
 
 def step_left():
-    c.check("double-click on media leaves Present", not c.win.property("presenting")
+    c.check("double-click doesn't leave Present", c.win.property("presenting"))
+    c.check("Present: a Save button beside the exit button",
+            c.js("saveButton.visible") and not c.js("presentButton.visible"))
+    c.key(Qt.Key_Escape)
+
+
+def step_left2():
+    c.check("Esc leaves Present", not c.win.property("presenting")
             and win_state() == c.start_visibility)
     c.key(Qt.Key_F11)
 
@@ -91,8 +98,14 @@ def step_present_button():
 def step_present_button2():
     c.check("the Present button starts Present", c.win.property("presenting") is True)
     c.move(c.win.width() // 2 + 30, c.win.height() // 2)
-    c.check("in Present only the exit button shows",
-            not c.js("presentButton.visible") and not c.js("saveButton.visible"))
+    c.check("in Present the Present button hides; Save stays",
+            not c.js("presentButton.visible") and c.js("saveButton.visible"))
+    c.js("sceneModel.addContainer(900, 600)")
+    dirty = c.js("projectController.dirty")
+    c.click(c.win.width() - 12 - 40 - 8 - 20, 12 + 20)             # Save, where Present was
+    c.check("...and Save works in Present", dirty and not c.js("projectController.dirty")
+            and c.win.property("presenting"))
+    c.js("sceneModel.undo()")
     c.key(Qt.Key_Escape)
 
 
@@ -116,5 +129,6 @@ def step_end():
 
 
 c.run(scene, [(1500, step_enter), (1500, step_present), (3200, step_idle), (400, step_idle2), (1200, step_left),
+              (1200, step_left2),
               (1200, step_full_screen), (1000, step_present_button), (1000, step_present_button2),
               (1000, step_back), (800, step_back2), (1000, step_end)])

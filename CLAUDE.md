@@ -24,7 +24,7 @@ On Linux: `venv/bin/python` instead. Setup: `python -m venv venv` followed by `p
 
 The unit tests cover `core/` only. They need no Qt or display and finish in milliseconds. Run them after any `core/` change.
 
-App checks (`tests/app/`, readme section 37) start the real app and drive it (about 150 checks, ~1.5 minutes; need a display and `tests/media/`): `.\venv\Scripts\python.exe tests\app\run.py [name ...]` (Linux: `venv/bin/python tests/app/run.py`). Run them after QML or bridge changes, and update or add a `check_*.py` when behaviour changes. They use `tests/app/harness.py` (`Check`: timed steps, input helpers, `js()` in Main.qml's context, `item_js()` / `center_of()` to find items by `objectName`). There is no linter or build step. `tests/media/` (gitignored) holds sample media for manual testing.
+App checks (`tests/app/`, readme section 37) start the real app and drive it (about 180 checks, ~1.5 minutes; need a display and `tests/media/`): `.\venv\Scripts\python.exe tests\app\run.py [name ...]` (Linux: `venv/bin/python tests/app/run.py`). Run them after QML or bridge changes, and update or add a `check_*.py` when behaviour changes. They use `tests/app/harness.py` (`Check`: timed steps, input helpers, `js()` in Main.qml's context, `item_js()` / `center_of()` to find items by `objectName`). There is no linter or build step. `tests/media/` (gitignored) holds sample media for manual testing.
 
 ## Architecture
 
@@ -42,6 +42,7 @@ App checks (`tests/app/`, readme section 37) start the real app and drive it (ab
 - A `SceneObject` of type `"media"` is an instance that refers to a source by `source_id`. Many instances can share one source, each with its own geometry and playback state.
 - A `"container"` is a viewport. It holds at most one media instance, linked by the child's `parent_id`. It never holds a filename directly.
 - A `"browser"` is a workspace object with folder and index state.
+- A `"text"` is a line of styled text (readme section 5.4): `text` plus one `text_style` dict, always complete and validated by `normalized_text_style`.
 - `SceneObject` is one flat dataclass whose fields apply per type. Saved fields are listed per type in `TYPE_FIELDS` in `core/project.py`. A new persistent field must be added there as well.
 
 ### Coordinates
@@ -50,13 +51,13 @@ App checks (`tests/app/`, readme section 37) start the real app and drive it (ab
 
 ### Model rows and roles
 
-Model rows are **top-level objects only**. Container content is not a row. It is exposed through the container row's `content*` / `contentSource*` roles and edited through the container's id (for example `commitContent(containerId, ...)`). `Main.qml` uses a `Repeater` with a `DelegateChooser` on `objectType` to choose `MediaObject`, `BrowserObject`, or `ContainerObject`. Role groups (`GEOMETRY_ROLES`, `PLAYBACK_ROLES`, and others) at the top of `bridge/scene_model.py` control which roles are emitted when something changes.
+Model rows are **top-level objects only**. Container content is not a row. It is exposed through the container row's `content*` / `contentSource*` roles and edited through the container's id (for example `commitContent(containerId, ...)`). `Main.qml` uses a `Repeater` with a `DelegateChooser` on `objectType` to choose `MediaObject`, `BrowserObject`, `ContainerObject`, or `TextObject`. Role groups (`GEOMETRY_ROLES`, `PLAYBACK_ROLES`, and others) at the top of `bridge/scene_model.py` control which roles are emitted when something changes.
 
 ### Interaction → model → undo
 
 - During a drag, resize, or rotate, QML moves the item directly. On release it sends the final values once (`commitGeometry`) and re-binds to the model, so later changes from Python (load, undo) reach the canvas.
 - Every change to saved state in `SceneModel` must end with `_changed()`. It records the previous snapshot in `History` and emits `modified`. Browser fields are saved but excluded from undo (`_changed(workspace_only=True)`), and selection is neither saved nor undone.
-- Undo stores whole-scene deep-copy snapshots (`core/history.py`), so new actions become undoable without extra code. The history is also saved next to the project as `<project>.history` (`core/history_file.py`), matched to the saved project by a content fingerprint. For rapid repeated changes such as wheel zoom, call `sceneModel.setMergeKey("zoom:" + id)` before the change so they merge into one step.
+- Undo stores whole-scene deep-copy snapshots (`core/history.py`), so new actions become undoable without extra code. The history lasts for the session only (in memory; it is never written to disk, and opening a project clears it). For rapid repeated changes such as wheel zoom, call `sceneModel.setMergeKey("zoom:" + id)` before the change so they merge into one step.
 - `_apply_state` diffs the target snapshot against the live scene and inserts or removes only the rows that changed. Untouched delegates survive, so browsers don't rescan and videos and GIFs keep playing. Keep that behavior when changing undo or reset code.
 
 ### Persistence (`core/project.py`)

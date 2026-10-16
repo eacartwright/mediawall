@@ -54,19 +54,6 @@ class History:
         self._redo.clear()
         self._merge_key = None
 
-    # ---- Saving between sessions (core/history_file.py) ----
-
-    def steps(self):
-        """(undo, redo) snapshot lists, oldest first."""
-        return list(self._undo), list(self._redo)
-
-    @classmethod
-    def from_steps(cls, undo, redo, max_steps=MAX_STEPS):
-        history = cls(max_steps)
-        history._undo = list(undo)[-max_steps:]
-        history._redo = list(redo)[-max_steps:]
-        return history
-
     def record(self, before: Scene, merge_key=None, now=None):
         """
         Record that the scene just changed from `before`.

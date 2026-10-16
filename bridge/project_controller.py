@@ -11,14 +11,12 @@ from pathlib import Path
 from PySide6.QtCore import Property, QObject, QTimer, Signal, Slot
 from PySide6.QtWidgets import QFileDialog, QMessageBox
 
-from core.history_file import load_history, save_history
 from core.layout import (
     LAYOUT_EXTENSION, count_layout_containers, load_layout, save_layout,
     with_layout_extension,
 )
 from core.project import (
-    FILE_EXTENSION, ProjectError, load_project, project_file_fingerprint,
-    save_project,
+    FILE_EXTENSION, ProjectError, load_project, save_project,
 )
 from core.scene import Scene
 
@@ -251,13 +249,6 @@ class ProjectController(QObject):
         self._set_dirty(False)
         self._remember(self._path)
 
-        # Continue the undo history from last time, if it still matches.
-        history, note = load_history(path, project_file_fingerprint(path))
-        if history is not None:
-            self._model.setHistory(history)
-        if note:
-            print(note)
-
         self._report_load_problems(scene, warnings)
         return True
 
@@ -293,7 +284,7 @@ class ProjectController(QObject):
 
     def _write(self, path):
         try:
-            fingerprint = save_project(self._model.scene, path)
+            save_project(self._model.scene, path)
         except OSError as exc:
             QMessageBox.critical(
                 None, "Couldn't Save Project",
@@ -301,13 +292,6 @@ class ProjectController(QObject):
                 f"{exc.strerror or exc}"
             )
             return False
-
-        # Undo history goes in a file next to the project. Failing to
-        # write it doesn't fail the save; it's only noted in the Log.
-        try:
-            save_history(path, self._model.history, fingerprint)
-        except OSError as exc:
-            print(f"Undo history wasn't saved: {exc.strerror or exc}")
 
         self._set_path(str(Path(path).resolve()))
         self._set_dirty(False)

@@ -8,7 +8,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from core.media_browser import MediaBrowser
+from core.media_browser import MediaBrowser, is_animated
 
 
 class MediaBrowserTests(unittest.TestCase):
@@ -56,6 +56,59 @@ class MediaBrowserTests(unittest.TestCase):
         self.assertEqual(
             self.browser.scan_folder(str(self.root / "nope"), True), []
         )
+
+
+def gif_bytes(frames):
+    """A tiny GIF with this many 1x1 frames (each with a delay block)."""
+    data = b"GIF89a" + bytes([1, 0, 1, 0, 0x80, 0, 0]) + b"\x00\x00\x00\xff\xff\xff"
+    data += b"\x21\xff\x0bNETSCAPE2.0\x03\x01\x00\x00\x00"      # loop extension
+    for _ in range(frames):
+        data += b"\x21\xf9\x04\x04\x0a\x00\x00\x00"               # frame delay
+        data += b"\x2c" + bytes(8) + b"\x00"                       # image descriptor
+        data += b"\x02\x02\x4c\x01\x00"                           # image data
+    return data + b"\x3b"
+
+
+def webp_bytes(animated):
+    flags = 0x02 if animated else 0x00
+    chunk = b"VP8X" + (10).to_bytes(4, "little") + bytes([flags]) + bytes(9)
+    return b"RIFF" + (4 + len(chunk)).to_bytes(4, "little") + b"WEBP" + chunk
+
+
+class AnimatedTests(unittest.TestCase):
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self.tmp.name)
+        for name, data in [
+            ("moving.gif", gif_bytes(3)),
+            ("still.gif", gif_bytes(1)),
+            ("moving.webp", webp_bytes(True)),
+            ("still.webp", webp_bytes(False)),
+            ("simple.webp", b"RIFF\x10\x00\x00\x00WEBPVP8 " + bytes(8)),
+            ("broken.gif", b"GIF89a\x01"),
+            ("photo.jpg", b""),
+        ]:
+            (self.root / name).write_bytes(data)
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def test_is_animated(self):
+        for name, expected in [("moving.gif", True), ("still.gif", False),
+                               ("moving.webp", True), ("still.webp", False),
+                               ("simple.webp", False), ("broken.gif", False),
+                               ("photo.jpg", False), ("nope.gif", False)]:
+            with self.subTest(name):
+                self.assertEqual(is_animated(self.root / name), expected)
+
+    def test_animated_filter(self):
+        names = [e["name"] for e in MediaBrowser().scan_folder(str(self.root), False, "animated")]
+        self.assertEqual(names, ["moving.gif", "moving.webp"])
+
+    def test_type_filter(self):
+        names = [e["name"] for e in MediaBrowser().scan_folder(str(self.root), False, "image")]
+        self.assertEqual(len(names), 7)
 
 
 if __name__ == "__main__":

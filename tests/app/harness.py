@@ -217,9 +217,9 @@ class Check:
             buttons, Qt.NoModifier, Qt.NoScrollPhase, False))
 
     def open_sidebar(self, tab="layersTab"):
-        """Open the right-edge flyout (if closed) and choose a tab."""
+        """Open the left-edge flyout (if closed) and choose a tab."""
         handle = self.center_of("sidebarHandle")
-        if handle and handle[0] > self.win.width() - 30:        # closed: tab at the edge
+        if handle and handle[0] < 30:                           # closed: tab at the edge
             self.click(handle[0], handle[1])
 
     def choose_tab(self, tab):

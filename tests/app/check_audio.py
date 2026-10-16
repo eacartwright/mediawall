@@ -18,7 +18,7 @@ webm = scene.add_source(media(WEBM), "video", 0, 0)
 scene.add_media(photo.id, 40, 90)
 box = scene.add_object("container", 600, 90, width=320, height=200)
 scene.add_media_to_container(webm.id, box.id)
-clip = scene.add_media(video.id, 60, 330)            # topmost: first card in the Playback tab
+clip = scene.add_media(video.id, 340, 330)           # clear of the open panel; topmost: first card in the Playback tab
 clip.width, clip.height = 240, 427                  # bar (and A-B button) on screen
 
 

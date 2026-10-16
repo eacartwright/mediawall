@@ -19,7 +19,6 @@ Design rules (readme sections 16, 42, 45, 46):
 
 from __future__ import annotations
 
-import hashlib
 import json
 import os
 import tempfile
@@ -28,7 +27,7 @@ from pathlib import Path
 from core.scene import (
     CLIP_SHAPES, FIT_COVER, FIT_MODES, MEDIA_FILTERS, OBJECT_TYPES, PLAYABLE_TYPES,
     MediaSource, Scene, SceneObject,
-    clamp_speed, new_id, normalized_loop,
+    clamp_speed, new_id, normalized_loop, normalized_text_style, one_line,
 )
 
 
@@ -48,6 +47,7 @@ TYPE_FIELDS = {
                   "media_filter"],
     "audio": ["source_id", "playing", "muted", "volume", "loop",
               "speed", "preserve_pitch", "loop_a", "loop_b"],
+    "text": ["text", "text_style"],
 }
 
 
@@ -131,26 +131,8 @@ def write_json_atomic(path, data) -> None:
         raise
 
 
-def fingerprint(data) -> str:
-    """A hash of a project's saved content (for matching its undo history)."""
-    text = json.dumps(data, sort_keys=True, ensure_ascii=False, separators=(",", ":"))
-    return hashlib.sha256(text.encode("utf-8")).hexdigest()
-
-
-def save_project(scene: Scene, path) -> str:
-    """Save the project; returns the saved content's fingerprint."""
-    data = scene_to_dict(scene, path)
-    write_json_atomic(path, data)
-    return fingerprint(data)
-
-
-def project_file_fingerprint(path):
-    """The fingerprint of a project file as it is on disk, or None."""
-    try:
-        with open(path, encoding="utf-8") as f:
-            return fingerprint(json.load(f))
-    except (OSError, ValueError):
-        return None
+def save_project(scene: Scene, path) -> None:
+    write_json_atomic(path, scene_to_dict(scene, path))
 
 
 # -------------------------------------------------
@@ -297,6 +279,10 @@ def scene_from_dict(data, project_path=None):
                 f"Unknown container shape {obj.clip_shape!r}; using rectangle."
             )
             obj.clip_shape = "rect"
+
+        if object_type == "text":
+            obj.text = one_line(obj.text)
+            obj.text_style = normalized_text_style(obj.text_style)
 
         if object_type in MEDIA_FILTERS and obj.media_filter not in MEDIA_FILTERS[object_type]:
             warnings.append(f"Unknown media filter {obj.media_filter!r}; showing all.")

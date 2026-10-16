@@ -71,9 +71,9 @@ class BrowserBackend(QObject):
     def folderExists(self, folder):
         return bool(folder) and Path(folder).is_dir()
 
-    @Slot(str, bool, result=list)
-    def scanFolder(self, folder, recursive):
-        return self.media_browser.scan_folder(folder, recursive)
+    @Slot(str, bool, str, result=list)
+    def scanFolder(self, folder, recursive, media_filter):
+        return self.media_browser.scan_folder(folder, recursive, media_filter)
 
 
 def main():

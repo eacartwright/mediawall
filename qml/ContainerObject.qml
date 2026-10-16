@@ -111,6 +111,7 @@ Item {
     readonly property real mediaLoopA: contentLoopA
     readonly property real mediaLoopB: contentLoopB
     readonly property bool mediaMirrored: contentMirrored
+    readonly property real mediaSpeed: contentSpeed
     readonly property var mediaView: contentView
 
     x: posX
@@ -152,12 +153,8 @@ Item {
             browseFiles = []
             return
         }
-        var filter = mediaFilter
-        browseFiles = browserBackend.scanFolder(browseFolder, browseSubfolders)
-            .filter(function(e) {
-                return (e.type === "image" || e.type === "video")
-                       && (filter === "all" || e.type === filter)
-            })
+        browseFiles = browserBackend.scanFolder(browseFolder, browseSubfolders, mediaFilter)
+            .filter(function(e) { return e.type === "image" || e.type === "video" })
 
         // An empty container starts on the folder's first file, rather
         // than sitting empty until the first step. So does one given a
@@ -634,7 +631,8 @@ Item {
             mode = ""
         }
 
-        // Reset the zoom (the container's Fit/Fill framing). Empty (and
+        // Reset the zoom (the container's Fit/Fill framing); on an
+        // animated image, start the animation over instead. Empty (and
         // not yet browsing a folder): choose one to browse.
         onDoubleClicked: function(mouse) {
             if (mouse.button !== Qt.LeftButton)
@@ -644,8 +642,15 @@ Item {
                     sceneModel.startBrowsing(root.objectId)
                 return
             }
-            if (!movesAt(mouse.x, mouse.y))
+            if (movesAt(mouse.x, mouse.y))
+                return
+            if (root.isAnimated) {
+                if (!root.contentPlaying)
+                    sceneModel.setPlaying(root.contentId, true)
+                contentView.restartAnimation()
+            } else {
                 sceneModel.resetContentFraming(root.objectId)
+            }
         }
 
         // Zoom the picture around the pointer; on the border strip (or

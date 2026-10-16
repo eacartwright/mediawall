@@ -45,6 +45,9 @@ Menu {
     readonly property bool isFreeMedia:
         target !== null && target.isFreeMedia === true
 
+    readonly property bool isText:
+        target !== null && target.isText === true
+
     // A free image, or a container's content, whose file can't be found
     readonly property bool targetMissing:
         target !== null &&
@@ -65,7 +68,74 @@ Menu {
 
     function openFor(item) {
         target = item
+        placeSpeedMenu()
         popup()   // opens at the mouse cursor
+    }
+
+    // ---- Speed submenu (animated images and video) ----
+    // A submenu can't be hidden like an item, so it is put in after
+    // the Play/Pause item when it applies and taken out otherwise.
+
+    readonly property var speeds: [0.25, 0.5, 0.75, 1, 1.25, 1.5, 2, 3, 4]
+
+    function formatSpeed(s) {
+        return (Math.round(s * 100) / 100) + "×"
+    }
+
+    function placeSpeedMenu() {
+        for (var i = 0; i < count; i++) {
+            if (itemAt(i).subMenu === speedMenu) {
+                takeMenu(i)
+                break
+            }
+        }
+        if (!(targetAnimated || targetVideo))
+            return
+        for (var j = 0; j < count; j++) {
+            if (itemAt(j) === playItem) {
+                insertMenu(j + 1, speedMenu)
+                return
+            }
+        }
+    }
+
+    property Menu speedMenu: Menu {
+        objectName: "speedMenu"      // found by tests/app
+        title: "Speed" + (menu.target && menu.target.mediaSpeed !== undefined
+                          && menu.target.mediaSpeed !== 1
+                          ? "   (" + menu.formatSpeed(menu.target.mediaSpeed) + ")" : "")
+
+        id: speedSub
+
+        // Inside a MenuItem, `menu` is the item's own menu (this
+        // submenu), so its items reach the context menu through here.
+        readonly property var owner: menu
+
+        Instantiator {
+            model: menu.speeds
+
+            MenuItem {
+                id: speedItem
+                required property real modelData
+
+                function isCurrent() {
+                    var t = speedSub.owner.target
+                    return t !== null && t.mediaSpeed !== undefined
+                           && Math.abs(t.mediaSpeed - modelData) < 0.001
+                }
+
+                text: speedSub.owner.formatSpeed(modelData) + (modelData === 1 ? "  (normal)" : "")
+                checkable: true
+                checked: isCurrent()
+                onTriggered: {
+                    sceneModel.setSpeed(speedSub.owner.target.playbackId, modelData)
+                    speedItem.checked = Qt.binding(speedItem.isCurrent)
+                }
+            }
+
+            onObjectAdded: function(index, object) { speedSub.insertItem(index, object) }
+            onObjectRemoved: function(index, object) { speedSub.removeItem(object) }
+        }
     }
 
 
@@ -86,9 +156,28 @@ Menu {
     }
 
 
+    // ---- Text: edited in the Wall Features panel's Text tab ----
+
+    MenuItem {
+        text: "Edit Text…"
+
+        visible: menu.isText
+        height: visible ? implicitHeight : 0
+
+        onTriggered: menu.target.sceneItem.textEditRequested(menu.targetId)
+    }
+
+    MenuSeparator {
+        visible: menu.isText
+        height: visible ? implicitHeight : 0
+    }
+
+
     // ---- Playback (animated images and video) ----
 
     MenuItem {
+        id: playItem
+
         text: {
             if (menu.targetEnded)
                 return "Replay Video"
@@ -310,6 +399,7 @@ Menu {
             { text: "Show Images Only", value: "image" },
             { text: "Show Videos Only", value: "video" },
             { text: "Show Audio Only", value: "audio" },
+            { text: "Show Animated Only (GIF, WebP)", value: "animated" },
         ]
 
         MenuItem {

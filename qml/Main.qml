@@ -84,6 +84,11 @@ ApplicationWindow {
         return null
     }
 
+    // Add a text object and open it for editing (AppActions.addText).
+    function addText(x, y) {
+        scene.textEditRequested(sceneModel.addText(x, y))
+    }
+
     // Back one level: Present -> where you were; Full Screen -> window.
     function stepOut() {
         if (presenting)
@@ -400,6 +405,14 @@ ApplicationWindow {
                 return mediaViews[mediaId] || null
             }
 
+            // The canvas item for a top-level object, or null.
+            function itemFor(objectId) {
+                return window.objectItem(objectId)
+            }
+
+            // Edit a text object: the panel opens its Text tab.
+            signal textEditRequested(string objectId)
+
             // Where a new player should start (e.g. a video converted to
             // an audio track continues from where it was), by media id.
             property var pendingSeeks: ({})
@@ -417,9 +430,8 @@ ApplicationWindow {
 
             // Clicking empty canvas clears the selection.
             // Right-clicking it opens the canvas menu.
-            // Double-clicking it leaves Full Screen / Present. (In
-            // Present, media objects let clicks through, so double-
-            // clicking them does too.)
+            // Double-clicking it leaves Full Screen (not Present, where
+            // a double-click restarts an animated image instead).
             MouseArea {
                 anchors.fill: parent
                 z: -1000000
@@ -436,7 +448,8 @@ ApplicationWindow {
                 }
 
                 onDoubleClicked: function(mouse) {
-                    if (mouse.button === Qt.LeftButton && window.fullScreen)
+                    if (mouse.button === Qt.LeftButton && window.fullScreenEditing
+                            && !window.presenting)
                         window.stepOut()
                 }
             }
@@ -459,6 +472,13 @@ ApplicationWindow {
                 MenuItem {
                     text: "Add Container Here"
                     onTriggered: sceneModel.addContainer(
+                        canvasMenu.clickPoint.x, canvasMenu.clickPoint.y
+                    )
+                }
+
+                MenuItem {
+                    text: "Add Text Here"
+                    onTriggered: window.addText(
                         canvasMenu.clickPoint.x, canvasMenu.clickPoint.y
                     )
                 }
@@ -492,6 +512,11 @@ ApplicationWindow {
                         ContainerObject { sceneItem: scene; contextMenu: objectMenu }
                     }
 
+                    DelegateChoice {
+                        roleValue: "text"
+                        TextObject { sceneItem: scene; contextMenu: objectMenu }
+                    }
+
                     // Audio tracks draw nothing; they only host a player.
                     DelegateChoice {
                         roleValue: "audio"
@@ -503,7 +528,7 @@ ApplicationWindow {
 
 
         // -------------------------------------------------
-        // Sidebar (Layers): a flyout on the right edge
+        // Sidebar (Wall Features): a flyout on the left edge
         // -------------------------------------------------
 
         Sidebar {
@@ -512,7 +537,7 @@ ApplicationWindow {
 
             anchors.top: toolbar.visible ? toolbar.bottom : parent.top
             anchors.bottom: parent.bottom
-            anchors.right: parent.right
+            anchors.left: parent.left
 
             visible: !window.presenting
 
@@ -610,7 +635,7 @@ ApplicationWindow {
 
             ToolTip.visible: exitArea.containsMouse
             ToolTip.text: window.presenting
-                          ? "Stop presenting (Esc, or double-click the canvas)"
+                          ? "Stop presenting (Esc)"
                           : "Leave full screen (F11, or double-click the canvas)"
             ToolTip.delay: 500
         }
@@ -667,13 +692,13 @@ ApplicationWindow {
             ToolTip.delay: 500
         }
 
-        // Full Screen (editing) only: Save, left of Present. Fades with
-        // the exit button too.
+        // Save (Full Screen and Present): left of Present, or of the
+        // exit button in Present. Fades with the exit button too.
         Rectangle {
             id: saveButton
 
             anchors.top: exitButton.top
-            anchors.right: presentButton.left
+            anchors.right: window.presenting ? exitButton.left : presentButton.left
             anchors.rightMargin: 8
 
             width: 40
@@ -686,7 +711,7 @@ ApplicationWindow {
             border.color: "#80ffffff"
 
             opacity: exitButton.opacity
-            visible: window.fullScreenEditing && !window.presenting && opacity > 0
+            visible: window.fullScreen && opacity > 0
 
             // A down arrow into a tray, drawn like the play triangle.
             Shape {

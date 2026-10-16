@@ -218,6 +218,14 @@ Item {
                                              150 + Math.random() * 100)
     }
 
+    // Placed clear of the Wall Features panel, which opens to edit it.
+    readonly property Action addText: Action {
+        text: "Add Text"
+        enabled: actions.editing
+        onTriggered: actions.window.addText(360 + Math.random() * 100,
+                                            150 + Math.random() * 100)
+    }
+
     // ---- View ----
 
     // F11: Full Screen on/off (from Present: back to where you were).

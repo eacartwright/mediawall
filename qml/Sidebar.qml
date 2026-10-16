@@ -2,9 +2,11 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 
-// Right-hand flyout panel, opened and closed with the tab on its left
-// edge. Tabs: Layers, and Playback (every video and audio track's sound
-// and playback settings; readme section 14).
+// "Wall Features": a left-hand flyout panel, opened and closed with the
+// tab on its right edge. (On the left so its tabs stay clear of the
+// Full Screen buttons in the top-right corner.) Tabs: Layers, Playback
+// (every video and audio track's sound and playback settings; readme
+// section 14), and Text (TextPanel.qml; readme section 5.4).
 // Overlays the canvas; hidden in Present mode (Main.qml).
 
 Item {
@@ -24,6 +26,18 @@ Item {
         function onAudioTrackAdded(trackId) {
             sidebar.open = true
             tabs.currentIndex = 1
+        }
+    }
+
+    // Editing a text object (added, double-clicked, or Edit Text…): show
+    // the Text tab, ready to type. The object is selected by then.
+    Connections {
+        target: sidebar.sceneItem
+        function onTextEditRequested(objectId) {
+            sceneModel.select(objectId)
+            sidebar.open = true
+            tabs.currentIndex = 2
+            Qt.callLater(textPanel.focusText)
         }
     }
 
@@ -53,7 +67,7 @@ Item {
         objectName: "sidebarHandle"      // objectNames: found by tests/app
 
         anchors.verticalCenter: parent.verticalCenter
-        x: panel.x - width
+        x: panel.x + panel.width
 
         width: 22
         height: 160
@@ -65,7 +79,7 @@ Item {
         Text {
             anchors.centerIn: parent
             rotation: -90
-            text: sidebar.open ? "Layers · Playback  ▸" : "◂  Layers · Playback"
+            text: "Wall Features"
             color: "#dddddd"
             font.pixelSize: 12
         }
@@ -88,11 +102,11 @@ Item {
         width: sidebar.panelWidth
         height: sidebar.height
 
-        // Slides out past the window's right edge when closed.
-        x: sidebar.open ? handle.width : handle.width + sidebar.panelWidth
+        // Slides out past the window's left edge when closed.
+        x: sidebar.open ? 0 : -sidebar.panelWidth
         Behavior on x { NumberAnimation { duration: 150; easing.type: Easing.OutCubic } }
 
-        visible: x < sidebar.width
+        visible: x + width > 0
 
         color: "#262626"
         border.color: "#444444"
@@ -115,6 +129,7 @@ Item {
 
                 TabButton { text: "Layers"; objectName: "layersTab" }
                 TabButton { text: "Playback"; objectName: "playbackTab" }
+                TabButton { text: "Text"; objectName: "textTab" }
             }
 
             StackLayout {
@@ -175,6 +190,7 @@ Item {
                                         case "audio": return "#9a7a3a"
                                         case "container": return "#3a7a5a"
                                         case "browser": return "#4a5a7a"
+                                        case "text": return "#8a5a3a"
                                         default: return "#5a5a5a"
                                         }
                                     }
@@ -187,6 +203,7 @@ Item {
                                             case "audio": return "audio"
                                             case "container": return "box"
                                             case "browser": return "browse"
+                                            case "text": return "text"
                                             default: return "image"
                                             }
                                         }
@@ -661,6 +678,14 @@ Item {
                         wrapMode: Text.WordWrap
                         horizontalAlignment: Text.AlignHCenter
                     }
+                }
+
+                // ---- Text ----
+
+                TextPanel {
+                    id: textPanel
+                    sceneItem: sidebar.sceneItem
+                    actions: sidebar.actions
                 }
             }
         }

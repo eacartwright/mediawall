@@ -84,6 +84,8 @@ OBJECT_ROLE_NAMES = [
     "browseFolder",
     "browseSubfolders",
     "mediaFilter",
+    "objText",
+    "textStyle",
 ]
 
 # Roles describing a media source. Used as "source*" for a media row,
@@ -122,6 +124,7 @@ CONTAINER_ROLES = [ROLES[n] for n in
                    ("lockContent", "clipShape", "fitMode", "browseMode",
                     "browseFolder", "browseSubfolders", "mediaFilter")]
 CONTENT_ROLES = [ROLES[n] for n in CONTENT_ROLE_NAMES]
+TEXT_ROLES = [ROLES[n] for n in ("objText", "textStyle")]
 
 
 def _file_url(path):
@@ -210,6 +213,10 @@ class SceneModel(QAbstractListModel):
     # move to that folder's first file unless it already shows one.
     browseFolderChosen = Signal(str)
 
+    # A text object's words or style were changed by the user (not by
+    # undo or loading): its box may need to follow the new proportions.
+    textEdited = Signal(str)
+
     def __init__(self, scene=None, parent=None):
         super().__init__(parent)
         self._scene = scene if scene is not None else Scene()
@@ -219,6 +226,7 @@ class SceneModel(QAbstractListModel):
         self._history = History()
         self._current = snapshot(self._scene)
         self._merge_key = None
+        self._text_edit_key = None      # the last text edit's merge key
 
         self._audio_model = AudioModel(self)
         self._audio_model.refresh()
@@ -226,16 +234,6 @@ class SceneModel(QAbstractListModel):
     @property
     def scene(self):
         return self._scene
-
-    @property
-    def history(self):
-        return self._history
-
-    def setHistory(self, history):
-        """Use a history loaded from disk (after setScene for the same project)."""
-        self._history = history
-        self._merge_key = None
-        self.historyChanged.emit()
 
     def _get_audio_items(self):
         return self._audio_model
@@ -357,6 +355,8 @@ class SceneModel(QAbstractListModel):
             "browseFolder": obj.browse_folder,
             "browseSubfolders": obj.browse_subfolders,
             "mediaFilter": obj.media_filter,
+            "objText": obj.text,
+            "textStyle": obj.text_style,
         }.get(name)
 
     # -------------------------------------------------
@@ -662,6 +662,49 @@ class SceneModel(QAbstractListModel):
     @Slot(float, float, result=str)
     def addContainer(self, x, y):
         return self._insert(lambda: self._scene.add_object("container", x, y))
+
+    @Slot(float, float, result=str)
+    def addText(self, x, y):
+        # The box then fits the words (fitTextWidth), in the same undo step.
+        self._merge_key = self._text_edit_key = f"add-text:{time.monotonic()}"
+        object_id = self._insert(lambda: self._scene.add_text(x, y))
+        self.textEdited.emit(object_id)
+        return object_id
+
+    @Slot(str, str)
+    def setText(self, object_id, text):
+        if self._scene.set_text(object_id, text):
+            self._text_edit("text:" + object_id, object_id)    # typing: one undo step
+
+    @Slot(str, "QVariantMap")
+    def setTextStyle(self, object_id, changes):
+        """Change some style values (a preset changes several at once)."""
+        if self._scene.set_text_style(object_id, dict(changes)):
+            # A slider drag: one undo step.
+            self._text_edit("style:" + object_id + ":" + ",".join(sorted(changes)), object_id)
+
+    def _text_edit(self, merge_key, object_id):
+        self._merge_key = self._text_edit_key = merge_key
+        self._emit_row(object_id, TEXT_ROLES)
+        self._changed()
+        self.textEdited.emit(object_id)
+
+    @Slot(str, float)
+    def fitTextWidth(self, object_id, width):
+        """
+        After an edit changes the text's proportions, the box follows
+        (part of the same undo step): it keeps its height and left edge,
+        or its center if rotated.
+        """
+        obj = self._scene.get(object_id)
+        if obj is None or obj.type != "text" or width <= 0:
+            return
+        x = obj.x if obj.rotation == 0 else obj.x + (obj.width - width) / 2
+        self._merge_key = self._text_edit_key
+        if self._scene.set_geometry(object_id, x, obj.y, width, obj.height, obj.rotation):
+            self._emit_row(object_id, GEOMETRY_ROLES)
+            self._changed()
+        self._merge_key = None
 
     @Slot(str, str, float, float, result=str)
     def addMedia(self, path, media_type, x, y):
