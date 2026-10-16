@@ -74,6 +74,10 @@ def step_settings2():
     from core.version import VERSION
     c.check("About tab: the version", c.item_js("aboutVersion", "item.text") == "Version " + VERSION)
     c.grab("settings-about.png")
+    x, y, _, _ = c.center_of("openLogButton")
+    c.click(x, y)
+    c.check("About tab: Open Log opens the Log window", c.js("logWindow.visible") is True)
+    c.js("logWindow.close()")
     c.js("settingsDialog.close()")
     c.check("a new settings object (a restart) reads it back", AppSettings().zoomStep == 25.0)
     c.js("appSettings.resetZoomStep()")

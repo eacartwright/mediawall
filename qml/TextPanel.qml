@@ -41,25 +41,25 @@ ScrollView {
         textField.selectAll()
     }
 
-    // Looks to start from. Each sets every color, outline, depth, and
-    // shadow value; the font, bold/italic, and stretch stay as they are.
+    // Looks to start from. Each sets every color, outline, and depth
+    // value; the font, bold/italic, and stretch stay as they are.
     readonly property var presets: [
         { name: "Classic", style: { fill: "#ffffff", fill2: "", outline: "#000000", outline_width: 4,
-                                    depth: 0, depth_color: "#404040", shadow: true } },
+                                    depth: 0, depth_color: "#404040" } },
         { name: "Sunset", style: { fill: "#ffd040", fill2: "#ff4020", outline: "#401000", outline_width: 3,
-                                   depth: 10, depth_color: "#802000", shadow: true } },
+                                   depth: 10, depth_color: "#802000" } },
         { name: "Ocean", style: { fill: "#70e8ff", fill2: "#2050d0", outline: "#ffffff", outline_width: 3,
-                                  depth: 0, depth_color: "#102860", shadow: true } },
+                                  depth: 0, depth_color: "#102860" } },
         { name: "Candy", style: { fill: "#40c0ff", fill2: "#c040ff", outline: "#ffffff", outline_width: 2,
-                                  depth: 6, depth_color: "#502070", shadow: false } },
+                                  depth: 6, depth_color: "#502070" } },
         { name: "Chrome", style: { fill: "#ffffff", fill2: "#707070", outline: "#202020", outline_width: 3,
-                                   depth: 14, depth_color: "#303030", shadow: false } },
+                                   depth: 14, depth_color: "#303030" } },
         { name: "Gold", style: { fill: "#fff0a0", fill2: "#c08000", outline: "#604000", outline_width: 2,
-                                 depth: 6, depth_color: "#604000", shadow: true } },
+                                 depth: 6, depth_color: "#604000" } },
         { name: "Neon", style: { fill: "#ff60d0", fill2: "", outline: "#ffffff", outline_width: 2,
-                                 depth: 0, depth_color: "#404040", shadow: true } },
+                                 depth: 0, depth_color: "#404040" } },
         { name: "Plain", style: { fill: "#ffffff", fill2: "", outline: "#000000", outline_width: 0,
-                                  depth: 0, depth_color: "#404040", shadow: false } },
+                                  depth: 0, depth_color: "#404040" } },
     ]
 
     // One color dialog, for whichever color is being chosen.
@@ -295,15 +295,6 @@ ScrollView {
             RowLayout {
                 Layout.fillWidth: true
                 spacing: 4
-
-                CheckBox {
-                    text: "Shadow"
-                    checked: panel.style.shadow === true
-                    onToggled: {
-                        panel.set({ shadow: checked })
-                        checked = Qt.binding(function() { return panel.style.shadow === true })
-                    }
-                }
 
                 CheckBox {
                     text: "Stretch to box"

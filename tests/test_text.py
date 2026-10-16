@@ -55,9 +55,9 @@ class TextObjectTests(unittest.TestCase):
     def test_set_style_merges(self):
         self.assertTrue(self.scene.set_text_style(self.text.id, {"depth": 8, "fill": "#ff0000"}))
         self.assertEqual((self.text.text_style["depth"], self.text.text_style["fill"]), (8, "#ff0000"))
-        self.assertTrue(self.scene.set_text_style(self.text.id, {"shadow": True}))
+        self.assertTrue(self.scene.set_text_style(self.text.id, {"italic": True}))
         self.assertEqual(self.text.text_style["depth"], 8)                  # kept
-        self.assertFalse(self.scene.set_text_style(self.text.id, {"shadow": True}))
+        self.assertFalse(self.scene.set_text_style(self.text.id, {"italic": True}))
 
     def test_duplicates_dont_share_a_style(self):
         copy = self.scene.duplicate_object(self.text.id)

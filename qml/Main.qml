@@ -357,7 +357,6 @@ ApplicationWindow {
                 Button { action: appActions.fullScreen }
                 Button { action: appActions.present }
                 Button { action: appActions.settings }
-                Button { action: appActions.log }
             }
         }
 

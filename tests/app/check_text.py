@@ -69,12 +69,12 @@ def step_delete_key():
     c.check("Delete/Backspace while typing edit the words, not the wall",
             len(texts()) == 2 and o.text == "hello wal", o.text)
     c.w_before_depth = o.width
-    c.sm.setTextStyle(o.id, {"depth": 20, "fill2": "#ff0000", "shadow": True})
+    c.sm.setTextStyle(o.id, {"depth": 20, "fill2": "#ff0000", "italic": True})
 
 
 def step_styled():
     o = new_text()
-    c.check("a style change is stored", o.text_style["depth"] == 20 and o.text_style["shadow"])
+    c.check("a style change is stored", o.text_style["depth"] == 20 and o.text_style["italic"])
     c.check("...and the box follows the new proportions", o.width != c.w_before_depth)
     c.grab("text.png")
     c.sm.undo()

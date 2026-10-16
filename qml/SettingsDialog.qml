@@ -5,12 +5,13 @@ import QtQuick.Layouts
 // App-wide settings (bridge/app_settings.py). Changes apply at once and
 // are saved immediately; Close just closes. Opened from the toolbar.
 // Tabs: General (the settings), Shortcuts (every key and modifier the
-// app responds to, read from AppActions where they're defined), About.
+// app responds to, read from AppActions where they're defined), About
+// (with the button that opens the Log window).
 
 Dialog {
     id: dialog
 
-    // AppActions, for the Shortcuts tab's key list.
+    // AppActions, for the Shortcuts tab's key list and About's Log button.
     property var actions
 
     title: "Settings"
@@ -379,10 +380,20 @@ Dialog {
                     textFormat: Text.StyledText
                     color: "#999999"
                     text: "<b>New in 0.9.8</b><br>"
-                          + "• Text: WordArt-style titles with presets, outline, 3D depth, and shadow<br>"
+                          + "• Text: WordArt-style titles with presets, gradient fill, outline, and 3D depth<br>"
                           + "• Animated images: double-click to restart, Speed menu, Animated Only filter<br>"
                           + "• The Wall Features panel (Layers, Playback, Text) is on the left<br>"
                           + "• Save button in Present"
+                }
+
+                // The Log window: everything the app would print to a
+                // terminal (FFmpeg, Qt, Python), in its own larger window.
+                Button {
+                    objectName: "openLogButton"        // found by tests/app
+                    Layout.alignment: Qt.AlignHCenter
+                    Layout.topMargin: 6
+                    action: dialog.actions ? dialog.actions.log : null
+                    text: "Open Log…"
                 }
 
                 Label {

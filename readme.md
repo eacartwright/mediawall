@@ -10,7 +10,7 @@ It runs on Linux (Mint/Ubuntu, the primary platform) and Windows, built with Pyt
 - Place images, GIFs/animated WebP, and videos anywhere; move, resize (corners or edge bars), rotate, and scale with the mouse wheel.
 - Double-click an edge bar to stretch an object until it meets its neighbours or the canvas edge.
 - Layer objects freely, from the right-click menu, shortcuts, or the Layers panel (drag to reorder).
-- Add text in WordArt-style looks: gradient fill, outline, 3D depth, and shadow, from presets or by hand.
+- Add text in WordArt-style looks: gradient fill, outline, and 3D depth, from presets or by hand.
 - Undo and redo every change, for as long as the app is open.
 
 **Browsers**
@@ -399,11 +399,11 @@ The default should be aspect-ratio preserving.
 A text object is one line of styled text that fills its box. It is a top-level object of type `text` (fields `text` and `text_style`), moved, resized, rotated, scaled with the wheel, layered, duplicated, and deleted like a free image.
 
 - **Adding:** **Add Text** (the Text tab, or right-click the canvas → **Add Text Here**). The new object is selected and the Text tab opens with the words selected, ready to type.
-- **Editing:** double-click it (or right-click → **Edit Text…**) to open the **Text** tab of the Wall Features panel: the words, eight **style presets** (Classic, Sunset, Ocean, Candy, Chrome, Gold, Neon, Plain; each sets the colors, outline, depth, and shadow, keeping the font), the **font** (any installed family; Default is the app's font), Bold / Italic, the **fill** color with an optional **fade to** a second color (top to bottom), the **outline** color and width, **3D depth** (an extrusion down and to the right) and its color, **Shadow**, and **Stretch to box**.
+- **Editing:** double-click it (or right-click → **Edit Text…**) to open the **Text** tab of the Wall Features panel: the words, eight **style presets** (Classic, Sunset, Ocean, Candy, Chrome, Gold, Neon, Plain; each sets the colors, outline, and depth, keeping the font), the **font** (any installed family; Default is the app's font), Bold / Italic, the **fill** color with an optional **fade to** a second color (top to bottom), the **outline** color and width, **3D depth** (an extrusion down and to the right) and its color, and **Stretch to box**.
 - **Sizing:** by default the letters keep their proportions, centered in the box, and the corner handles keep the box's proportions. After an edit that changes the text's shape (new words, font, outline, depth), the box keeps its height and its width follows (keeping its left edge, or its center if rotated), in the same undo step as the edit. Undo and loading never resize anything. **Stretch to box** fills the box exactly instead, and the handles resize freely.
 - **Undo:** every change is undoable; a run of typing or one slider drag is one step.
-- **Drawing** (`qml/TextArt.qml`): the glyphs are vector shapes (`Shape` + `PathText`, curve renderer) drawn 100 px tall and then scaled, so they stay sharp at any size. The outline is the path's stroke, the fade a `LinearGradient` fill, the depth that many copies of the text stepped down and right (farthest first, darker toward the back), and the shadow a `MultiEffect` on a layer rendered at the on-screen size. Style sizes (outline width, depth) are in units of the 100 px text, so they scale with the box. The box size comes from the shape's measured bounds (`Shape.boundingRect`; `PathText`'s own width is too small for some fonts).
-- **Saved style** (`TEXT_STYLE_DEFAULTS` in `core/scene.py`): font, bold, italic, fill, fill2 (empty: no fade), outline, outline_width (0–20), depth (0–40), depth_color, shadow, stretch. Loading repairs a damaged style value by value (`normalized_text_style`).
+- **Drawing** (`qml/TextArt.qml`): the glyphs are vector shapes (`Shape` + `PathText`, curve renderer) drawn 100 px tall and then scaled, so they stay sharp at any size. The outline is the path's stroke, the fade a `LinearGradient` fill, the depth that many copies of the text stepped down and right (farthest first, darker toward the back). (A drop shadow, a `MultiEffect` on a layer, was tried and removed: it didn't look good.) Style sizes (outline width, depth) are in units of the 100 px text, so they scale with the box. The box size comes from the shape's measured bounds (`Shape.boundingRect`; `PathText`'s own width is too small for some fonts).
+- **Saved style** (`TEXT_STYLE_DEFAULTS` in `core/scene.py`): font, bold, italic, fill, fill2 (empty: no fade), outline, outline_width (0–20), depth (0–40), depth_color, stretch. Loading repairs a damaged style value by value (`normalized_text_style`).
 - Not yet: more than one line, text along a curve, perspective tilt, glow. See section 51.
 
 ---
@@ -1800,7 +1800,7 @@ Linux:    venv/bin/python tools/create_launchers.py [--desktop]
 
 ### Log window
 
-Everything the app would print to a terminal (FFmpeg, Qt warnings and QML errors, Python output and uncaught exceptions) is captured by `bridge/log_capture.py` and shown in the **Log** window (toolbar button), with Copy All and Clear. It is also written to `logs/mediawall.log` (the previous run is kept as `mediawall.previous.log`); an installed copy writes it to the user's own data folder instead (`%LOCALAPPDATA%/MediaWall/logs` on Windows, `~/.local/state/MediaWall/logs` on Linux), since its install folder may not be writable. That way a start that fails before the window appears still leaves a trace. When the app is started from a terminal, the output appears there too.
+Everything the app would print to a terminal (FFmpeg, Qt warnings and QML errors, Python output and uncaught exceptions) is captured by `bridge/log_capture.py` and shown in the **Log** window (Settings → About → **Open Log…**; on the toolbar until 0.9.8), with Copy All and Clear. It is also written to `logs/mediawall.log` (the previous run is kept as `mediawall.previous.log`); an installed copy writes it to the user's own data folder instead (`%LOCALAPPDATA%/MediaWall/logs` on Windows, `~/.local/state/MediaWall/logs` on Linux), since its install folder may not be writable. That way a start that fails before the window appears still leaves a trace. When the app is started from a terminal, the output appears there too.
 
 The capture works by redirecting file descriptors 1 and 2 into a pipe, since FFmpeg writes to stderr directly. On Windows it also points the process's standard output and error handles at the pipe (`SetStdHandle`): `python.exe` does that as part of the redirect, but the installed build's launcher doesn't, and without it FFmpeg's messages went missing there.
 
@@ -2457,7 +2457,7 @@ Exact bindings can still change.
 
 The prototype currently provides:
 
-- a canvas with a toolbar (New, Open with Open Recent ▾, Save, Save As, Undo, Redo, Add Browser, Add Container, Full Screen, Present, Log)
+- a canvas with a toolbar (New, Open with Open Recent ▾, Save, Save As, Undo, Redo, Add Browser, Add Container, Full Screen, Present, Settings; the Log window opens from Settings → About)
 - Full Screen (editing) and Present (view-only canvas, browsers still usable) modes (section 15); Full Screen has ✕, ▶ (Present), and Save buttons in the corner, Present has ✕ and Save
 - a right-click menu on empty canvas (Add Browser Here, Add Container Here)
 - project save/load to `.mediawall` files, with unsaved-changes prompts and the project name in the window title; a modal "Opening…" popup while a project opens
@@ -2472,7 +2472,7 @@ The prototype currently provides:
 - free media objects: move, aspect-locked resize, rotate
 - EXIF orientation applied to photos, on the canvas and in browser previews
 - animated GIF and WebP playback, on the canvas and in browser previews; each instance can be paused or played and its speed set from its right-click menu, and double-clicking one starts it over (section 5.3)
-- text objects ("WordArt"): one line of text with presets, font, gradient fill, outline, 3D depth, and shadow, edited in the Text tab (section 5.4)
+- text objects ("WordArt"): one line of text with presets, font, gradient fill, outline, and 3D depth, edited in the Text tab (section 5.4)
 - video on the canvas, in containers, and in browser previews, with per-instance play/pause, mute, and loop (right-click menu), and an on-object seek bar when selected
 - per-video speed (0.5x to 3x by default; the range is a setting), Keep pitch, and A-B loop; a Playback tab in the Wall Features panel with every video's sound and playback settings (section 14.5)
 - a Settings dialog (toolbar): the mouse-wheel zoom step, the speed range, and the hold-to-step pace; a Shortcuts tab listing every key; an About tab with the version (section 25)
@@ -2545,7 +2545,7 @@ Done since the review: browsing containers (section 6.4), layouts (section 17), 
 
 - **Fold the browser into browsing containers** (open decision, section 55), with double-clicking the empty canvas creating a container.
 - **Multi-select**: drag a selection box on the empty canvas to select several free media and containers, and move them as a group (resize and rotate later). Selection is a single id today, so this touches the model, the handles, and undo.
-- **Text, next steps** (section 5.4): more than one line; text along an arc (each letter placed separately); perspective tilt (a `Rotation` about the X or Y axis); a glow (shadow without offset, in the fill's color); typing directly on the canvas; an Add Text button on the toolbar once the UI pass makes room.
+- **Text, next steps** (section 5.4): more than one line; text along an arc (each letter placed separately); perspective tilt (a `Rotation` about the X or Y axis); a glow (a blur behind the text, in the fill's color); typing directly on the canvas; an Add Text button on the toolbar once the UI pass makes room.
 
 - **Inspector** (Phase 11): exact position, size, and rotation.
 - **UI pass**, once the functionality has settled (decided 2026-09-29): a traditional **menu bar** (e.g. File / Edit / View / Wall / Help) instead of only a row of buttons; **icons** instead of text on toolbar buttons, from one bundled SVG icon set so Windows and Linux match (Qt has no consistent icon theme on Windows; candidates: Lucide, Material Symbols; check licenses); a compact toolbar for the most-used commands (it already barely fits at 1280 px). The groundwork is done: every command is an `Action` in `qml/AppActions.qml` (section 25), so the menu bar and toolbar can be built from the same actions without rewiring. Reference points: XnView MP, qView, qBittorrent (all Qt applications).
@@ -2792,6 +2792,8 @@ The following design decisions are currently established:
 - Mirroring is one per-instance flag (`mirrored`), horizontal only, applied to the picture in `MediaView` (not to overlays such as error boxes) (2026-10-02).
 - Containers show no outline once filled unless selected (1 px green) or being adjusted (2 px orange), so a finished wall reads as pictures rather than boxes; an empty container keeps a faint grey outline (hidden in Present) until it's filled. A browsing container's badge is just `⇅`, without the `n / total` count (2026-09-29).
 - The sidebar is now the **Wall Features** panel, on the **left** edge: on the right, its tabs collided with the Full Screen corner buttons. Its tab reads just "Wall Features" (no ◂ ▸ arrows), and it has a third tab, **Text** (2026-10-15).
+- Text objects have **no shadow** option: the drop shadow (a `MultiEffect` on a layer) didn't look good, and the text looks right without it. Old `shadow` values in a saved style are dropped on load (2026-10-15).
+- The **Log** button moved from the toolbar to **Settings → About** (**Open Log…**), freeing toolbar room; the Log stays its own, larger window rather than a Settings tab (2026-10-15).
 - Present has a **Save** button too (left of the ✕). **Double-click no longer leaves Present** (Esc, F5, and the ✕ do); in Present a double-click restarts an animated image. Double-clicking the empty canvas still leaves Full Screen (2026-10-15).
 - **Double-click on an animated image restarts it**, in a container as well, where it replaces the zoom reset for animated content (a still picture or video still resets). It is the quick fix for GIFs that freeze on Mint, rather than a right-click item, which was too clunky (2026-10-15).
 - Animated images get a **Speed** submenu (0.25×–4×) in the right-click menu, reusing the per-instance `speed` field; no slider in the Playback tab, which would fill up on GIF-heavy walls. The menu builds the submenu in or out per object, since a Qt Quick submenu can't be hidden like an item (2026-10-15).

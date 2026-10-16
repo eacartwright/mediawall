@@ -132,7 +132,6 @@ TEXT_STYLE_DEFAULTS = {
     "outline_width": 3.0,       # 0 .. TEXT_OUTLINE_MAX
     "depth": 0,                 # 3D extrusion, 0 .. TEXT_DEPTH_MAX
     "depth_color": "#404040",
-    "shadow": False,
     "stretch": False,           # fill the box exactly, not keeping proportions
 }
 

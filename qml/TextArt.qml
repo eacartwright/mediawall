@@ -1,6 +1,5 @@
 import QtQuick
 import QtQuick.Shapes
-import QtQuick.Effects
 
 // Draws a line of text in a text object's style ("WordArt"; readme
 // section 5.4), scaled to fill this item: keeping its proportions
@@ -31,7 +30,6 @@ Item {
     readonly property real outlineWidth: value("outline_width", 3)
     readonly property int depth: value("depth", 0)
     readonly property color depthColor: value("depth_color", "#404040")
-    readonly property bool shadow: value("shadow", false)
     readonly property bool stretch: value("stretch", false)
 
     // Drawn at this size, then scaled; style sizes are in these units.
@@ -61,21 +59,6 @@ Item {
         y: (art.height - height * art.scaleY) / 2
 
         transform: Scale { xScale: art.scaleX; yScale: art.scaleY }
-
-        // The shadow needs a layer; it is rendered at the size shown, so
-        // it is as sharp as the text.
-        layer.enabled: art.shadow
-        layer.smooth: true
-        layer.textureSize: Qt.size(
-            Math.max(1, Math.ceil(width * art.scaleX * Screen.devicePixelRatio)),
-            Math.max(1, Math.ceil(height * art.scaleY * Screen.devicePixelRatio)))
-        layer.effect: MultiEffect {
-            shadowEnabled: true
-            shadowBlur: 0.4
-            shadowHorizontalOffset: 4
-            shadowVerticalOffset: 4
-            shadowColor: "#b0000000"
-        }
 
         // 3D extrusion: copies of the text stepping down and right, the
         // farthest drawn first, a little darker the farther back.
