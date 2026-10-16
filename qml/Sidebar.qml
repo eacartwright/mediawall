@@ -61,27 +61,27 @@ Item {
 
 
     // ---- Edge tab ----
+    // A small arrow tab, near the top (▸ opens, ◂ closes).
 
     Rectangle {
         id: handle
         objectName: "sidebarHandle"      // objectNames: found by tests/app
 
-        anchors.verticalCenter: parent.verticalCenter
+        y: Math.round(parent.height * 0.18 - height / 2)
         x: panel.x + panel.width
 
-        width: 22
-        height: 160
-        radius: 4
+        width: 20
+        height: 40
+        radius: 3
 
         color: handleArea.containsMouse ? "#3a3a3a" : "#2c2c2c"
         border.color: "#555555"
 
         Text {
             anchors.centerIn: parent
-            rotation: -90
-            text: "Wall Features"
+            text: sidebar.open ? "◂" : "▸"
             color: "#dddddd"
-            font.pixelSize: 12
+            font.pixelSize: 16
         }
 
         MouseArea {
@@ -90,6 +90,10 @@ Item {
             hoverEnabled: true
             onClicked: sidebar.open = !sidebar.open
         }
+
+        ToolTip.visible: handleArea.containsMouse
+        ToolTip.text: sidebar.open ? "Hide the panel" : "Layers, Playback, Text"
+        ToolTip.delay: 500
     }
 
 
