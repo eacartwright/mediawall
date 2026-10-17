@@ -24,7 +24,7 @@ On Linux: `venv/bin/python` instead. Setup: `python -m venv venv` followed by `p
 
 The unit tests cover `core/` only. They need no Qt or display and finish in milliseconds. Run them after any `core/` change.
 
-App checks (`tests/app/`, readme section 37) start the real app and drive it (about 220 checks, ~1.5 minutes; need a display and `tests/media/`): `.\venv\Scripts\python.exe tests\app\run.py [name ...]` (Linux: `venv/bin/python tests/app/run.py`). Run them after QML or bridge changes, and update or add a `check_*.py` when behaviour changes. They use `tests/app/harness.py` (`Check`: timed steps, input helpers, `js()` in Main.qml's context, `item_js()` / `center_of()` to find items by `objectName`). There is no linter or build step. `tests/media/` (gitignored) holds sample media for manual testing.
+App checks (`tests/app/`, readme section 37) start the real app and drive it (about 250 checks, ~1.5 minutes; need a display and `tests/media/`): `.\venv\Scripts\python.exe tests\app\run.py [name ...]` (Linux: `venv/bin/python tests/app/run.py`). Run them after QML or bridge changes, and update or add a `check_*.py` when behaviour changes. They use `tests/app/harness.py` (`Check`: timed steps, input helpers, `js()` in Main.qml's context, `item_js()` / `center_of()` to find items by `objectName`). There is no linter or build step. `tests/media/` (gitignored) holds sample media for manual testing.
 
 ## Architecture
 
@@ -34,7 +34,7 @@ App checks (`tests/app/`, readme section 37) start the real app and drive it (ab
 - **`bridge/`** is the Qt glue. `SceneModel` (a `QAbstractListModel`) exposes the scene to QML and turns QML slot calls into `core` operations. `ProjectController` handles New/Open/Save dialogs, the dirty flag, and the window title.
 - **`qml/`** renders model rows and handles live interaction. It never owns persistent state.
 - App commands (toolbar, menus, shortcuts) are Qt Quick `Action`s defined once in `qml/AppActions.qml`; controls use `action: appActions.<name>`. Add new commands there rather than wiring buttons and `Shortcut`s separately.
-- `main.py` wires `sceneModel`, `projectController`, `browserBackend`, and `appSettings` (app-wide settings via QSettings, `bridge/app_settings.py`) into QML as context properties. Set `MEDIAWALL_SETTINGS` to an `.ini` path when running the app in tests, so the user's real settings are never changed. It sets `QML_DISABLE_DISK_CACHE=1`, because stale compiled QML causes errors like "Type X unavailable".
+- `main.py` wires `sceneModel`, `projectController`, `browserBackend`, `appSettings` (app-wide settings via QSettings, `bridge/app_settings.py`), and `speechEngine` (text to speech by running the user's Piper, `bridge/speech.py`; readme section 14.6) into QML as context properties. Set `MEDIAWALL_SETTINGS` to an `.ini` path when running the app in tests, so the user's real settings are never changed. It sets `QML_DISABLE_DISK_CACHE=1`, because stale compiled QML causes errors like "Type X unavailable".
 
 ### Source → Instance → Viewport (readme section 52; do not collapse these)
 

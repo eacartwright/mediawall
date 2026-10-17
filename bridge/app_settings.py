@@ -14,7 +14,7 @@ everywhere at once, and is saved immediately.
 import os
 import re
 
-from PySide6.QtCore import Property, QObject, QSettings, Signal, Slot
+from PySide6.QtCore import Property, QObject, QSettings, QUrl, Signal, Slot
 from PySide6.QtGui import QKeySequence
 
 from core.recent import with_recent, without_recent
@@ -59,6 +59,12 @@ _HEX_COLOR = re.compile(r"#[0-9a-fA-F]{6}")
 RECENT_KEY = "recent/projects"
 
 
+# Speech (readme section 14.6): the Piper program, and the folder of
+# voices the user downloaded.
+PIPER_PATH_KEY = "speech/piperPath"
+VOICES_FOLDER_KEY = "speech/voicesFolder"
+
+
 class AppSettings(QObject):
 
     zoomStepChanged = Signal()
@@ -66,6 +72,7 @@ class AppSettings(QObject):
     stepRepeatChanged = Signal()
     containerColorChanged = Signal()
     recentProjectsChanged = Signal()
+    speechChanged = Signal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -238,6 +245,31 @@ class AppSettings(QObject):
     @Slot()
     def resetContainerColor(self):
         self._set_container_color(CONTAINER_COLOR_DEFAULT)
+
+    # ---- Speech (paths; "" = not set) ----
+
+    def _get_text(self, key):
+        return str(self._settings.value(key, "") or "")
+
+    def _set_text(self, key, value):
+        value = str(value or "").strip()
+        if value == self._get_text(key):
+            return
+        self._settings.setValue(key, value)
+        self._settings.sync()
+        self.speechChanged.emit()
+
+    piperPath = Property(str, lambda self: self._get_text(PIPER_PATH_KEY),
+                         lambda self, v: self._set_text(PIPER_PATH_KEY, v),
+                         notify=speechChanged)
+    voicesFolder = Property(str, lambda self: self._get_text(VOICES_FOLDER_KEY),
+                            lambda self, v: self._set_text(VOICES_FOLDER_KEY, v),
+                            notify=speechChanged)
+
+    @Slot("QVariant", result=str)
+    def localPath(self, url):
+        """A file dialog's chosen URL as a path."""
+        return QUrl(url).toLocalFile() if not isinstance(url, QUrl) else url.toLocalFile()
 
     # ---- Shortcut display (the Settings dialog's Shortcuts tab) ----
 

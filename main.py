@@ -19,6 +19,7 @@ from bridge.key_release import KeyReleaseWatcher
 from bridge.log_capture import LogCapture
 from bridge.project_controller import ProjectController
 from bridge.scene_model import SceneModel
+from bridge.speech import SpeechEngine
 from bridge.text_shaper import TextShaper
 from bridge.ui_font import fix_linux_ui_font
 from core.media_browser import MediaBrowser
@@ -122,6 +123,8 @@ def main():
     scene_model = SceneModel()
     project_controller = ProjectController(scene_model, app_settings)
     text_shaper = TextShaper()
+    speech_engine = SpeechEngine(app_settings)
+    app.aboutToQuit.connect(speech_engine.shutdown)
 
     engine = QQmlApplicationEngine()
     context = engine.rootContext()
@@ -131,6 +134,7 @@ def main():
     context.setContextProperty("appLog", log_capture.model)
     context.setContextProperty("appSettings", app_settings)
     context.setContextProperty("textShaper", text_shaper)
+    context.setContextProperty("speechEngine", speech_engine)
     context.setContextProperty("keyRelease", key_release)
     context.setContextProperty("appVersion", VERSION)
     context.setContextProperty("appIconUrl", QUrl.fromLocalFile(str(ICON_PATH)))

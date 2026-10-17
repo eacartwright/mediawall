@@ -30,6 +30,7 @@ from PySide6.QtWidgets import QFileDialog, QMessageBox
 
 from bridge.audio_model import AudioModel
 from core.history import History, snapshot
+from core.speech import normalized_speech
 from core.layout import add_layout_to_scene
 from core.media_browser import (
     AUDIO_EXTENSIONS, IMAGE_EXTENSIONS, VIDEO_EXTENSIONS, is_animatable,
@@ -95,6 +96,7 @@ OBJECT_ROLE_NAMES = [
     "favorites",
     "objText",
     "textStyle",
+    "objSpeech",
 ]
 
 # Roles describing a media source. Used as "source*" for a media row,
@@ -220,6 +222,9 @@ class SceneModel(QAbstractListModel):
 
     # An audio track was added (the sidebar shows its Playback tab).
     audioTrackAdded = Signal(str)
+
+    # A project (opened, or New) brought its own Speech tab contents.
+    speechDraftChanged = Signal()
 
     # A container is about to browse a newly chosen folder: it should
     # move to that folder's first file unless it already shows one.
@@ -375,6 +380,7 @@ class SceneModel(QAbstractListModel):
             "favorites": list(obj.favorites),
             "objText": obj.text,
             "textStyle": obj.text_style,
+            "objSpeech": obj.speech,
         }.get(name)
 
     # -------------------------------------------------
@@ -390,6 +396,7 @@ class SceneModel(QAbstractListModel):
         self._history.clear()
         self._current = snapshot(self._scene)
         self.historyChanged.emit()
+        self.speechDraftChanged.emit()
 
         self.countChanged.emit()
         self.selectedIdChanged.emit()
@@ -769,6 +776,43 @@ class SceneModel(QAbstractListModel):
         self.audioTrackAdded.emit(track_id)
         return track_id
 
+    @Slot("QVariantMap", result=str)
+    def addSpeechTrack(self, speech):
+        """Add to Playback (the Speech tab): a speech track, with no file;
+        its clip is made when it's needed (readme section 14.6)."""
+        speech = normalized_speech(dict(speech))
+        if not speech:                                       # nothing to say
+            return ""
+        return self._insert(lambda: self._scene.add_speech_track(speech))
+
+    @Slot(str, "QVariantMap", result=bool)
+    def setTrackSpeech(self, track_id, speech):
+        """Update Track (the Speech tab): undoable."""
+        if not self._scene.set_track_speech(track_id, dict(speech)):
+            return False
+        self._emit_row(track_id, [ROLES["objSpeech"]] + PLAYBACK_ROLES)
+        self._changed()
+        return True
+
+    # What's in the Speech tab, saved with the project (workspace state:
+    # not undone). Announced only when a project replaces it, not for
+    # the tab's own edits.
+    def _get_speech_draft(self):
+        return dict(self._scene.speech_draft)
+
+    speechDraft = Property("QVariantMap", _get_speech_draft, notify=speechDraftChanged)
+
+    @Slot("QVariantMap")
+    def setSpeechDraft(self, draft):
+        if self._scene.set_speech_draft(dict(draft)):
+            self._changed(workspace_only=True)
+
+    @Slot(str, result="QVariantMap")
+    def trackSpeech(self, track_id):
+        """What made a speech track ({} for any other object)."""
+        obj = self._scene.get(track_id)
+        return dict(obj.speech) if obj is not None and obj.type == "audio" else {}
+
     @Slot(str, result=str)
     def convertToAudioTrack(self, media_id):
         """
@@ -1079,6 +1123,14 @@ class SceneModel(QAbstractListModel):
         """A browsing container steps to another file."""
         source = self._register_source(path, media_type)
         if self._scene.show_file_in_container(container_id, source.id):
+            self._emit_row(container_id, CONTENT_ROLES)
+            self._changed(workspace_only=True)
+
+    @Slot(str, str)
+    def continueInContainer(self, container_id, path):
+        """Continue Play goes on to the next video (even when locked)."""
+        source = self._register_source(path, "video")
+        if self._scene.show_file_in_container(container_id, source.id, continuing=True):
             self._emit_row(container_id, CONTENT_ROLES)
             self._changed(workspace_only=True)
 

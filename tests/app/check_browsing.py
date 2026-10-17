@@ -277,6 +277,37 @@ def step_continue():
     nxt = c.order0[::-1][(c.order0[::-1].index(c.before_end) + 1) % len(c.order0)]
     c.check("Continue Play: at the end of a video, the next video plays",
             shown() == nxt and player_state(box.id) == 1, f"{c.before_end} -> {shown()}")
+    # Locked, it still plays on (it's part of how the container was set up).
+    c.sm.setLocked(box.id, True)
+    c.before_end = shown()
+    step_seek()
+
+
+def step_continue_locked():
+    c.check("...and goes on in a locked container too",
+            shown() != c.before_end and c.scene.get(box.id).locked, f"{c.before_end} -> {shown()}")
+    # Off, the video loops, whatever the content's own Loop says.
+    c.sm.setLocked(box.id, False)
+    c.sm.setContinuePlay(box.id, False)
+    c.sm.setLoop(content().id, False)
+    c.before_end = shown()
+
+
+def step_loops():
+    c.check("Continue Play off: the video loops (its own Loop is ignored)",
+            shown() == c.before_end and player_state(box.id) == 1,
+            f"{c.before_end} -> {shown()}, state {player_state(box.id)}")
+    c.js(f"objectMenu.openFor(window.objectItem('{box.id}'))")
+    shown_items = c.js("""(function() {
+        var out = []
+        for (var i = 0; i < objectMenu.count; i++) {
+            var it = objectMenu.itemAt(i)
+            if (it && it.visible && it.text) out.push(it.text)
+        }
+        return out })()""")
+    c.js("objectMenu.close()")
+    c.check("a browsing container's menu has Continue Play and no Loop",
+            "Continue Play" in shown_items and "Loop" not in shown_items, str(shown_items))
     c.finish()
 
 
@@ -295,4 +326,5 @@ c.run(scene, [(1500, step_controls), (1150, step_hold), (1150, step_hold_key), (
               (1800, step_autoplay3), (1500, step_empty), (1500, step_present),
               (1300, step_present2), (1300, step_end), (1300, step_other_folder),
               (1300, step_other_folder2), (1300, step_filter), (1300, step_sort),
-              (1000, step_seek), (1000, step_continue)])
+              (1000, step_seek), (1000, step_continue), (1000, step_continue_locked),
+              (1000, step_seek), (1000, step_loops)])

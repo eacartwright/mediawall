@@ -6,7 +6,8 @@ import QtQuick.Layouts
 // tab on its right edge. (On the left so its tabs stay clear of the
 // Full Screen buttons in the top-right corner.) Tabs: Layers, Playback
 // (every video and audio track's sound and playback settings; readme
-// section 14), and Text (TextPanel.qml; readme section 5.4).
+// section 14), Speech (SpeechPanel.qml; readme section 14.6), and Text
+// (TextPanel.qml; readme section 5.4).
 // Overlays the canvas; hidden in Present mode (Main.qml).
 
 Item {
@@ -36,7 +37,7 @@ Item {
         function onTextEditRequested(objectId) {
             sceneModel.select(objectId)
             sidebar.open = true
-            tabs.currentIndex = 2
+            tabs.currentIndex = 3
             Qt.callLater(textPanel.focusText)
         }
         // Typing on the canvas (added or double-clicked): the Text tab
@@ -44,7 +45,7 @@ Item {
         function onTextTypeRequested(objectId) {
             sceneModel.select(objectId)
             sidebar.open = true
-            tabs.currentIndex = 2
+            tabs.currentIndex = 3
         }
     }
 
@@ -99,7 +100,7 @@ Item {
         }
 
         ToolTip.visible: handleArea.containsMouse
-        ToolTip.text: sidebar.open ? "Hide the panel" : "Layers, Playback, Text"
+        ToolTip.text: sidebar.open ? "Hide the panel" : "Layers, Playback, Speech, Text"
         ToolTip.delay: 500
     }
 
@@ -140,6 +141,7 @@ Item {
 
                 TabButton { text: "Layers"; objectName: "layersTab" }
                 TabButton { text: "Playback"; objectName: "playbackTab" }
+                TabButton { text: "Speech"; objectName: "speechTab" }
                 TabButton { text: "Text"; objectName: "textTab" }
             }
 
@@ -467,6 +469,18 @@ Item {
                             required property bool preservePitch
                             required property real loopA
                             required property real loopB
+                            required property bool browsing        // in a browsing container
+                            required property bool continuePlay
+                            required property bool ownerLocked
+                            required property bool isSpeech         // made in the Speech tab
+                            required property var speech
+
+                            // A speech track's clip: "" (ready, or not asked
+                            // for yet), "Making…", or why it can't be made.
+                            readonly property string speechStatus: {
+                                speechEngine.clipsVersion
+                                return isSpeech ? speechEngine.clipStatus(speech) : ""
+                            }
 
                             // The player on the canvas, for position (A/B).
                             readonly property var view: {
@@ -509,7 +523,8 @@ Item {
                                         Layout.preferredWidth: 38
                                         Layout.preferredHeight: 16
                                         radius: 3
-                                        color: card.kind === "audio" ? "#9a7a3a" : "#7a4a9a"
+                                        color: card.kind === "audio" ? "#9a7a3a"
+                                               : card.kind === "speech" ? "#3a7a8a" : "#7a4a9a"
                                         Text {
                                             anchors.centerIn: parent
                                             text: card.kind
@@ -545,6 +560,22 @@ Item {
                                         onClicked: sceneModel.locateMissing(card.itemId)
                                     }
 
+                                    // A speech track: its words and settings
+                                    // back in the Speech tab, to change.
+                                    Button {
+                                        objectName: "editSpeechButton"
+                                        Layout.preferredHeight: 22
+                                        visible: card.isSpeech
+                                        text: "Edit…"
+                                        onClicked: {
+                                            tabs.currentIndex = 2
+                                            speechPanel.edit(card.itemId)
+                                        }
+                                        ToolTip.visible: hovered
+                                        ToolTip.text: "Change the words or voice in the Speech tab"
+                                        ToolTip.delay: 500
+                                    }
+
                                     // Tracks have no canvas item, so they're
                                     // removed here (undoable).
                                     Button {
@@ -557,6 +588,16 @@ Item {
                                         ToolTip.text: "Remove this audio track"
                                         ToolTip.delay: 500
                                     }
+                                }
+
+                                Text {
+                                    objectName: "speechTrackStatus"
+                                    Layout.fillWidth: true
+                                    visible: card.speechStatus !== ""
+                                    text: card.speechStatus
+                                    color: card.speechStatus === "Making…" ? "#aaaaaa" : "#e08080"
+                                    font.pixelSize: 11
+                                    wrapMode: Text.WordWrap
                                 }
 
                                 // ---- Play, mute, volume ----
@@ -656,12 +697,15 @@ Item {
                                     }
                                 }
 
-                                // ---- Loop and A-B ----
+                                // ---- Loop (or Continue Play) and A-B ----
+                                // A browsing container's content has
+                                // Continue Play instead: off, it loops.
                                 RowLayout {
                                     Layout.fillWidth: true
                                     spacing: 4
 
                                     CheckBox {
+                                        visible: !card.browsing
                                         checked: card.loop
                                         onToggled: {
                                             sceneModel.setLoop(card.itemId, checked)
@@ -670,11 +714,33 @@ Item {
                                     }
 
                                     Text {
+                                        visible: !card.browsing
                                         text: "Loop"
                                         color: "#cccccc"
                                         font.pixelSize: 11
                                         TapHandler {
                                             onTapped: sceneModel.setLoop(card.itemId, !card.loop)
+                                        }
+                                    }
+
+                                    CheckBox {
+                                        visible: card.browsing
+                                        enabled: !card.ownerLocked
+                                        checked: card.continuePlay
+                                        onToggled: {
+                                            sceneModel.setContinuePlay(card.ownerId, checked)
+                                            checked = Qt.binding(function() { return card.continuePlay })
+                                        }
+                                    }
+
+                                    Text {
+                                        visible: card.browsing
+                                        text: "Continue Play"
+                                        color: card.ownerLocked ? "#777777" : "#cccccc"
+                                        font.pixelSize: 11
+                                        TapHandler {
+                                            enabled: !card.ownerLocked
+                                            onTapped: sceneModel.setContinuePlay(card.ownerId, !card.continuePlay)
                                         }
                                     }
 
@@ -742,6 +808,15 @@ Item {
                             horizontalAlignment: Text.AlignHCenter
                         }
                     }
+                }
+
+                // ---- Speech ----
+
+                SpeechPanel {
+                    id: speechPanel
+                    objectName: "speechPanel"           // found by tests/app
+                    sceneItem: sidebar.sceneItem
+                    actions: sidebar.actions
                 }
 
                 // ---- Text ----

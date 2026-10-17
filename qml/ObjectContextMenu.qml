@@ -303,13 +303,33 @@ Menu {
         checkable: true
         checked: menu.target !== null && menu.target.mediaLoop === true
 
-        visible: menu.targetVideo
+        // A browsing container has Continue Play instead (off = loop).
+        visible: menu.targetVideo && !(menu.isContainer && menu.target.browseMode === true)
         height: visible ? implicitHeight : 0
 
         onTriggered: {
             sceneModel.setLoop(menu.target.playbackId, !menu.target.mediaLoop)
             loopItem.checked = Qt.binding(function() {
                 return menu.target !== null && menu.target.mediaLoop === true
+            })
+        }
+    }
+
+    // A browsing container: at the end of a video, play the next one;
+    // off, the video loops. (A locked container keeps it as set.)
+    MenuItem {
+        id: continuePlayItem
+        objectName: "continuePlayItem"      // found by tests/app
+        text: "Continue Play"
+        enabled: !menu.targetLocked
+        checkable: true
+        checked: menu.isContainer && menu.target.continuePlay === true
+        visible: menu.isContainer && menu.target.browseMode === true
+        height: visible ? implicitHeight : 0
+        onTriggered: {
+            sceneModel.setContinuePlay(menu.targetId, !menu.target.continuePlay)
+            continuePlayItem.checked = Qt.binding(function() {
+                return menu.isContainer && menu.target.continuePlay === true
             })
         }
     }
@@ -529,23 +549,6 @@ Menu {
             sceneModel.setNewFirst(menu.targetId, !menu.target.newFirst)
             newFirstItem.checked = Qt.binding(function() {
                 return menu.isContainer && menu.target.newFirst === true
-            })
-        }
-    }
-
-    // A browsing container: at the end of a video, play the next one.
-    MenuItem {
-        id: continuePlayItem
-        text: "Continue Play"
-        enabled: !menu.targetLocked
-        checkable: true
-        checked: menu.isContainer && menu.target.continuePlay === true
-        visible: menu.isContainer && menu.target.browseMode === true
-        height: visible ? implicitHeight : 0
-        onTriggered: {
-            sceneModel.setContinuePlay(menu.targetId, !menu.target.continuePlay)
-            continuePlayItem.checked = Qt.binding(function() {
-                return menu.isContainer && menu.target.continuePlay === true
             })
         }
     }

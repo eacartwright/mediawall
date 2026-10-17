@@ -24,6 +24,7 @@ import os
 import tempfile
 from pathlib import Path
 
+from core.speech import normalized_speech
 from core.scene import (
     CLIP_SHAPES, FIT_CONTAIN, FIT_MODES, MEDIA_FILTERS, OBJECT_TYPES, PLAYABLE_TYPES,
     SORT_KEYS, MediaSource, Scene, SceneObject,
@@ -48,7 +49,7 @@ TYPE_FIELDS = {
                   "media_filter", "sort_by", "sort_descending", "continue_play",
                   "new_first", "favorites"],
     "audio": ["source_id", "playing", "muted", "volume", "loop",
-              "speed", "preserve_pitch", "loop_a", "loop_b"],
+              "speed", "preserve_pitch", "loop_a", "loop_b", "speech"],
     "text": ["text", "text_style"],
 }
 
@@ -106,12 +107,15 @@ def scene_to_dict(scene: Scene, project_path=None) -> dict:
             fields = COMMON_FIELDS + TYPE_FIELDS.get(item.type, [])
             objects.append({name: getattr(item, name) for name in fields})
 
-    return {
+    data = {
         "format": FORMAT,
         "version": VERSION,
         "media_sources": sources,
         "objects": objects,
     }
+    if scene.speech_draft:
+        data["speech_draft"] = scene.speech_draft
+    return data
 
 
 def write_json_atomic(path, data) -> None:
@@ -260,7 +264,15 @@ def scene_from_dict(data, project_path=None):
             except (TypeError, ValueError) as exc:
                 warnings.append(f"Ignored bad value for {name!r} ({exc}).")
 
-        if object_type in PLAYABLE_TYPES and obj.source_id not in scene.sources:
+        # A speech track has no file: its speech is its source (readme
+        # 14.6). One saved with a file (before 2026-10-17) drops it.
+        if object_type == "audio":
+            obj.speech = normalized_speech(obj.speech)
+            if obj.speech:
+                obj.source_id = None
+
+        if (object_type in PLAYABLE_TYPES and obj.source_id not in scene.sources
+                and not (object_type == "audio" and obj.speech)):
             warnings.append("Skipped a media object whose source is unknown.")
             continue
 
@@ -306,6 +318,9 @@ def scene_from_dict(data, project_path=None):
 
     scene._normalize_z()
     scene.refresh_missing()
+
+    # What was in the Speech tab (readme 14.6).
+    scene.speech_draft = normalized_speech(data.get("speech_draft"))
 
     return scene, warnings
 

@@ -549,6 +549,13 @@ class LockedContainerTests(unittest.TestCase):
         self.assertTrue(self.scene.set_media_option(self.content.id, "volume", 0.5))
         self.assertTrue(self.scene.set_playing(self.content.id, False))
 
+    def test_continue_play_still_steps(self):
+        self.assertTrue(self.scene.show_file_in_container(self.box.id, self.tall.id,
+                                                          continuing=True))
+        self.assertEqual(self.content.source_id, self.tall.id)
+        self.assertFalse(self.scene.show_file_in_container(self.free.id, self.wide.id,
+                                                           continuing=True))
+
     def test_unlocked_it_changes_again(self):
         self.assertTrue(self.scene.set_locked(self.box.id, False))
         self.assertTrue(self.scene.set_geometry(self.box.id, 50, 50, 100, 100, 30))

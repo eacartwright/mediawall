@@ -38,6 +38,8 @@ from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Optional
 
+from core.speech import normalized_speech, speech_title
+
 
 OBJECT_TYPES = {"media", "browser", "container", "audio", "text"}
 
@@ -337,6 +339,11 @@ class SceneObject:
     text: str = ""
     text_style: dict = field(default_factory=dict)
 
+    # audio track made by Speech (readme 14.6): the words, voice, and
+    # settings that made its file (core/speech.py SPEECH_DEFAULTS), so
+    # it can be edited and made again; {} for any other track.
+    speech: dict = field(default_factory=dict)
+
     @property
     def center(self):
         return self.x + self.width / 2, self.y + self.height / 2
@@ -348,6 +355,10 @@ class Scene:
         self.sources: dict[str, MediaSource] = {}
         self.objects: list[SceneObject] = []
         self.selected_id: Optional[str] = None
+        # What's in the Speech tab (a speech dict, or {}): saved with the
+        # project, but workspace state, so undo never changes it (undo
+        # snapshots copy only sources and objects).
+        self.speech_draft: dict = {}
 
     # -------------------------------------------------
     # Sources
@@ -597,6 +608,40 @@ class Scene:
         return self.add_object(
             "audio", 0, 0, source_id=source_id, muted=False, loop=True, z=0,
         )
+
+    def add_speech_track(self, speech) -> Optional[SceneObject]:
+        """
+        Add a speech track (readme 14.6): an audio track with no file,
+        whose speech is made into a clip when it's needed.
+        """
+        speech = normalized_speech(speech)
+        if not speech:
+            return None
+        return self.add_object(
+            "audio", 0, 0, source_id=None, muted=False, loop=True, z=0, speech=speech,
+        )
+
+    def set_speech_draft(self, raw) -> bool:
+        """What's in the Speech tab, to save with the project."""
+        draft = normalized_speech(raw)
+        if draft == self.speech_draft:
+            return False
+        self.speech_draft = draft
+        return True
+
+    def set_track_speech(self, track_id, speech) -> bool:
+        """
+        A speech track changed (Update Track). It plays the new version
+        from the start.
+        """
+        track = self.get(track_id)
+        speech = normalized_speech(speech)
+        if track is None or track.type != "audio" or not track.speech or not speech:
+            return False
+        track.speech = speech             # a new dict: duplicates never share one
+        track.playing = True
+        track.loop_a = track.loop_b = -1.0
+        return True
 
     def audio_tracks(self) -> list:
         return [o for o in self.objects if o.type == "audio"]
@@ -1195,7 +1240,7 @@ class Scene:
         container.browse_subfolders = bool(include)
         return True
 
-    def show_file_in_container(self, container_id, source_id) -> bool:
+    def show_file_in_container(self, container_id, source_id, continuing=False) -> bool:
         """
         Show another file in a container (browsing): the content keeps
         its id and playback settings (volume, mute, loop, speed), takes
@@ -1203,8 +1248,13 @@ class Scene:
         container's Fit/Fill mode. A-B loop points belonged to the old
         file, so they're cleared. An empty container
         gets new content.
+
+        A locked container refuses, except for Continue Play
+        (continuing=True): it is part of how the container was set up.
         """
-        container = self._editable_container(container_id)
+        container = self.get(container_id) if continuing else self._editable_container(container_id)
+        if container is not None and container.type != "container":
+            container = None
         source = self.sources.get(source_id)
         if container is None or source is None:
             return False
@@ -1311,6 +1361,9 @@ class Scene:
         obj = self.get(object_id)
         if obj is None:
             return ""
+
+        if obj.type == "audio" and obj.speech:
+            return speech_title(obj.speech)
 
         if obj.type in PLAYABLE_TYPES:
             return self.source_name(obj.source_id)

@@ -345,14 +345,17 @@ Item {
         sceneModel.showInContainer(objectId, browseFiles[i].path, browseFiles[i].type)
     }
 
-    // Continue Play: at the end of a video, play the folder's next video
-    // (images are skipped). A video doesn't loop meanwhile.
-    readonly property bool playsThrough: browseMode && continuePlay && !locked
+    // A browsing container's end-of-video setting is Continue Play: on,
+    // play the folder's next video (images are skipped); off, loop. The
+    // content's own Loop is ignored. A-B points override it (they loop).
+    // A locked container keeps playing on, as it was set up.
+    readonly property bool playsThrough: browseMode && continuePlay && !contentView.abLooping
+    readonly property bool contentLoops: browseMode ? !playsThrough : contentLoop
 
     function playNextVideo() {
         var fresh = takeNewFile("video")
         if (fresh) {
-            sceneModel.showInContainer(objectId, fresh.path, "video")
+            sceneModel.continueInContainer(objectId, fresh.path)
             return
         }
         var n = browseFiles.length
@@ -364,7 +367,7 @@ Item {
             if (i === browseIndex)
                 contentView.replay()        // the folder's only video
             else
-                sceneModel.showInContainer(objectId, browseFiles[i].path, "video")
+                sceneModel.continueInContainer(objectId, browseFiles[i].path)
             return
         }
     }
@@ -520,7 +523,7 @@ Item {
             playing: root.contentPlaying
             muted: root.contentMuted
             volume: root.contentVolume * (root.sceneItem ? root.sceneItem.masterVolume : 1)
-            loop: root.contentLoop && !root.playsThrough
+            loop: root.contentLoops
             speed: root.contentSpeed
             preservePitch: root.contentPreservePitch
             loopA: root.contentLoopA
