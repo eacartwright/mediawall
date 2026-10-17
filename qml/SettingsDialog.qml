@@ -541,12 +541,11 @@ Dialog {
                     wrapMode: Text.WordWrap
                     textFormat: Text.StyledText
                     color: "#999999"
-                    text: "<b>New in 0.9.10</b><br>"
-                          + "• Text: a Size control, colour emoji, and presets and glow that redraw properly<br>"
-                          + "• Lock Container: nothing about it changes until it's unlocked<br>"
-                          + "• Favorites in browsing containers (☆), and Show Favorites Only<br>"
-                          + "• Show New Files First: a new file in the folder (e.g. a download) shows next<br>"
-                          + "• Master volume (Playback tab); container background colour (Settings); Fit by default"
+                    text: "<b>New in 0.9.11</b><br>"
+                          + "• Speech: type words and hear them in a Piper voice, as a track in the Playback tab<br>"
+                          + "• Speech: voices, modes, speed, and pitch; set up Piper in Settings > Speech<br>"
+                          + "• Browsing containers: Continue Play replaces Loop (off = the video loops)<br>"
+                          + "• Wall Features tabs: Layers, Playback, Speech, Text"
                 }
 
                 // The Log window: everything the app would print to a
