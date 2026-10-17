@@ -383,6 +383,31 @@ class MediaFilterTests(unittest.TestCase):
         self.assertEqual(len(warnings), 1)
 
 
+class SortAndContinueTests(unittest.TestCase):
+
+    def test_sort_setters(self):
+        scene = Scene()
+        browser = scene.add_object("browser", 0, 0)
+        box = scene.add_object("container", 0, 0)
+        text = scene.add_text(0, 0)
+        self.assertTrue(scene.set_sort(browser.id, "type", True))
+        self.assertFalse(scene.set_sort(browser.id, "type", True))     # no change
+        self.assertTrue(scene.set_sort(box.id, descending=True))       # direction only
+        self.assertFalse(scene.set_sort(box.id, "size"))
+        self.assertFalse(scene.set_sort(text.id, "name", True))
+        self.assertEqual((browser.sort_by, browser.sort_descending), ("type", True))
+        self.assertEqual((box.sort_by, box.sort_descending), ("name", True))
+
+    def test_continue_play_is_for_containers(self):
+        scene = Scene()
+        box = scene.add_object("container", 0, 0)
+        browser = scene.add_object("browser", 0, 0)
+        self.assertTrue(scene.set_continue_play(box.id, True))
+        self.assertFalse(scene.set_continue_play(box.id, True))
+        self.assertFalse(scene.set_continue_play(browser.id, True))
+        self.assertTrue(box.continue_play)
+
+
 class FillAlongTests(unittest.TestCase):
     """Double-click an edge bar: stretch into the free space (1280 x 800 canvas)."""
 

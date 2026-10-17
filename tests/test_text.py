@@ -30,6 +30,16 @@ class TextStyleTests(unittest.TestCase):
         style = normalized_text_style({"outline_width": 99, "depth": -3})
         self.assertEqual((style["outline_width"], style["depth"]), (20.0, 0))
 
+    def test_shape_values_are_checked(self):
+        style = normalized_text_style({"arc": 999, "tilt": -90, "glow": -1, "size": 1,
+                                       "align": "justify", "glow_color": "pink", "wrap": True})
+        self.assertEqual((style["arc"], style["tilt"], style["glow"], style["size"]),
+                         (360.0, -70.0, 0.0, 4.0))
+        self.assertEqual(style["align"], TEXT_STYLE_DEFAULTS["align"])
+        self.assertEqual(style["glow_color"], TEXT_STYLE_DEFAULTS["glow_color"])
+        self.assertTrue(style["wrap"])
+        self.assertEqual(normalized_text_style({"align": "right"})["align"], "right")
+
     def test_gradient_end_may_be_empty(self):
         self.assertEqual(normalized_text_style({"fill2": ""})["fill2"], "")
         self.assertEqual(normalized_text_style({"fill2": "#102030"})["fill2"], "#102030")
@@ -58,6 +68,16 @@ class TextObjectTests(unittest.TestCase):
         self.assertTrue(self.scene.set_text_style(self.text.id, {"italic": True}))
         self.assertEqual(self.text.text_style["depth"], 8)                  # kept
         self.assertFalse(self.scene.set_text_style(self.text.id, {"italic": True}))
+
+    def test_scaling_wrapped_text_scales_its_letters(self):
+        self.scene.set_text_style(self.text.id, {"wrap": True, "size": 50})
+        self.assertTrue(self.scene.scale_object(self.text.id, 0, 0, 2.0))
+        self.assertEqual(self.text.text_style["size"], 100.0)
+
+    def test_scaling_unwrapped_text_keeps_its_style(self):
+        style = dict(self.text.text_style)
+        self.assertTrue(self.scene.scale_object(self.text.id, 0, 0, 2.0))
+        self.assertEqual(self.text.text_style, style)
 
     def test_duplicates_dont_share_a_style(self):
         copy = self.scene.duplicate_object(self.text.id)

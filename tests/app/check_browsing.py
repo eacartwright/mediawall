@@ -240,6 +240,40 @@ def step_filter():
     c.check("...(forward: another video)", shown() in videos, str(shown()))
     c.sm.setMediaFilter(box.id, "audio")
     c.check("a container can't be set to audio", c.scene.get(box.id).media_filter == "video")
+    c.order0 = browse_order()
+    c.js(f"objectMenu.openFor(window.objectItem('{box.id}'))")
+    c.check("its menu has a Sort by submenu", c.js("""(function() {
+        for (var i = 0; i < objectMenu.count; i++)
+            if (objectMenu.itemAt(i).subMenu === objectMenu.sortMenu) return true
+        return false })()"""))
+    c.js("objectMenu.close()")
+    c.sm.setSort(box.id, "name", True)
+
+
+def browse_order(cid=box.id):
+    return c.js(f"window.objectItem('{cid}').browseFiles.map(function(e) {{ return e.name }})")
+
+
+def step_sort():
+    c.check("Sort by Name, Descending reverses the order", browse_order() == c.order0[::-1],
+            str(browse_order()))
+    c.check("...and keeps the file shown", shown() in c.order0, str(shown()))
+    # Continue Play: near the end of a video, it goes on to the next one.
+    c.sm.setContinuePlay(box.id, True)
+    c.before_end = shown()
+    item = content()
+    c.sm.setPlaying(item.id, True)
+
+
+def step_seek():
+    item = content()
+    c.js(f"scene.viewFor('{item.id}').seek(scene.viewFor('{item.id}').duration - 300)")
+
+
+def step_continue():
+    nxt = c.order0[::-1][(c.order0[::-1].index(c.before_end) + 1) % len(c.order0)]
+    c.check("Continue Play: at the end of a video, the next video plays",
+            shown() == nxt and player_state(box.id) == 1, f"{c.before_end} -> {shown()}")
     c.finish()
 
 
@@ -257,4 +291,5 @@ c.run(scene, [(1500, step_controls), (1150, step_hold), (1150, step_hold_key), (
               (1300, step_after_reset), (1800, step_autoplay), (1500, step_autoplay2),
               (1800, step_autoplay3), (1500, step_empty), (1500, step_present),
               (1300, step_present2), (1300, step_end), (1300, step_other_folder),
-              (1300, step_other_folder2), (1300, step_filter)])
+              (1300, step_other_folder2), (1300, step_filter), (1300, step_sort),
+              (1000, step_seek), (1000, step_continue)])

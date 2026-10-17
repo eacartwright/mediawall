@@ -1,10 +1,12 @@
 import QtQuick
+import QtQuick.Controls
 import "Zoom.js" as Zoom
 
 // A text object on the canvas ("WordArt"; readme section 5.4): one line
-// of styled text that fills its box. Moved, resized, and rotated like a
-// free image; its words and style are edited in the Text tab of the
-// Wall Features panel (double-click it, or right-click > Edit Text).
+// of styled text that fills its box, or (wrap) lines as wide as the box.
+// Moved, resized, and rotated like a free image. Its words are typed on
+// the canvas (double-click it) or in the Text tab of the Wall Features
+// panel, where its style is set (right-click > Edit Text).
 
 Item {
     id: root
@@ -36,7 +38,8 @@ Item {
 
     // Used by the context menu and the Text tab.
     readonly property bool isText: true
-    readonly property bool stretch: textStyle && textStyle.stretch === true
+    readonly property bool wrap: textStyle && textStyle.wrap === true
+    readonly property bool stretch: textStyle && textStyle.stretch === true && !wrap
 
     x: posX
     y: posY
@@ -51,8 +54,22 @@ Item {
     // -------------------------------------------------
 
     function commit() {
+        // Wrapping, the height follows the lines at the new width.
+        if (wrap && objText !== "")
+            fitHeight(art.wrappedHeight)
         sceneModel.commitGeometry(objectId, x, y, width, height, rotation)
         rebind()
+    }
+
+    // A new height keeping the top edge where it is (rotated or not).
+    function fitHeight(h) {
+        var dh = h - height
+        var r = rotation * Math.PI / 180
+        var cx = x + width / 2 - Math.sin(r) * dh / 2
+        var cy = y + height / 2 + Math.cos(r) * dh / 2
+        height = h
+        x = cx - width / 2
+        y = cy - h / 2
     }
 
     function rebind() {
@@ -71,9 +88,9 @@ Item {
 
     // -------------------------------------------------
     // The box follows the text's proportions after an edit (new words,
-    // font, outline, depth...), unless the style stretches it. Only
-    // after the user's edits: undo and loading never resize anything.
-    // The new size arrives once the glyphs have been laid out.
+    // font, outline, depth...), unless the style stretches it; wrapping,
+    // its height follows the lines. Only after the user's edits: undo
+    // and loading never resize anything.
     // -------------------------------------------------
 
     Connections {
@@ -84,12 +101,39 @@ Item {
         }
     }
 
+    // Wrap on or off (Text tab), keeping the letters' size on screen.
+    // Turning it off, the box then fits the one line at that size.
+    property real unwrapSize: 0
+
+    function setWrap(on) {
+        if (on) {
+            unwrapSize = 0
+            sceneModel.setTextStyle(objectId, { wrap: true, size: art.scaleY * art.basePixelSize })
+        } else {
+            unwrapSize = textStyle.size
+            sceneModel.setTextStyle(objectId, { wrap: false })
+        }
+    }
+
     Timer {
         id: fitTimer
         interval: 30
         onTriggered: {
+            if (!root.wrap && root.unwrapSize > 0 && root.objText !== "") {
+                var h = art.naturalHeight * root.unwrapSize / art.basePixelSize
+                root.unwrapSize = 0
+                sceneModel.fitTextHeight(root.objectId, h)
+                sceneModel.fitTextWidth(root.objectId, h * art.naturalAspect)
+                return
+            }
+            root.unwrapSize = 0
             if (root.stretch || root.objText === "")
                 return
+            if (root.wrap) {
+                if (Math.abs(art.wrappedHeight - root.objHeight) > 0.5)
+                    sceneModel.fitTextHeight(root.objectId, art.wrappedHeight)
+                return
+            }
             var w = root.objHeight * art.naturalAspect
             if (Math.abs(w - root.objWidth) > 0.5)
                 sceneModel.fitTextWidth(root.objectId, w)
@@ -106,6 +150,51 @@ Item {
         anchors.fill: parent
         text: root.objText
         style: root.textStyle
+    }
+
+    // -------------------------------------------------
+    // Typing on the canvas: a field under the box (double-click, or a
+    // new text object). The words change as you type; Enter, Esc, or
+    // clicking elsewhere finishes. A run of typing is one undo step.
+    // -------------------------------------------------
+
+    property bool typing: false
+
+    function startTyping() {
+        typing = true
+        Qt.callLater(function() {
+            typeField.forceActiveFocus()
+            typeField.selectAll()
+        })
+    }
+
+    Connections {
+        target: root.sceneItem
+        function onTextTypeRequested(id) {
+            if (id === root.objectId)
+                root.startTyping()
+        }
+    }
+
+    onSelectedChanged: if (!selected) typing = false
+
+    TextField {
+        id: typeField
+        objectName: "canvasTextField"
+
+        visible: root.typing
+        z: 10
+        anchors.top: parent.bottom
+        anchors.topMargin: 8
+        anchors.horizontalCenter: parent.horizontalCenter
+        width: Math.max(240, Math.min(root.width, 640))
+        placeholderText: "Type the text"
+
+        text: root.objText
+        onTextEdited: sceneModel.setText(root.objectId, text)
+        onAccepted: root.typing = false
+        Keys.onEscapePressed: root.typing = false
+        onActiveFocusChanged: if (!activeFocus) root.typing = false
     }
 
     // Empty text: a faint placeholder, so the box can still be found.
@@ -189,7 +278,7 @@ Item {
 
         onDoubleClicked: function(mouse) {
             if (mouse.button === Qt.LeftButton && root.sceneItem)
-                root.sceneItem.textEditRequested(root.objectId)
+                root.sceneItem.textTypeRequested(root.objectId)
         }
 
         // Mouse wheel over selected text scales it around the pointer.
@@ -210,7 +299,7 @@ Item {
 
 
     // -------------------------------------------------
-    // Resize (proportions kept unless stretching) and rotate
+    // Resize (proportions kept unless stretching or wrapping) and rotate
     // -------------------------------------------------
 
     ResizeHandles {
@@ -219,7 +308,7 @@ Item {
         target: root
         sceneItem: root.sceneItem
 
-        keepAspect: !root.stretch && root.objText !== ""
+        keepAspect: !root.stretch && !root.wrap && root.objText !== ""
         aspectRatio: art.naturalAspect
 
         minWidth: 30

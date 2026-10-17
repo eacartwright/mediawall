@@ -29,8 +29,8 @@ Item {
         }
     }
 
-    // Editing a text object (added, double-clicked, or Edit Text…): show
-    // the Text tab, ready to type. The object is selected by then.
+    // Editing a text object in the panel (Edit Text…): show the Text
+    // tab, ready to type. The object is selected by then.
     Connections {
         target: sidebar.sceneItem
         function onTextEditRequested(objectId) {
@@ -38,6 +38,13 @@ Item {
             sidebar.open = true
             tabs.currentIndex = 2
             Qt.callLater(textPanel.focusText)
+        }
+        // Typing on the canvas (added or double-clicked): the Text tab
+        // shows, but the canvas keeps the keyboard.
+        function onTextTypeRequested(objectId) {
+            sceneModel.select(objectId)
+            sidebar.open = true
+            tabs.currentIndex = 2
         }
     }
 

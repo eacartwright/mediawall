@@ -76,6 +76,12 @@ MEDIA_FILTERS = {
     "container": ("all", "image", "video", "animated"),
 }
 
+# The order a browser or browsing container steps through a folder
+# (core/media_browser.py, sort_entries). "name" is natural name order,
+# folder by folder; "date" is the modification time (creation time
+# isn't recorded on Linux); "random" is a shuffle fixed per object.
+SORT_KEYS = ("name", "date", "type", "random")
+
 # Object types that always stack above the others (workspace tools).
 OVERLAY_TYPES = {"browser"}
 
@@ -133,10 +139,25 @@ TEXT_STYLE_DEFAULTS = {
     "depth": 0,                 # 3D extrusion, 0 .. TEXT_DEPTH_MAX
     "depth_color": "#404040",
     "stretch": False,           # fill the box exactly, not keeping proportions
+    # Wrap: the words wrap onto lines as wide as the box, at a fixed
+    # letter size (scene px), and the box's height follows them.
+    "wrap": False,
+    "size": 60.0,               # letter size when wrapping, TEXT_SIZE_MIN .. MAX
+    "align": "center",          # TEXT_ALIGNS, for wrapped lines
+    "arc": 0.0,                 # bend, degrees the line spans; > 0 arches up
+    "tilt": 0.0,                # perspective lean, degrees; > 0 top leans back
+    "glow": 0.0,                # glow size, 0 .. TEXT_GLOW_MAX
+    "glow_color": "#40c0ff",
 }
 
 TEXT_OUTLINE_MAX = 20.0
 TEXT_DEPTH_MAX = 40
+TEXT_SIZE_MIN = 4.0
+TEXT_SIZE_MAX = 2000.0
+TEXT_ALIGNS = ("left", "center", "right")
+TEXT_ARC_MAX = 360.0
+TEXT_TILT_MAX = 70.0
+TEXT_GLOW_MAX = 40.0
 
 _COLOR = re.compile(r"#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})")
 
@@ -155,8 +176,10 @@ def normalized_text_style(raw) -> dict:
             ok = isinstance(value, bool)
         elif isinstance(default, (int, float)):
             ok = isinstance(value, (int, float)) and not isinstance(value, bool)
-        elif key in ("fill", "outline", "depth_color"):
+        elif key in ("fill", "outline", "depth_color", "glow_color"):
             ok = isinstance(value, str) and _COLOR.fullmatch(value) is not None
+        elif key == "align":
+            ok = value in TEXT_ALIGNS
         elif key == "fill2":
             ok = isinstance(value, str) and (value == "" or _COLOR.fullmatch(value) is not None)
         else:
@@ -166,6 +189,10 @@ def normalized_text_style(raw) -> dict:
 
     style["outline_width"] = round(min(TEXT_OUTLINE_MAX, max(0.0, float(style["outline_width"]))), 2)
     style["depth"] = int(min(TEXT_DEPTH_MAX, max(0, round(style["depth"]))))
+    style["size"] = round(min(TEXT_SIZE_MAX, max(TEXT_SIZE_MIN, float(style["size"]))), 2)
+    style["arc"] = round(min(TEXT_ARC_MAX, max(-TEXT_ARC_MAX, float(style["arc"]))), 1)
+    style["tilt"] = round(min(TEXT_TILT_MAX, max(-TEXT_TILT_MAX, float(style["tilt"]))), 1)
+    style["glow"] = round(min(TEXT_GLOW_MAX, max(0.0, float(style["glow"]))), 1)
     return style
 
 
@@ -281,8 +308,15 @@ class SceneObject:
     browse_subfolders: bool = True
 
     # browser and browsing container: "all" or one media type
-    # (MEDIA_FILTERS). Workspace state.
+    # (MEDIA_FILTERS), and the order files are stepped through
+    # (SORT_KEYS). Workspace state.
     media_filter: str = "all"
+    sort_by: str = "name"
+    sort_descending: bool = False
+
+    # browsing container: when a video ends, play the folder's next
+    # video (Continue Play). Workspace state.
+    continue_play: bool = False
 
     # text: what it says (one line), and how it looks
     # (TEXT_STYLE_DEFAULTS; always complete, see normalized_text_style)
@@ -745,6 +779,11 @@ class Scene:
         obj.x = px + (cx - px) * factor - obj.width / 2
         obj.y = py + (cy - py) * factor - obj.height / 2
 
+        # Wrapped text: the letters scale too, so the lines stay the same.
+        if obj.type == "text" and obj.text_style.get("wrap"):
+            size = obj.text_style.get("size", TEXT_STYLE_DEFAULTS["size"]) * factor
+            obj.text_style = normalized_text_style({**obj.text_style, "size": size})
+
         content = self.content_of(obj.id) if obj.type == "container" else None
         if content is not None:
             content.x *= factor
@@ -786,6 +825,27 @@ class Scene:
             return False
 
         obj.include_subfolders = bool(include)
+        return True
+
+    def set_sort(self, object_id, sort_by=None, descending=None) -> bool:
+        """A browser or container's file order (SORT_KEYS), and its direction."""
+        obj = self.get(object_id)
+        if obj is None or obj.type not in MEDIA_FILTERS:
+            return False
+        sort_by = obj.sort_by if sort_by is None else sort_by
+        descending = obj.sort_descending if descending is None else bool(descending)
+        if sort_by not in SORT_KEYS:
+            return False
+        if (obj.sort_by, obj.sort_descending) == (sort_by, descending):
+            return False
+        obj.sort_by, obj.sort_descending = sort_by, descending
+        return True
+
+    def set_continue_play(self, container_id, on) -> bool:
+        obj = self.get(container_id)
+        if obj is None or obj.type != "container" or obj.continue_play == bool(on):
+            return False
+        obj.continue_play = bool(on)
         return True
 
     def set_media_filter(self, object_id, media_filter) -> bool:

@@ -26,7 +26,7 @@ from pathlib import Path
 
 from core.scene import (
     CLIP_SHAPES, FIT_COVER, FIT_MODES, MEDIA_FILTERS, OBJECT_TYPES, PLAYABLE_TYPES,
-    MediaSource, Scene, SceneObject,
+    SORT_KEYS, MediaSource, Scene, SceneObject,
     clamp_speed, new_id, normalized_loop, normalized_text_style, one_line,
 )
 
@@ -41,10 +41,11 @@ COMMON_FIELDS = ["id", "type", "x", "y", "width", "height", "rotation", "z"]
 TYPE_FIELDS = {
     "media": ["source_id", "playing", "parent_id", "muted", "volume", "loop",
               "speed", "preserve_pitch", "loop_a", "loop_b", "mirrored"],
-    "browser": ["folder", "current_index", "include_subfolders", "media_filter"],
+    "browser": ["folder", "current_index", "include_subfolders", "media_filter",
+                "sort_by", "sort_descending"],
     "container": ["lock_content", "clip_shape", "fit_mode",
                   "browse_mode", "browse_folder", "browse_subfolders",
-                  "media_filter"],
+                  "media_filter", "sort_by", "sort_descending", "continue_play"],
     "audio": ["source_id", "playing", "muted", "volume", "loop",
               "speed", "preserve_pitch", "loop_a", "loop_b"],
     "text": ["text", "text_style"],
@@ -287,6 +288,10 @@ def scene_from_dict(data, project_path=None):
         if object_type in MEDIA_FILTERS and obj.media_filter not in MEDIA_FILTERS[object_type]:
             warnings.append(f"Unknown media filter {obj.media_filter!r}; showing all.")
             obj.media_filter = "all"
+
+        if obj.sort_by not in SORT_KEYS:
+            warnings.append(f"Unknown sort order {obj.sort_by!r}; sorting by name.")
+            obj.sort_by = "name"
 
         scene.objects.append(obj)
 

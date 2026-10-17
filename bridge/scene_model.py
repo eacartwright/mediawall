@@ -11,6 +11,7 @@ content* roles, and edited through the container's id.
 """
 
 import copy
+import math
 import time
 from pathlib import Path
 
@@ -38,13 +39,14 @@ from core.scene import FIT_CONTAIN, FIT_COVER, Scene
 
 # Browser fields are workspace state: saved with the project, but not
 # part of undo (undoing a move shouldn't also rewind your browsing).
-BROWSER_FIELDS = ("folder", "current_index", "include_subfolders", "media_filter")
+BROWSER_FIELDS = ("folder", "current_index", "include_subfolders", "media_filter",
+                  "sort_by", "sort_descending")
 
 # The same for browsing containers: their browse settings, and while
 # browsing, the content itself (which file, and how it's framed) and
 # the Fit/Fill mode it's framed with.
 CONTAINER_BROWSE_FIELDS = ("browse_mode", "browse_folder", "browse_subfolders",
-                           "media_filter")
+                           "media_filter", "sort_by", "sort_descending", "continue_play")
 
 
 def _media_file_filter():
@@ -84,6 +86,9 @@ OBJECT_ROLE_NAMES = [
     "browseFolder",
     "browseSubfolders",
     "mediaFilter",
+    "sortBy",
+    "sortDescending",
+    "continuePlay",
     "objText",
     "textStyle",
 ]
@@ -113,7 +118,8 @@ ROLES = {name: int(Qt.UserRole) + 1 + i for i, name in enumerate(ROLE_NAMES)}
 GEOMETRY_ROLES = [ROLES[n] for n in
                   ("posX", "posY", "objWidth", "objHeight", "objRotation")]
 BROWSER_ROLES = [ROLES[n] for n in
-                 ("folder", "currentIndex", "includeSubfolders", "mediaFilter")]
+                 ("folder", "currentIndex", "includeSubfolders", "mediaFilter",
+                  "sortBy", "sortDescending")]
 Z_ROLES = [ROLES["objZ"]]
 PLAYBACK_ROLES = [ROLES[n] for n in
                   ("objPlaying", "objMuted", "objVolume", "objLoop",
@@ -122,7 +128,8 @@ PLAYBACK_ROLES = [ROLES[n] for n in
 SOURCE_ROLES = [ROLES["source" + f] for f in SOURCE_FIELDS]
 CONTAINER_ROLES = [ROLES[n] for n in
                    ("lockContent", "clipShape", "fitMode", "browseMode",
-                    "browseFolder", "browseSubfolders", "mediaFilter")]
+                    "browseFolder", "browseSubfolders", "mediaFilter",
+                    "sortBy", "sortDescending", "continuePlay")]
 CONTENT_ROLES = [ROLES[n] for n in CONTENT_ROLE_NAMES]
 TEXT_ROLES = [ROLES[n] for n in ("objText", "textStyle")]
 
@@ -355,6 +362,9 @@ class SceneModel(QAbstractListModel):
             "browseFolder": obj.browse_folder,
             "browseSubfolders": obj.browse_subfolders,
             "mediaFilter": obj.media_filter,
+            "sortBy": obj.sort_by,
+            "sortDescending": obj.sort_descending,
+            "continuePlay": obj.continue_play,
             "objText": obj.text,
             "textStyle": obj.text_style,
         }.get(name)
@@ -702,6 +712,26 @@ class SceneModel(QAbstractListModel):
         x = obj.x if obj.rotation == 0 else obj.x + (obj.width - width) / 2
         self._merge_key = self._text_edit_key
         if self._scene.set_geometry(object_id, x, obj.y, width, obj.height, obj.rotation):
+            self._emit_row(object_id, GEOMETRY_ROLES)
+            self._changed()
+        self._merge_key = None
+
+    @Slot(str, float)
+    def fitTextHeight(self, object_id, height):
+        """
+        Wrapped text: after an edit, the box's height follows the lines
+        (part of the same undo step), keeping its top edge in place.
+        """
+        obj = self._scene.get(object_id)
+        if obj is None or obj.type != "text" or height <= 0:
+            return
+        r = math.radians(obj.rotation)
+        dh = height - obj.height
+        cx = obj.x + obj.width / 2 - math.sin(r) * dh / 2
+        cy = obj.y + obj.height / 2 + math.cos(r) * dh / 2
+        self._merge_key = self._text_edit_key
+        if self._scene.set_geometry(object_id, cx - obj.width / 2, cy - height / 2,
+                                    obj.width, height, obj.rotation):
             self._emit_row(object_id, GEOMETRY_ROLES)
             self._changed()
         self._merge_key = None
@@ -1098,6 +1128,21 @@ class SceneModel(QAbstractListModel):
         if self._scene.set_media_filter(object_id, media_filter):
             obj = self._scene.get(object_id)
             self._emit_row(object_id, BROWSER_ROLES if obj.type == "browser" else CONTAINER_ROLES)
+            self._changed(workspace_only=True)
+
+    @Slot(str, str, bool)
+    def setSort(self, object_id, sort_by, descending):
+        """The order a browser or browsing container steps through files."""
+        if self._scene.set_sort(object_id, sort_by, descending):
+            obj = self._scene.get(object_id)
+            self._emit_row(object_id, BROWSER_ROLES if obj.type == "browser" else CONTAINER_ROLES)
+            self._changed(workspace_only=True)
+
+    @Slot(str, bool)
+    def setContinuePlay(self, container_id, on):
+        """A browsing container plays on to the next video at the end of one."""
+        if self._scene.set_continue_play(container_id, on):
+            self._emit_row(container_id, CONTAINER_ROLES)
             self._changed(workspace_only=True)
 
     @Slot(str, bool)

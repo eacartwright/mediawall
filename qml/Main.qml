@@ -84,9 +84,9 @@ ApplicationWindow {
         return null
     }
 
-    // Add a text object and open it for editing (AppActions.addText).
+    // Add a text object, ready to type on the canvas (AppActions.addText).
     function addText(x, y) {
-        scene.textEditRequested(sceneModel.addText(x, y))
+        scene.textTypeRequested(sceneModel.addText(x, y))
     }
 
     // Back one level: Present -> where you were; Full Screen -> window.
@@ -349,6 +349,7 @@ ApplicationWindow {
 
                 Button { action: appActions.addBrowser }
                 Button { action: appActions.addContainer }
+                Button { action: appActions.addText; objectName: "toolbarAddText" }
 
                 Item {
                     Layout.fillWidth: true
@@ -411,6 +412,10 @@ ApplicationWindow {
 
             // Edit a text object: the panel opens its Text tab.
             signal textEditRequested(string objectId)
+
+            // Type a text object's words on the canvas (TextObject.qml);
+            // the panel shows its Text tab too, for the style.
+            signal textTypeRequested(string objectId)
 
             // Where a new player should start (e.g. a video converted to
             // an audio track continues from where it was), by media id.

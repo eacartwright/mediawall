@@ -27,6 +27,8 @@ Rectangle {
     required property int currentIndex
     required property bool includeSubfolders
     required property string mediaFilter        // "all" or a media type
+    required property string sortBy             // core/scene.py SORT_KEYS
+    required property bool sortDescending
 
     property Item sceneItem
 
@@ -205,7 +207,8 @@ Rectangle {
         var previousPath = currentEntry ? currentEntry.path : ""
 
         mediaFiles = folder !== ""
-                     ? browserBackend.scanFolder(folder, includeSubfolders, mediaFilter)
+                     ? browserBackend.scanFolder(folder, includeSubfolders, mediaFilter,
+                                               sortBy, sortDescending, objectId)
                      : []
 
         if (previousPath === "")
@@ -228,6 +231,8 @@ Rectangle {
     onFolderChanged: rescan()
     onIncludeSubfoldersChanged: rescan()
     onMediaFilterChanged: rescan()
+    onSortByChanged: rescan()
+    onSortDescendingChanged: rescan()
     Component.onCompleted: rescan()
 
 

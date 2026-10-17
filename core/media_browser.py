@@ -1,4 +1,5 @@
 import os
+import random
 import re
 from pathlib import Path
 
@@ -128,6 +129,13 @@ def natural_key(text):
     ]
 
 
+def _mtime(file_path):
+    try:
+        return file_path.stat().st_mtime
+    except OSError:
+        return 0.0
+
+
 def _entry(file_path, root):
     return {
         "path": str(file_path),
@@ -140,6 +148,7 @@ def _entry(file_path, root):
         "relpath": file_path.relative_to(root).as_posix(),
         "type": media_type_for(file_path),
         "animatable": is_animatable(file_path),
+        "mtime": _mtime(file_path),
     }
 
 
@@ -150,9 +159,36 @@ def _sort_key(entry):
     return ([natural_key(p) for p in parts[:-1]], natural_key(parts[-1]))
 
 
+# Grouped this way by "type": images (still, then animated), videos, audio.
+_TYPE_ORDER = {"image": 0, "video": 1, "audio": 2}
+
+
+def sort_entries(entries, sort_by="name", descending=False, seed=""):
+    """
+    Put scanned entries in a browser or container's order (SORT_KEYS in
+    core/scene.py): "name" (natural, folder by folder), "date" (modified),
+    "type" (then extension, then name), or "random". The random order is
+    fixed by `seed` (the object's id), so stepping back and forth and
+    rescanning keep the same order; descending doesn't apply to it.
+    """
+    entries = sorted(entries, key=_sort_key)
+    if sort_by == "random":
+        random.Random(seed).shuffle(entries)
+        return entries
+    if sort_by == "date":
+        entries.sort(key=lambda e: e["mtime"])          # stable: ties by name
+    elif sort_by == "type":
+        entries.sort(key=lambda e: (_TYPE_ORDER.get(e["type"], 3), e["animatable"],
+                                    Path(e["name"]).suffix.lower()))
+    if descending:
+        entries.reverse()
+    return entries
+
+
 class MediaBrowser:
 
-    def scan_folder(self, folder, recursive=False, media_filter="all"):
+    def scan_folder(self, folder, recursive=False, media_filter="all",
+                    sort_by="name", descending=False, seed=""):
         """
         Return supported media files in a folder as a list of dicts:
 
@@ -162,11 +198,13 @@ class MediaBrowser:
                 "name":    file name,
                 "relpath": path relative to the chosen folder,
                 "type":    "image" | "video" | "audio",
-                "animatable": True for GIF/WebP
+                "animatable": True for GIF/WebP,
+                "mtime":   modification time (seconds)
             }
 
         With recursive=True, subfolders are included. media_filter keeps
-        only matching files (matches_filter). Hidden folders
+        only matching files (matches_filter); sort_by, descending, and seed
+        set the order (sort_entries). Hidden folders
         (names starting with ".") are skipped, symlinked folders are
         not followed (avoids loops), and unreadable folders are skipped
         rather than failing the whole scan.
@@ -207,5 +245,4 @@ class MediaBrowser:
                     entries.append(_entry(item, root))
 
         entries = [e for e in entries if matches_filter(e, media_filter)]
-        entries.sort(key=_sort_key)
-        return entries
+        return sort_entries(entries, sort_by, descending, seed)

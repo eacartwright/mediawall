@@ -36,6 +36,9 @@ Item {
     required property string browseFolder
     required property bool browseSubfolders
     required property string mediaFilter        // "all", "image", or "video"
+    required property string sortBy             // core/scene.py SORT_KEYS
+    required property bool sortDescending
+    required property bool continuePlay
 
     required property string contentId
     required property real contentX
@@ -153,7 +156,8 @@ Item {
             browseFiles = []
             return
         }
-        browseFiles = browserBackend.scanFolder(browseFolder, browseSubfolders, mediaFilter)
+        browseFiles = browserBackend.scanFolder(browseFolder, browseSubfolders, mediaFilter,
+                                                sortBy, sortDescending, objectId)
             .filter(function(e) { return e.type === "image" || e.type === "video" })
 
         // An empty container starts on the folder's first file, rather
@@ -178,6 +182,8 @@ Item {
     onBrowseModeChanged: rescanBrowse()
     onBrowseFolderChanged: rescanBrowse()
     onBrowseSubfoldersChanged: rescanBrowse()
+    onSortByChanged: rescanBrowse()
+    onSortDescendingChanged: rescanBrowse()
     // A new filter that hides the file shown moves on to the first one.
     onMediaFilterChanged: {
         startAtFirstFile = true
@@ -232,6 +238,24 @@ Item {
         var i = browseIndex < 0 ? (delta > 0 ? 0 : n - 1)
                                 : (browseIndex + delta + n) % n
         sceneModel.showInContainer(objectId, browseFiles[i].path, browseFiles[i].type)
+    }
+
+    // Continue Play: at the end of a video, play the folder's next video
+    // (images are skipped). A video doesn't loop meanwhile.
+    readonly property bool playsThrough: browseMode && continuePlay
+
+    function playNextVideo() {
+        var n = browseFiles.length
+        for (var k = 1; k <= n; k++) {
+            var i = ((browseIndex < 0 ? -1 : browseIndex) + k) % n
+            if (browseFiles[i].type !== "video")
+                continue
+            if (i === browseIndex)
+                contentView.replay()        // the folder's only video
+            else
+                sceneModel.showInContainer(objectId, browseFiles[i].path, "video")
+            return
+        }
     }
 
 
@@ -384,13 +408,18 @@ Item {
             playing: root.contentPlaying
             muted: root.contentMuted
             volume: root.contentVolume
-            loop: root.contentLoop
+            loop: root.contentLoop && !root.playsThrough
             speed: root.contentSpeed
             preservePitch: root.contentPreservePitch
             loopA: root.contentLoopA
             loopB: root.contentLoopB
             mirrored: root.contentMirrored
             name: root.contentSourceName
+
+            onEndedChanged: {
+                if (ended && root.playsThrough)
+                    Qt.callLater(root.playNextVideo)
+            }
 
             // Registered under the content's id (it changes when the
             // content is replaced or removed).

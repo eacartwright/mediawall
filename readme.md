@@ -396,15 +396,18 @@ The default should be aspect-ratio preserving.
 
 ## 5.4 Text objects ("WordArt")
 
-A text object is one line of styled text that fills its box. It is a top-level object of type `text` (fields `text` and `text_style`), moved, resized, rotated, scaled with the wheel, layered, duplicated, and deleted like a free image.
+A text object is a line of styled text that fills its box, or (with **Wrap to box**) words wrapped onto lines as wide as the box. It is a top-level object of type `text` (fields `text` and `text_style`), moved, resized, rotated, scaled with the wheel, layered, duplicated, and deleted like a free image.
 
-- **Adding:** **Add Text** (the Text tab, or right-click the canvas → **Add Text Here**). The new object is selected and the Text tab opens with the words selected, ready to type.
-- **Editing:** double-click it (or right-click → **Edit Text…**) to open the **Text** tab of the Wall Features panel: the words, eight **style presets** (Classic, Sunset, Ocean, Candy, Chrome, Gold, Neon, Plain; each sets the colors, outline, and depth, keeping the font), the **font** (any installed family; Default is the app's font), Bold / Italic, the **fill** color with an optional **fade to** a second color (top to bottom), the **outline** color and width, **3D depth** (an extrusion down and to the right) and its color, and **Stretch to box**.
-- **Sizing:** by default the letters keep their proportions, centered in the box, and the corner handles keep the box's proportions. After an edit that changes the text's shape (new words, font, outline, depth), the box keeps its height and its width follows (keeping its left edge, or its center if rotated), in the same undo step as the edit. Undo and loading never resize anything. **Stretch to box** fills the box exactly instead, and the handles resize freely.
+- **Adding:** **Add Text** (the toolbar, the Text tab, or right-click the canvas → **Add Text Here**). The new object is selected, the Text tab shows, and a field opens on the canvas just under the box with the words selected, ready to type.
+- **Typing on the canvas:** double-click a text object to open that field again. The words change as you type; Enter, Esc, or clicking elsewhere closes it. (A field under the box, rather than a cursor in the letters: the letters may be bent, tilted, or stretched.)
+- **Editing the style:** right-click → **Edit Text…** opens the **Text** tab of the Wall Features panel: the words, eight **style presets** (Classic, Sunset, Ocean, Candy, Chrome, Gold, Neon, Plain; each sets the colors, outline, and depth, keeping the font), the **font** (any installed family, each shown in its own font, with a box to type part of a name; Default is the app's font), Bold / Italic, the **fill** color with an optional **fade to** a second color (top to bottom), the **outline** color and width, **3D depth** (an extrusion down and to the right) and its color, **glow** (a soft light behind the letters) with its color and size, **arc**, **tilt**, **Wrap to box** with Left / Center / Right, and **Stretch to box**.
+- **Arc** bends the line onto a circle: the slider is the angle the text spans (−360° to 360°), > 0 arching up, < 0 sagging; 360° takes it all the way round. The letters themselves bend, as in classic WordArt. **Tilt** leans the text back (> 0) or forward in perspective (±70°). Clicking the angle shown beside either slider sets it back to 0; near 0 the slider snaps to straight.
+- **Sizing:** by default the letters keep their proportions, centered in the box, and the corner handles keep the box's proportions. After an edit that changes the text's shape (new words, font, outline, depth, arc, tilt), the box keeps its height and its width follows (keeping its left edge, or its center if rotated), in the same undo step as the edit. Undo and loading never resize anything. **Stretch to box** fills the box exactly instead, and the handles resize freely.
+- **Wrap to box:** the letters have a fixed size (`size`, scene px) and the words wrap at spaces onto lines as wide as the box (a word too long for a line breaks between letters). The handles resize freely, and on release the box's height follows the lines, keeping its top edge; after an edit the height follows too. Wheel scaling scales the letter size along with the box, so the lines stay the same. Turning wrap on keeps the letters the size they appear; turning it off fits the box to the one line at that size. There are no line breaks of your own (the words are still one line of text).
 - **Undo:** every change is undoable; a run of typing or one slider drag is one step.
-- **Drawing** (`qml/TextArt.qml`): the glyphs are vector shapes (`Shape` + `PathText`, curve renderer) drawn 100 px tall and then scaled, so they stay sharp at any size. The outline is the path's stroke, the fade a `LinearGradient` fill, the depth that many copies of the text stepped down and right (farthest first, darker toward the back). (A drop shadow, a `MultiEffect` on a layer, was tried and removed: it didn't look good.) Style sizes (outline width, depth) are in units of the 100 px text, so they scale with the box. The box size comes from the shape's measured bounds (`Shape.boundingRect`; `PathText`'s own width is too small for some fonts).
-- **Saved style** (`TEXT_STYLE_DEFAULTS` in `core/scene.py`): font, bold, italic, fill, fill2 (empty: no fade), outline, outline_width (0–20), depth (0–40), depth_color, stretch. Loading repairs a damaged style value by value (`normalized_text_style`).
-- Not yet: more than one line, text along a curve, perspective tilt, glow. See section 51.
+- **Drawing** (`qml/TextArt.qml`, `bridge/text_shaper.py`): Qt's font engine turns the words into glyph outlines (`QPainterPath.addText`, at 100 px). `text_shaper` wraps them onto lines and bends and tilts them by moving the outline's points (long edges and curves are first cut into short pieces so they bend smoothly), and hands QML the result as SVG path data, drawn with `Shape` + `PathSvg` (curve renderer) and then scaled, so the letters stay sharp at any size. The outline is the path's stroke, the fade a `LinearGradient` fill, the depth that many copies of the path stepped down and right (farthest first, darker toward the back), and the glow a thickened copy in the glow color blurred with `MultiEffect` (blurred anyway, so its lower-resolution layer doesn't show). Layouts are cached, so a resize drag of wrapped text stays smooth. Style sizes (outline width, depth, glow) are in units of the 100 px text, so they scale with the box. (A drop shadow, a `MultiEffect` on a layer, was tried and removed: it didn't look good.)
+- **Saved style** (`TEXT_STYLE_DEFAULTS` in `core/scene.py`): font, bold, italic, fill, fill2 (empty: no fade), outline, outline_width (0–20), depth (0–40), depth_color, stretch, wrap, size (4–2000), align (left/center/right), arc (±360), tilt (±70), glow (0–40), glow_color. Loading repairs a damaged style value by value (`normalized_text_style`); projects saved before these values existed load with them off.
+- Not yet: line breaks of your own; effects per letter. See section 51.
 
 ---
 
@@ -513,7 +516,7 @@ This should be a property of the media/container relationship.
 - **Every container works like a picture viewer (qView)**, browsing or not, selected or not: **left-drag pans** the picture, the **mouse wheel zooms** it around the pointer, and **double-click resets** it to the Fit/Fill framing. The **border strip** (about 10 px inside the edge; a move cursor shows there; resize handles take priority when selected) moves the container on a left-drag and **scales it on the wheel**, around the pointer and content included, so the view inside doesn't change (whether or not "Scale Content with Container" is on; that setting only affects the resize handles). A **middle-button drag** moves it from anywhere. An **empty** container moves and scales from anywhere, which makes building layouts quick. In Present, every container's picture still pans and zooms; nothing moves or scales. Panning and zooming are undoable, except in browsing containers (workspace state, below).
 - **Rotating the picture inside**: drag the rotation knob with **Ctrl** held (otherwise the knob turns the container), or use Adjust mode.
 - **Flip Horizontally** (right-click; checkable) mirrors the picture of a free image or video, or a container's picture, without moving it (`mirrored` on the media instance; saved, undoable, copied by Duplicate). In a browsing container it stays on as the files change, since it belongs to the instance. There's no vertical flip: that's a horizontal flip plus a 180° turn.
-- **Browsing containers** (right-click → **Browse This Folder**; section 13): the container steps through the images and videos in a folder, by default the folder of the file it shows (an empty container asks for a folder; **double-clicking an empty container** does the same). **Browse Folder…** picks any folder, for any container, even a filled or already browsing one: it moves to that folder's first file unless the file it shows is in that folder, keeping the same media instance (volume, loop, and so on). A browsing container's menu can also limit it to **images only**, **videos only**, or **animated only** (GIF/WebP that really move; `media_filter`, section 5.3; moving to the first matching file if the one shown is filtered out). Subfolders can be included (**Browse Subfolders Too**). On top of the usual container controls (pan, zoom, double-click reset; above), the **back/forward mouse buttons** (thumb buttons) go to the previous/next file (wrapping around; hold one to keep stepping, after a short pause), as do **tilting the wheel** left/right and, while it's selected, the **Left/Right arrow keys**. In Present all of this keeps working (a hand-driven slideshow). An empty browsing container starts on the folder's first file as soon as the folder is scanned (after choosing it, or when a project or layout is opened), instead of waiting at "0 / n". Each file replaces the content in place (same instance, volume, mute, loop, and speed; A-B points cleared) and **starts playing**, even if the previous one was paused, framed with the container's Fit/Fill mode. When selected, a small `⇅` badge marks it as browsing (no position count: it cluttered the wall). **Stop Browsing** keeps whatever is showing. Browse settings, and while browsing the content itself (which file, its pan and zoom, and the Fit/Fill mode), are workspace state: saved, but never changed by Undo (section 47).
+- **Browsing containers** (right-click → **Browse This Folder**; section 13): the container steps through the images and videos in a folder, by default the folder of the file it shows (an empty container asks for a folder; **double-clicking an empty container** does the same). **Browse Folder…** picks any folder, for any container, even a filled or already browsing one: it moves to that folder's first file unless the file it shows is in that folder, keeping the same media instance (volume, loop, and so on). A browsing container's menu can also limit it to **images only**, **videos only**, or **animated only** (GIF/WebP that really move; `media_filter`, section 5.3; moving to the first matching file if the one shown is filtered out). Subfolders can be included (**Browse Subfolders Too**). **Sort by** (a submenu) sets the order it steps through: **Name** (natural order, the folder's own files first, then each subfolder; the default), **Date Modified**, **Type** (images, then animated images, then videos, by extension), or **Random** (a shuffle fixed per container, seeded by its id, so stepping back and forth stays consistent), then **Ascending** or **Descending** (not for Random). Re-sorting keeps the file shown. ("Date Modified" rather than created: Linux doesn't record when a file was created.) **Continue Play** (checkable): when a video ends, the container goes on to the folder's next video (skipping images, wrapping around) and plays it; while it's on, videos don't loop. On top of the usual container controls (pan, zoom, double-click reset; above), the **back/forward mouse buttons** (thumb buttons) go to the previous/next file (wrapping around; hold one to keep stepping, after a short pause), as do **tilting the wheel** left/right and, while it's selected, the **Left/Right arrow keys**. In Present all of this keeps working (a hand-driven slideshow). An empty browsing container starts on the folder's first file as soon as the folder is scanned (after choosing it, or when a project or layout is opened), instead of waiting at "0 / n". Each file replaces the content in place (same instance, volume, mute, loop, and speed; A-B points cleared) and **starts playing**, even if the previous one was paused, framed with the container's Fit/Fill mode. When selected, a small `⇅` badge marks it as browsing (no position count: it cluttered the wall). **Stop Browsing** keeps whatever is showing. Browse settings (folder, subfolders, filter, sort, Continue Play), and while browsing the content itself (which file, its pan and zoom, and the Fit/Fill mode), are workspace state: saved, but never changed by Undo (section 47).
 - **Adjust mode** (right-click → Adjust Content, or Crop / Zoom Inside) is for framing with free rotation: the rotation knob turns the content, every drag pans (the border strip too), and the part of the content outside the frame shows as a faint ghost (a live texture of the content itself, so video and GIF ghosts stay in sync and nothing is loaded twice). It has an orange outline and no toolbar (Fit and Fill are in the right-click menu). Enter or Space finishes, as do clicking elsewhere and Escape.
 - **Release Content** turns the content back into a free object at the position, size, and rotation it currently appears on the canvas. **Remove Content** deletes it. Deleting a container deletes its content.
 - Only top-level objects take part in z-order; content has none of its own.
@@ -1486,6 +1489,7 @@ The browser is kept compact, with the media as large as possible:
 - New media from **Add to Canvas** (or double-click) is placed **beside the browser**, level with its top: to the right of a browser in the left half of the canvas, to the left of one in the right half (switching sides when that side has too little room and the other has more), kept inside the visible canvas. Repeated adds step 24 px down and outward so they don't pile up exactly.
 - **New Container** (images and videos) does the same, but puts the file in a new container of its own, 300 px wide and shaped like the image (`Scene.add_container_with_media`; one undo step). A video's container starts at 16:9 until its real size is known, and the video is then framed to the container's Fit/Fill mode. **Add to Container** (shown while a container is selected) instead fills that existing empty container.
 - **Filter** (right-click the browser): Show All Media, or Images / Videos / Audio Only. The position label then names the type ("2 / 3 videos"). Saved with the project (`media_filter`), like the folder, and not undone.
+- **Sort by** (right-click the browser): Name, Date Modified, Type, or Random, then Ascending or Descending, as for browsing containers (section 6.4; `sort_by`, `sort_descending`; the sorting is `sort_entries` in `core/media_browser.py`). Per browser, saved, and not undone.
 
 ---
 
@@ -1899,6 +1903,7 @@ mediawall/
 │   ├── audio_model.py      video/audio instances for the Playback tab
 │   ├── app_settings.py     app-wide settings (QSettings), for Settings
 │   ├── scene_model.py      exposes Scene to QML as a list model
+│   ├── text_shaper.py      text outlines: wrap, arc, tilt (section 5.4)
 │   └── project_controller.py  New/Open/Save dialogs, title, unsaved prompts
 │
 ├── qml/
@@ -1907,6 +1912,7 @@ mediawall/
 │   ├── TextObject.qml      text object ("WordArt", section 5.4)
 │   ├── TextArt.qml         draws styled text (canvas and style previews)
 │   ├── TextPanel.qml       the Text tab: add text, edit words and style
+│   ├── FontPicker.qml      the Text tab's font list (type to find)
 │   ├── BrowserObject.qml   Browse Object
 │   ├── ContainerObject.qml container (viewport with clipped content)
 │   ├── AudioTrackObject.qml audio track (a player with no canvas item)
@@ -2081,7 +2087,7 @@ Implement:
 - Make Container
 - Add as Slideshow
 
-Done: folder selection, file discovery with optional subfolders, supported-media filtering, current item, previous/next (buttons and mouse wheel), image, GIF, video, and audio preview, preview zoom, Add to Canvas (or double-click), Add to Container (for the selected empty container), New Container (the file in a new container beside the browser), Add to Audio for audio files, and browser state stored in the scene model. Remaining (back burner, with slideshows): Add as Slideshow.
+Done: folder selection, file discovery with optional subfolders, supported-media filtering, current item, previous/next (buttons and mouse wheel), image, GIF, video, and audio preview, preview zoom, Add to Canvas (or double-click), Add to Container (for the selected empty container), New Container (the file in a new container beside the browser), Add to Audio for audio files, Sort by (name, date modified, type, random), and browser state stored in the scene model. Remaining (back burner, with slideshows): Add as Slideshow.
 
 ---
 
@@ -2457,7 +2463,7 @@ Exact bindings can still change.
 
 The prototype currently provides:
 
-- a canvas with a toolbar (New, Open with Open Recent ▾, Save, Save As, Undo, Redo, Add Browser, Add Container, Full Screen, Present, Settings; the Log window opens from Settings → About)
+- a canvas with a toolbar (New, Open with Open Recent ▾, Save, Save As, Undo, Redo, Add Browser, Add Container, Add Text, Full Screen, Present, Settings; the Log window opens from Settings → About)
 - Full Screen (editing) and Present (view-only canvas, browsers still usable) modes (section 15); Full Screen has ✕, ▶ (Present), and Save buttons in the corner, Present has ✕ and Save
 - a right-click menu on empty canvas (Add Browser Here, Add Container Here)
 - project save/load to `.mediawall` files, with unsaved-changes prompts and the project name in the window title; a modal "Opening…" popup while a project opens
@@ -2472,7 +2478,7 @@ The prototype currently provides:
 - free media objects: move, aspect-locked resize, rotate
 - EXIF orientation applied to photos, on the canvas and in browser previews
 - animated GIF and WebP playback, on the canvas and in browser previews; each instance can be paused or played and its speed set from its right-click menu, and double-clicking one starts it over (section 5.3)
-- text objects ("WordArt"): one line of text with presets, font, gradient fill, outline, and 3D depth, edited in the Text tab (section 5.4)
+- text objects ("WordArt"): a line of text, or words wrapped to the box, with presets, font, gradient fill, outline, 3D depth, glow, arc, and perspective tilt; typed on the canvas (double-click) and styled in the Text tab (section 5.4)
 - video on the canvas, in containers, and in browser previews, with per-instance play/pause, mute, and loop (right-click menu), and an on-object seek bar when selected
 - per-video speed (0.5x to 3x by default; the range is a setting), Keep pitch, and A-B loop; a Playback tab in the Wall Features panel with every video's sound and playback settings (section 14.5)
 - a Settings dialog (toolbar): the mouse-wheel zoom step, the speed range, and the hold-to-step pace; a Shortcuts tab listing every key; an About tab with the version (section 25)
@@ -2488,7 +2494,8 @@ The prototype currently provides:
 - single selection; clicking empty canvas deselects
 - z-order and Delete through a right-click menu, plus shortcuts
 - a Wall Features panel (left-edge flyout) with Layers, Playback, and Text tabs; Layers: every object top first, selection linked both ways, Top/Up/Down/Bottom, drag to reorder
-- browser and browsing-container filters: all, images, videos, audio (browsers), or animated GIF/WebP only
+- browser and browsing-container filters: all, images, videos, audio (browsers), or animated GIF/WebP only; and Sort by: name, date modified, type, or random, ascending or descending
+- Continue Play for browsing containers: at the end of a video, the next video in the folder plays
 - unit tests for `core/`, and app checks that drive the real app (section 37)
 - installers: a Windows `Setup.exe` and a Linux `.deb`, built by `packaging/build.py` (section 37); 0.9.8 built (Windows installer; the `.deb` is built on Linux Mint)
 
@@ -2530,14 +2537,14 @@ Waiting on an answer (2026-10-15):
 
 ### Next
 
-Nothing queued. The 2026-10-15 batch is done: Save in Present, the Wall Features panel moved to the left edge, session-only undo (no `.history` file), double-click to restart animations (double-click no longer leaves Present), a Speed submenu for animated images, the Animated Only filter, and a first pass of text objects (section 5.4).
+Nothing queued. The 2026-10-16 batch is done: an Add Text button on the toolbar; Wrap to box, arc, perspective tilt, and glow for text; typing on the canvas; a faster font list (type to find, three rows a wheel notch); Sort by for browsers and browsing containers; and Continue Play (sections 5.4, 6.4, 26). Arrow-key nudging was dropped.
+
+The 2026-10-15 batch is done: Save in Present, the Wall Features panel moved to the left edge, session-only undo (no `.history` file), double-click to restart animations (double-click no longer leaves Present), a Speed submenu for animated images, the Animated Only filter, and a first pass of text objects (section 5.4).
 
 Done since the review: browsing containers (section 6.4), layouts (section 17), video as audio (section 14.2), drag-to-reorder in the Layers panel, edge resize handles, the Adjust-mode ghost for video, hiding the idle pointer in Present, and undo history kept between sessions (section 47).
 
 ### Soon
 
-- Arrow keys to nudge the selected object (Shift for bigger steps). Left/Right step through files instead when a browser or browsing container is selected.
-- **Continue play** in browsing containers: when a video ends, go on to the next file unless the video is looped (probably a per-container option).
 - **Trim the Linux build**: the `.deb` installs 237 MB against about 140 MB on Windows. `UNUSED_QT` in `packaging/mediawall.spec` probably misses Qt parts under their Linux file names (`libQt6*.so*`, plugins). List the largest files in `dist/MediaWall/_internal` on Linux, add what isn't used, and check the app still runs.
 - **Duplicate by mouse**, e.g. Alt+drag. A double right-click is awkward, since the first right-click already opens the menu.
 
@@ -2545,7 +2552,7 @@ Done since the review: browsing containers (section 6.4), layouts (section 17), 
 
 - **Fold the browser into browsing containers** (open decision, section 55), with double-clicking the empty canvas creating a container.
 - **Multi-select**: drag a selection box on the empty canvas to select several free media and containers, and move them as a group (resize and rotate later). Selection is a single id today, so this touches the model, the handles, and undo.
-- **Text, next steps** (section 5.4): more than one line; text along an arc (each letter placed separately); perspective tilt (a `Rotation` about the X or Y axis); a glow (a blur behind the text, in the fill's color); typing directly on the canvas; an Add Text button on the toolbar once the UI pass makes room.
+- **Text, next steps** (section 5.4): line breaks of your own (wrapping is done); a size slider for wrapped text (the wheel scales it today); more warps (wave, bulge), now that `bridge/text_shaper.py` can move the outline's points.
 
 - **Inspector** (Phase 11): exact position, size, and rotation.
 - **UI pass**, once the functionality has settled (decided 2026-09-29): a traditional **menu bar** (e.g. File / Edit / View / Wall / Help) instead of only a row of buttons; **icons** instead of text on toolbar buttons, from one bundled SVG icon set so Windows and Linux match (Qt has no consistent icon theme on Windows; candidates: Lucide, Material Symbols; check licenses); a compact toolbar for the most-used commands (it already barely fits at 1280 px). The groundwork is done: every command is an `Action` in `qml/AppActions.qml` (section 25), so the menu bar and toolbar can be built from the same actions without rewiring. Reference points: XnView MP, qView, qBittorrent (all Qt applications).
@@ -2565,6 +2572,7 @@ Done since the review: browsing containers (section 6.4), layouts (section 17), 
 
 ### Dropped
 
+- Arrow keys to nudge the selected object (decided 2026-10-16: not wanted). Left/Right still step through files in a browser or browsing container.
 - Contain/Cover/Free/Stretch display modes for free media (section 5.1).
 - Audio solo, and choosing between several audio streams in one file.
 - Scaling the wall to other screen sizes (Phase 10).
@@ -2799,6 +2807,12 @@ The following design decisions are currently established:
 - **Double-click on an animated image restarts it**, in a container as well, where it replaces the zoom reset for animated content (a still picture or video still resets). It is the quick fix for GIFs that freeze on Mint, rather than a right-click item, which was too clunky (2026-10-15).
 - Animated images get a **Speed** submenu (0.25×–4×) in the right-click menu, reusing the per-instance `speed` field; no slider in the Playback tab, which would fill up on GIF-heavy walls. The menu builds the submenu in or out per object, since a Qt Quick submenu can't be hidden like an item (2026-10-15).
 - **Animated Only** filter (`media_filter` "animated") for browsers and browsing containers: animation is detected by reading the file (a GIF's second frame, a WebP's animation flag), so still GIFs and WebPs are left out. Filtering moved into `MediaBrowser.scan_folder` (the QML passes the filter) (2026-10-15).
+- **Text outlines come from the bridge** (`bridge/text_shaper.py`, 2026-10-16): `PathText` can't wrap, bend, or tilt, so Qt's font engine (`QPainterPath.addText`) builds the outlines in Python, which wraps, arcs, and tilts them by moving points, and QML draws the SVG path. It needs Qt fonts, so it lives in `bridge/`, not `core/`; the style values stay in `core` (`TEXT_STYLE_DEFAULTS`). Arc and tilt bend the letters themselves (a warp) rather than just placing them, which is the WordArt look and keeps one path for the depth copies.
+- **Wrapped text has a letter size, and its box height follows the lines** (2026-10-16), rather than the whole block scaling to the box: resizing a paragraph rewraps it instead of shrinking it. Wheel scaling scales the letter size too. Still no line breaks of your own.
+- **Typing on the canvas is a field under the text box** (2026-10-16), not a cursor in the letters (which may be bent or stretched). Double-click and Add Text open it; Edit Text… still opens the Text tab.
+- **The font list is a custom picker** (`qml/FontPicker.qml`, 2026-10-16): the ComboBox's list scrolled only a pixel or two per wheel notch through hundreds of fonts. The picker scrolls three rows a notch, shows each name in its own font, and has a box to type part of a name.
+- **Sort by** for browsers and browsing containers (2026-10-16): Name (the old order), Date Modified (not created: Linux doesn't record creation time), Type, Random (fixed per object by its id), and Ascending / Descending. Per object, workspace state like the filter.
+- **Continue Play** (2026-10-16) is a per-container option: at a video's end it goes to the next *video* (images are skipped), and looping is off while it's on.
 - **Text objects** ("WordArt"; section 5.4), first pass: one top-level type `text` with `text` and a single `text_style` dict (one role and one setter, `setTextStyle(id, changes)`, rather than a field and role per style value), drawn as vector shapes scaled to the box, edited in the Text tab rather than on the canvas. The box follows the text's proportions only after the user's own edits (`SceneModel.textEdited`), merged into the same undo step, so undo and loading never resize anything (2026-10-15).
 
 ### Open decisions

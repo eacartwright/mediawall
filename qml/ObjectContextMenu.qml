@@ -69,6 +69,7 @@ Menu {
     function openFor(item) {
         target = item
         placeSpeedMenu()
+        placeSortMenu()
         popup()   // opens at the mouse cursor
     }
 
@@ -96,6 +97,83 @@ Menu {
                 insertMenu(j + 1, speedMenu)
                 return
             }
+        }
+    }
+
+    // ---- Sort by submenu (browsers and browsing containers) ----
+    // Put in just after the filter items, like the Speed submenu.
+
+    function placeSortMenu() {
+        for (var i = 0; i < count; i++) {
+            if (itemAt(i).subMenu === sortMenu) {
+                takeMenu(i)
+                break
+            }
+        }
+        if (!filtersFiles)
+            return
+        for (var j = 0; j < count; j++) {
+            if (itemAt(j) === lockItem) {
+                insertMenu(j, sortMenu)
+                return
+            }
+        }
+    }
+
+    property Menu sortMenu: Menu {
+        id: sortSub
+        objectName: "sortMenu"       // found by tests/app
+        title: "Sort by"
+
+        readonly property var owner: menu
+        readonly property string sortBy: owner.filtersFiles ? owner.target.sortBy : ""
+        readonly property bool descending: owner.filtersFiles && owner.target.sortDescending === true
+
+        function setSort(key, descending) {
+            sceneModel.setSort(owner.targetId, key, descending)
+        }
+
+        // Checked state is re-bound after each click (a click toggles it).
+        component SortItem: MenuItem {
+            id: sortItem
+            property bool current
+            checkable: true
+            checked: current
+            onTriggered: checked = Qt.binding(function() { return sortItem.current })
+        }
+
+        SortItem {
+            text: "Name"
+            current: sortSub.sortBy === "name"
+            onTriggered: sortSub.setSort("name", sortSub.descending)
+        }
+        SortItem {
+            text: "Date Modified"
+            current: sortSub.sortBy === "date"
+            onTriggered: sortSub.setSort("date", sortSub.descending)
+        }
+        SortItem {
+            text: "Type"
+            current: sortSub.sortBy === "type"
+            onTriggered: sortSub.setSort("type", sortSub.descending)
+        }
+        SortItem {
+            text: "Random"
+            current: sortSub.sortBy === "random"
+            onTriggered: sortSub.setSort("random", sortSub.descending)
+        }
+        MenuSeparator {}
+        SortItem {
+            text: "Ascending"
+            enabled: sortSub.sortBy !== "random"
+            current: !sortSub.descending
+            onTriggered: sortSub.setSort(sortSub.sortBy, false)
+        }
+        SortItem {
+            text: "Descending"
+            enabled: sortSub.sortBy !== "random"
+            current: sortSub.descending
+            onTriggered: sortSub.setSort(sortSub.sortBy, true)
         }
     }
 
@@ -391,15 +469,31 @@ Menu {
         }
     }
 
+    // A browsing container: at the end of a video, play the next one.
+    MenuItem {
+        id: continuePlayItem
+        text: "Continue Play"
+        checkable: true
+        checked: menu.isContainer && menu.target.continuePlay === true
+        visible: menu.isContainer && menu.target.browseMode === true
+        height: visible ? implicitHeight : 0
+        onTriggered: {
+            sceneModel.setContinuePlay(menu.targetId, !menu.target.continuePlay)
+            continuePlayItem.checked = Qt.binding(function() {
+                return menu.isContainer && menu.target.continuePlay === true
+            })
+        }
+    }
+
     // Which files a browser or browsing container steps through (one
     // is checked). Containers show no audio.
     Repeater {
         model: [
             { text: "Show All Media", value: "all" },
             { text: "Show Images Only", value: "image" },
+            { text: "Show Animated Only", value: "animated" },
             { text: "Show Videos Only", value: "video" },
             { text: "Show Audio Only", value: "audio" },
-            { text: "Show Animated Only (GIF, WebP)", value: "animated" },
         ]
 
         MenuItem {
