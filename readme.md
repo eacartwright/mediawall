@@ -2506,7 +2506,7 @@ The prototype currently provides:
 - Lock Container: nothing about a locked container changes (position, size, picture, file) until it's unlocked (section 6.4)
 - new container content framed with Fit (the whole picture) by default
 - unit tests for `core/`, and app checks that drive the real app (section 37)
-- installers: a Windows `Setup.exe` and a Linux `.deb`, built by `packaging/build.py` (section 37); 0.9.9 built (Windows installer; the `.deb` is built on Linux Mint)
+- installers: a Windows `Setup.exe` and a Linux `.deb`, built by `packaging/build.py` (section 37); 0.9.10 built (Windows installer; the `.deb` is built on Linux Mint)
 
 ### How interactions reach the model
 

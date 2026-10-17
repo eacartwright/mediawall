@@ -440,12 +440,12 @@ Dialog {
                     wrapMode: Text.WordWrap
                     textFormat: Text.StyledText
                     color: "#999999"
-                    text: "<b>New in 0.9.9</b><br>"
-                          + "• Text: wrap to the box, arc, perspective tilt, and glow<br>"
-                          + "• Text: type right on the canvas (double-click), Add Text on the toolbar<br>"
-                          + "• A faster font list: type part of a name to find it<br>"
-                          + "• Sort by name, date, type, or random in browsers and browsing containers<br>"
-                          + "• Continue Play: a browsing container plays on to the next video"
+                    text: "<b>New in 0.9.10</b><br>"
+                          + "• Text: a Size control, colour emoji, and presets and glow that redraw properly<br>"
+                          + "• Lock Container: nothing about it changes until it's unlocked<br>"
+                          + "• Favorites in browsing containers (☆), and Show Favorites Only<br>"
+                          + "• Show New Files First: a new file in the folder (e.g. a download) shows next<br>"
+                          + "• Master volume (Playback tab); container background colour (Settings); Fit by default"
                 }
 
                 // The Log window: everything the app would print to a
