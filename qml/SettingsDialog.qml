@@ -379,11 +379,12 @@ Dialog {
                     wrapMode: Text.WordWrap
                     textFormat: Text.StyledText
                     color: "#999999"
-                    text: "<b>New in 0.9.8</b><br>"
-                          + "• Text: WordArt-style titles with presets, gradient fill, outline, and 3D depth<br>"
-                          + "• Animated images: double-click to restart, Speed menu, Animated Only filter<br>"
-                          + "• The Wall Features panel (Layers, Playback, Text) is on the left<br>"
-                          + "• Save button in Present"
+                    text: "<b>New in 0.9.9</b><br>"
+                          + "• Text: wrap to the box, arc, perspective tilt, and glow<br>"
+                          + "• Text: type right on the canvas (double-click), Add Text on the toolbar<br>"
+                          + "• A faster font list: type part of a name to find it<br>"
+                          + "• Sort by name, date, type, or random in browsers and browsing containers<br>"
+                          + "• Continue Play: a browsing container plays on to the next video"
                 }
 
                 // The Log window: everything the app would print to a
