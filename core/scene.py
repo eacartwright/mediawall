@@ -70,10 +70,11 @@ FIT_MODES = {FIT_CONTAIN, FIT_COVER}
 
 # Which files a browser or browsing container steps through: every
 # kind it shows, one type, or animated GIF/WebP only
-# (core/media_browser.py, matches_filter). Containers show no audio.
+# (core/media_browser.py, matches_filter). Containers show no audio, and
+# can show only their favorites.
 MEDIA_FILTERS = {
     "browser": ("all", "image", "video", "audio", "animated"),
-    "container": ("all", "image", "video", "animated"),
+    "container": ("all", "image", "video", "animated", "favorites"),
 }
 
 # The order a browser or browsing container steps through a folder
@@ -297,8 +298,12 @@ class SceneObject:
 
     # container
     lock_content: bool = True     # resizing the container scales content
+    # Locked (Lock Container): the container can't be moved, resized,
+    # or rotated, and its content can't be panned, zoomed, replaced, or
+    # stepped to another file, until unlocked. Playback still works.
+    locked: bool = False
     clip_shape: str = "rect"
-    fit_mode: str = FIT_COVER     # how new content is framed (Fit/Fill)
+    fit_mode: str = FIT_CONTAIN   # how new content is framed (Fit/Fill)
 
     # A browsing container: the wheel steps through the media in a
     # folder, showing each file as its content. Workspace state, like a
@@ -317,6 +322,15 @@ class SceneObject:
     # browsing container: when a video ends, play the folder's next
     # video (Continue Play). Workspace state.
     continue_play: bool = False
+
+    # browsing container: files added to the folder since it was last
+    # looked at are shown first, newest first (Show New Files First).
+    # Workspace state.
+    new_first: bool = False
+
+    # browsing container: the files marked as favorites (absolute paths,
+    # as scanned), for the Favorites Only filter. Saved and undoable.
+    favorites: list = field(default_factory=list)
 
     # text: what it says (one line), and how it looks
     # (TEXT_STYLE_DEFAULTS; always complete, see normalized_text_style)
@@ -481,6 +495,14 @@ class Scene:
         if obj is None or obj.type != "container":
             return None
         return obj
+
+    def _editable_container(self, container_id) -> Optional[SceneObject]:
+        """The container, unless it is missing or locked."""
+        container = self._container(container_id)
+        return None if container is None or container.locked else container
+
+    def _frozen(self, obj) -> bool:
+        return obj.type == "container" and obj.locked
 
     def container_at(self, x, y, exclude_id=None) -> Optional[SceneObject]:
         """The top-most container whose (rotated) box contains a scene point."""
@@ -678,7 +700,7 @@ class Scene:
 
     def set_geometry(self, object_id, x, y, width, height, rotation) -> bool:
         obj = self.get(object_id)
-        if obj is None:
+        if obj is None or self._frozen(obj):
             return False
 
         new = (float(x), float(y), float(width), float(height), float(rotation))
@@ -755,7 +777,7 @@ class Scene:
         so the view inside the frame stays exactly the same.
         """
         obj = self.get(object_id)
-        if obj is None or obj.parent_id is not None or factor <= 0:
+        if obj is None or obj.parent_id is not None or factor <= 0 or self._frozen(obj):
             return False
 
         shorter = min(obj.width, obj.height)
@@ -848,6 +870,26 @@ class Scene:
         obj.continue_play = bool(on)
         return True
 
+    def set_new_first(self, container_id, on) -> bool:
+        obj = self.get(container_id)
+        if obj is None or obj.type != "container" or obj.new_first == bool(on):
+            return False
+        obj.new_first = bool(on)
+        return True
+
+    def set_favorite(self, container_id, path, on) -> bool:
+        """Mark (or unmark) a file as one of a container's favorites."""
+        obj = self.get(container_id)
+        if obj is None or obj.type != "container" or not path:
+            return False
+        if bool(on) == (path in obj.favorites):
+            return False
+        if on:
+            obj.favorites = obj.favorites + [path]
+        else:
+            obj.favorites = [p for p in obj.favorites if p != path]
+        return True
+
     def set_media_filter(self, object_id, media_filter) -> bool:
         obj = self.get(object_id)
         if obj is None or media_filter not in MEDIA_FILTERS.get(obj.type, ()):
@@ -914,7 +956,7 @@ class Scene:
     # Containers
     # -------------------------------------------------
 
-    def _frame_content(self, container, content, aspect, mode=FIT_COVER):
+    def _frame_content(self, container, content, aspect, mode=FIT_CONTAIN):
         """Center content in the container at a fitted size, unrotated."""
         if aspect <= 0:
             aspect = FALLBACK_ASPECT
@@ -993,7 +1035,7 @@ class Scene:
         Returns (new_instance, released) where released is the previous
         content (now a free object) or None.
         """
-        container = self._container(container_id)
+        container = self._editable_container(container_id)
         if container is None:
             return None, None
 
@@ -1019,7 +1061,7 @@ class Scene:
         the container's previous content (now free) or None.
         """
         media = self.get(media_id)
-        container = self._container(container_id)
+        container = self._editable_container(container_id)
 
         if (media is None or container is None or media.type != "media"
                 or media.parent_id is not None):
@@ -1047,7 +1089,7 @@ class Scene:
         Turn a container's content back into a free media object,
         placed where it currently appears on the canvas (unclipped).
         """
-        container = self._container(container_id)
+        container = self._editable_container(container_id)
         content = self.content_of(container_id) if container else None
         if content is None:
             return None
@@ -1068,7 +1110,7 @@ class Scene:
 
     def remove_content(self, container_id) -> bool:
         content = self.content_of(container_id)
-        if content is None:
+        if content is None or self._editable_container(container_id) is None:
             return False
         self.objects = [o for o in self.objects if o.id != content.id]
         return True
@@ -1076,7 +1118,7 @@ class Scene:
     def set_content_geometry(self, container_id, x, y, width, height,
                              rotation) -> bool:
         content = self.content_of(container_id)
-        if content is None:
+        if content is None or self._editable_container(container_id) is None:
             return False
 
         new = (float(x), float(y), max(1.0, float(width)),
@@ -1095,7 +1137,7 @@ class Scene:
         Re-frame the content (Fit or Fill). The container remembers the
         mode, and frames new content (e.g. while browsing) the same way.
         """
-        container = self._container(container_id)
+        container = self._editable_container(container_id)
         if container is None or mode not in FIT_MODES:
             return False
 
@@ -1123,7 +1165,7 @@ class Scene:
         `folder`, or else the folder of the file it shows now; with
         neither, it stays off (returns False).
         """
-        container = self._container(container_id)
+        container = self._editable_container(container_id)
         if container is None:
             return False
 
@@ -1162,7 +1204,7 @@ class Scene:
         file, so they're cleared. An empty container
         gets new content.
         """
-        container = self._container(container_id)
+        container = self._editable_container(container_id)
         source = self.sources.get(source_id)
         if container is None or source is None:
             return False
@@ -1217,7 +1259,7 @@ class Scene:
         Step 2: make the media the container's content, filling it
         exactly, so nothing visibly changes.
         """
-        container = self._container(container_id)
+        container = self._editable_container(container_id)
         media = self.get(media_id)
         if container is None or media is None or media.parent_id is not None:
             return False
@@ -1238,6 +1280,14 @@ class Scene:
         if container is not None:
             self.adopt_as_content(container.id, media_id)
         return container
+
+    def set_locked(self, container_id, locked) -> bool:
+        """Lock Container / Unlock Container."""
+        container = self._container(container_id)
+        if container is None or container.locked == bool(locked):
+            return False
+        container.locked = bool(locked)
+        return True
 
     def set_lock_content(self, container_id, locked) -> bool:
         container = self._container(container_id)

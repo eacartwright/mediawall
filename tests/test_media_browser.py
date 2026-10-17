@@ -53,6 +53,19 @@ class MediaBrowserTests(unittest.TestCase):
             "Japan/Kyoto/temple.png",   # subfolder after its parent's files
         ])
 
+    def test_favorites_filter_keeps_only_favorites(self):
+        paths = [e["path"] for e in self.browser.scan_folder(str(self.root), True)]
+        favorites = [paths[0], paths[3]]
+        found = self.browser.scan_folder(str(self.root), True, "favorites",
+                                         favorites=favorites)
+        self.assertEqual([e["path"] for e in found], favorites)
+        self.assertEqual(self.browser.scan_folder(str(self.root), True, "favorites"), [])
+
+    def test_entries_record_size(self):
+        (self.root / "top.jpg").write_bytes(b"12345")
+        sizes = {e["relpath"]: e["size"] for e in self.browser.scan_folder(str(self.root), True)}
+        self.assertEqual((sizes["top.jpg"], sizes["Beach/clip.mp4"]), (5, 0))
+
     def test_missing_folder_returns_empty(self):
         self.assertEqual(
             self.browser.scan_folder(str(self.root / "nope"), True), []

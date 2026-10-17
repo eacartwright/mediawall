@@ -85,6 +85,17 @@ Item {
         sceneModel.scaleObject(objectId, px, py, f)
     }
 
+    // The letters' size on the canvas (the Text tab's Size). Wrapping,
+    // it's the style's size; otherwise the box scales around its center.
+    readonly property real letterSize: art.scaleY * art.basePixelSize
+
+    function setLetterSize(s) {
+        if (wrap)
+            sceneModel.setTextStyle(objectId, { size: s })
+        else if (letterSize > 0)
+            scaleAround(x + width / 2, y + height / 2, s / letterSize)
+    }
+
 
     // -------------------------------------------------
     // The box follows the text's proportions after an edit (new words,

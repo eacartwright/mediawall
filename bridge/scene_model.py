@@ -46,7 +46,8 @@ BROWSER_FIELDS = ("folder", "current_index", "include_subfolders", "media_filter
 # browsing, the content itself (which file, and how it's framed) and
 # the Fit/Fill mode it's framed with.
 CONTAINER_BROWSE_FIELDS = ("browse_mode", "browse_folder", "browse_subfolders",
-                           "media_filter", "sort_by", "sort_descending", "continue_play")
+                           "media_filter", "sort_by", "sort_descending", "continue_play",
+                           "new_first")
 
 
 def _media_file_filter():
@@ -80,6 +81,7 @@ OBJECT_ROLE_NAMES = [
     "currentIndex",
     "includeSubfolders",
     "lockContent",
+    "locked",
     "clipShape",
     "fitMode",
     "browseMode",
@@ -89,6 +91,8 @@ OBJECT_ROLE_NAMES = [
     "sortBy",
     "sortDescending",
     "continuePlay",
+    "newFirst",
+    "favorites",
     "objText",
     "textStyle",
 ]
@@ -127,9 +131,10 @@ PLAYBACK_ROLES = [ROLES[n] for n in
                    "objMirrored")]
 SOURCE_ROLES = [ROLES["source" + f] for f in SOURCE_FIELDS]
 CONTAINER_ROLES = [ROLES[n] for n in
-                   ("lockContent", "clipShape", "fitMode", "browseMode",
+                   ("lockContent", "locked", "clipShape", "fitMode", "browseMode",
                     "browseFolder", "browseSubfolders", "mediaFilter",
-                    "sortBy", "sortDescending", "continuePlay")]
+                    "sortBy", "sortDescending", "continuePlay", "newFirst",
+                    "favorites")]
 CONTENT_ROLES = [ROLES[n] for n in CONTENT_ROLE_NAMES]
 TEXT_ROLES = [ROLES[n] for n in ("objText", "textStyle")]
 
@@ -356,6 +361,7 @@ class SceneModel(QAbstractListModel):
             "currentIndex": obj.current_index,
             "includeSubfolders": obj.include_subfolders,
             "lockContent": obj.lock_content,
+            "locked": obj.locked,
             "clipShape": obj.clip_shape,
             "fitMode": obj.fit_mode,
             "browseMode": obj.browse_mode,
@@ -365,6 +371,8 @@ class SceneModel(QAbstractListModel):
             "sortBy": obj.sort_by,
             "sortDescending": obj.sort_descending,
             "continuePlay": obj.continue_play,
+            "newFirst": obj.new_first,
+            "favorites": list(obj.favorites),
             "objText": obj.text,
             "textStyle": obj.text_style,
         }.get(name)
@@ -637,11 +645,12 @@ class SceneModel(QAbstractListModel):
     def containerAt(self, x, y, exclude_id):
         """
         The empty container under a scene point, for dropping media.
-        A full container on top blocks the drop rather than letting it
-        reach one underneath: content is never replaced by dropping.
+        A full (or locked) container on top blocks the drop rather than
+        letting it reach one underneath: content is never replaced by
+        dropping.
         """
         obj = self._scene.container_at(x, y, exclude_id or None)
-        if obj is None or self._scene.content_of(obj.id) is not None:
+        if obj is None or obj.locked or self._scene.content_of(obj.id) is not None:
             return ""
         return obj.id
 
@@ -1074,6 +1083,13 @@ class SceneModel(QAbstractListModel):
             self._changed(workspace_only=True)
 
     @Slot(str, bool)
+    def setLocked(self, container_id, locked):
+        """Lock Container / Unlock Container (undoable)."""
+        if self._scene.set_locked(container_id, locked):
+            self._emit_row(container_id, CONTAINER_ROLES)
+            self._changed()
+
+    @Slot(str, bool)
     def setLockContent(self, container_id, locked):
         if self._scene.set_lock_content(container_id, locked):
             self._emit_row(container_id, CONTAINER_ROLES)
@@ -1144,6 +1160,20 @@ class SceneModel(QAbstractListModel):
         if self._scene.set_continue_play(container_id, on):
             self._emit_row(container_id, CONTAINER_ROLES)
             self._changed(workspace_only=True)
+
+    @Slot(str, bool)
+    def setNewFirst(self, container_id, on):
+        """A browsing container shows files new to its folder first."""
+        if self._scene.set_new_first(container_id, on):
+            self._emit_row(container_id, CONTAINER_ROLES)
+            self._changed(workspace_only=True)
+
+    @Slot(str, str, bool)
+    def setFavorite(self, container_id, path, on):
+        """Mark a file as one of a browsing container's favorites (undoable)."""
+        if self._scene.set_favorite(container_id, path, on):
+            self._emit_row(container_id, CONTAINER_ROLES)
+            self._changed()
 
     @Slot(str, bool)
     def setPlaying(self, object_id, playing):

@@ -25,7 +25,7 @@ import tempfile
 from pathlib import Path
 
 from core.scene import (
-    CLIP_SHAPES, FIT_COVER, FIT_MODES, MEDIA_FILTERS, OBJECT_TYPES, PLAYABLE_TYPES,
+    CLIP_SHAPES, FIT_CONTAIN, FIT_MODES, MEDIA_FILTERS, OBJECT_TYPES, PLAYABLE_TYPES,
     SORT_KEYS, MediaSource, Scene, SceneObject,
     clamp_speed, new_id, normalized_loop, normalized_text_style, one_line,
 )
@@ -43,9 +43,10 @@ TYPE_FIELDS = {
               "speed", "preserve_pitch", "loop_a", "loop_b", "mirrored"],
     "browser": ["folder", "current_index", "include_subfolders", "media_filter",
                 "sort_by", "sort_descending"],
-    "container": ["lock_content", "clip_shape", "fit_mode",
+    "container": ["lock_content", "locked", "clip_shape", "fit_mode",
                   "browse_mode", "browse_folder", "browse_subfolders",
-                  "media_filter", "sort_by", "sort_descending", "continue_play"],
+                  "media_filter", "sort_by", "sort_descending", "continue_play",
+                  "new_first", "favorites"],
     "audio": ["source_id", "playing", "muted", "volume", "loop",
               "speed", "preserve_pitch", "loop_a", "loop_b"],
     "text": ["text", "text_style"],
@@ -272,8 +273,14 @@ def scene_from_dict(data, project_path=None):
                 obj.loop_a = obj.loop_b = -1.0
 
         if object_type == "container" and obj.fit_mode not in FIT_MODES:
-            warnings.append(f"Unknown fit mode {obj.fit_mode!r}; using Fill.")
-            obj.fit_mode = FIT_COVER
+            warnings.append(f"Unknown fit mode {obj.fit_mode!r}; using Fit.")
+            obj.fit_mode = FIT_CONTAIN
+
+        if object_type == "container" and (
+                not isinstance(obj.favorites, list)
+                or not all(isinstance(p, str) for p in obj.favorites)):
+            warnings.append("Ignored a bad favorites list.")
+            obj.favorites = [p for p in obj.favorites if isinstance(p, str)]                 if isinstance(obj.favorites, list) else []
 
         if object_type == "container" and obj.clip_shape not in CLIP_SHAPES:
             warnings.append(

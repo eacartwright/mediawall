@@ -31,18 +31,18 @@ class ContainerTests(unittest.TestCase):
         self.src = self.scene.add_source("/pics/wide.jpg", "image", 400, 200)
         self.box = self.scene.add_object("container", 100, 100)   # 360 x 260
 
-    def test_add_media_fills_container(self):
+    def test_add_media_fits_container(self):
         content, released = self.scene.add_media_to_container(
             self.src.id, self.box.id
         )
         self.assertIsNone(released)
         self.assertEqual(content.parent_id, self.box.id)
-        # 2:1 into 360x260, cover: height matches, width overflows
-        self.assertAlmostEqual(content.height, 260)
-        self.assertAlmostEqual(content.width, 520)
+        # 2:1 into 360x260, contain (the default): width matches
+        self.assertAlmostEqual(content.width, 360)
+        self.assertAlmostEqual(content.height, 180)
         # centered
-        self.assertAlmostEqual(content.x, (360 - 520) / 2)
-        self.assertAlmostEqual(content.y, 0)
+        self.assertAlmostEqual(content.x, 0)
+        self.assertAlmostEqual(content.y, (260 - 180) / 2)
 
     def test_content_is_not_top_level_or_stacked(self):
         content, _ = self.scene.add_media_to_container(self.src.id, self.box.id)
@@ -291,8 +291,9 @@ class BrowsingContainerTests(unittest.TestCase):
         self.box = self.scene.add_object("container", 0, 0)       # 360 x 260
 
     def test_fit_mode_is_remembered_for_new_content(self):
-        self.assertEqual(self.box.fit_mode, FIT_COVER)
-        self.assertTrue(self.scene.fit_content(self.box.id, FIT_CONTAIN))  # empty: mode only
+        self.assertEqual(self.box.fit_mode, FIT_CONTAIN)              # Fit by default
+        self.assertTrue(self.scene.fit_content(self.box.id, FIT_COVER))    # empty: mode only
+        self.assertTrue(self.scene.fit_content(self.box.id, FIT_CONTAIN))
         content, _ = self.scene.add_media_to_container(self.wide.id, self.box.id)
         # 2:1 into 360x260, contain: width matches
         self.assertAlmostEqual(content.width, 360)
@@ -325,9 +326,9 @@ class BrowsingContainerTests(unittest.TestCase):
         self.assertEqual(content.source_id, self.tall.id)
         self.assertTrue(content.playing)                           # each file plays
         self.assertEqual((content.loop_a, content.loop_b), (-1.0, -1.0))
-        # 1:2 into 360x260, cover (the default): width matches
-        self.assertAlmostEqual(content.width, 360)
-        self.assertAlmostEqual(content.height, 720)
+        # 1:2 into 360x260, contain (the default): height matches
+        self.assertAlmostEqual(content.width, 130)
+        self.assertAlmostEqual(content.height, 260)
 
     def test_showing_a_file_in_an_empty_container(self):
         self.assertTrue(self.scene.show_file_in_container(self.box.id, self.tall.id))
@@ -351,7 +352,7 @@ class BrowsingContainerTests(unittest.TestCase):
             "objects": [{"id": "c", "type": "container", "fit_mode": "zoom"}],
         }
         scene, warnings = scene_from_dict(data)
-        self.assertEqual(scene.get("c").fit_mode, FIT_COVER)
+        self.assertEqual(scene.get("c").fit_mode, FIT_CONTAIN)
         self.assertEqual(len(warnings), 1)
 
 
@@ -506,6 +507,95 @@ class ScaleObjectTests(unittest.TestCase):
     def test_content_cannot_be_scaled_directly(self):
         content, _ = self.scene.add_media_to_container(self.src.id, self.box.id)
         self.assertFalse(self.scene.scale_object(content.id, 0, 0, 2.0))
+
+
+class LockedContainerTests(unittest.TestCase):
+    """Lock Container: nothing about it changes until it is unlocked."""
+
+    def setUp(self):
+        self.scene = Scene()
+        self.wide = self.scene.add_source("/trip/wide.jpg", "image", 400, 200)
+        self.tall = self.scene.add_source("/trip/tall.jpg", "image", 200, 400)
+        self.free = self.scene.add_media(self.tall.id, 600, 0)
+        self.box = self.scene.add_object("container", 0, 0)
+        self.content, _ = self.scene.add_media_to_container(self.wide.id, self.box.id)
+        self.assertTrue(self.scene.set_locked(self.box.id, True))
+        self.assertFalse(self.scene.set_locked(self.box.id, True))   # no change
+
+    def test_container_cannot_move_resize_rotate_or_scale(self):
+        before = (self.box.x, self.box.y, self.box.width, self.box.height, self.box.rotation)
+        self.assertFalse(self.scene.set_geometry(self.box.id, 50, 50, 100, 100, 30))
+        self.assertFalse(self.scene.scale_object(self.box.id, 0, 0, 2.0))
+        self.assertFalse(self.scene.fill_along(self.box.id, "h", 2000, 2000))
+        self.assertEqual((self.box.x, self.box.y, self.box.width, self.box.height,
+                          self.box.rotation), before)
+
+    def test_content_cannot_change(self):
+        frame = (self.content.x, self.content.y, self.content.width, self.content.height)
+        self.assertFalse(self.scene.set_content_geometry(self.box.id, 5, 5, 10, 10, 0))
+        self.assertFalse(self.scene.fit_content(self.box.id, FIT_COVER))
+        self.assertFalse(self.scene.show_file_in_container(self.box.id, self.tall.id))
+        self.assertEqual(self.scene.add_media_to_container(self.tall.id, self.box.id), (None, None))
+        self.assertEqual(self.scene.move_into_container(self.free.id, self.box.id), (False, None))
+        self.assertIsNone(self.scene.release_content(self.box.id))
+        self.assertFalse(self.scene.remove_content(self.box.id))
+        self.assertFalse(self.scene.set_browsing(self.box.id, True, "/trip"))
+        self.assertIs(self.scene.content_of(self.box.id), self.content)
+        self.assertEqual(self.content.source_id, self.wide.id)
+        self.assertEqual((self.content.x, self.content.y, self.content.width,
+                          self.content.height), frame)
+
+    def test_playback_still_works(self):
+        self.assertTrue(self.scene.set_media_option(self.content.id, "volume", 0.5))
+        self.assertTrue(self.scene.set_playing(self.content.id, False))
+
+    def test_unlocked_it_changes_again(self):
+        self.assertTrue(self.scene.set_locked(self.box.id, False))
+        self.assertTrue(self.scene.set_geometry(self.box.id, 50, 50, 100, 100, 30))
+        self.assertTrue(self.scene.show_file_in_container(self.box.id, self.tall.id))
+
+    def test_lock_is_saved(self):
+        loaded, _ = scene_from_dict(scene_to_dict(self.scene))
+        self.assertTrue(loaded.get(self.box.id).locked)
+        self.assertFalse(loaded.get(self.free.id).locked)
+
+
+class FavoritesTests(unittest.TestCase):
+
+    def setUp(self):
+        self.scene = Scene()
+        self.box = self.scene.add_object("container", 0, 0)
+
+    def test_mark_and_unmark(self):
+        self.assertTrue(self.scene.set_favorite(self.box.id, "/a.jpg", True))
+        self.assertFalse(self.scene.set_favorite(self.box.id, "/a.jpg", True))   # already
+        self.assertTrue(self.scene.set_favorite(self.box.id, "/b.jpg", True))
+        self.assertEqual(self.box.favorites, ["/a.jpg", "/b.jpg"])
+        self.assertTrue(self.scene.set_favorite(self.box.id, "/a.jpg", False))
+        self.assertEqual(self.box.favorites, ["/b.jpg"])
+
+    def test_favorites_filter_is_a_container_filter(self):
+        self.assertTrue(self.scene.set_media_filter(self.box.id, "favorites"))
+        browser = self.scene.add_object("browser", 0, 0)
+        self.assertFalse(self.scene.set_media_filter(browser.id, "favorites"))
+
+    def test_saved_with_new_first(self):
+        self.scene.set_favorite(self.box.id, "/a.jpg", True)
+        self.assertTrue(self.scene.set_new_first(self.box.id, True))
+        loaded, warnings = scene_from_dict(scene_to_dict(self.scene))
+        box = loaded.get(self.box.id)
+        self.assertEqual((box.favorites, box.new_first, warnings), (["/a.jpg"], True, []))
+
+    def test_bad_favorites_are_repaired(self):
+        data = {
+            "format": FORMAT, "version": 1, "media_sources": {},
+            "objects": [{"id": "c", "type": "container", "favorites": ["/a.jpg", 3]},
+                        {"id": "d", "type": "container", "favorites": "nope"}],
+        }
+        scene, warnings = scene_from_dict(data)
+        self.assertEqual(scene.get("c").favorites, ["/a.jpg"])
+        self.assertEqual(scene.get("d").favorites, [])
+        self.assertEqual(len(warnings), 2)
 
 
 if __name__ == "__main__":

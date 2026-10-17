@@ -1,5 +1,6 @@
 import QtQuick
 import QtQuick.Controls
+import QtQuick.Dialogs
 import QtQuick.Layouts
 
 // App-wide settings (bridge/app_settings.py). Changes apply at once and
@@ -222,6 +223,66 @@ Dialog {
                           + " ms). A held tilt can't step faster than the mouse sends it."
                     color: "#999999"
                     font.pixelSize: 12
+                }
+
+                // ---- Container background ----
+
+                Label {
+                    Layout.topMargin: 12
+                    text: "Container background"
+                    font.bold: true
+                }
+
+                RowLayout {
+                    spacing: 8
+
+                    Rectangle {
+                        objectName: "containerColorSwatch"   // found by tests/app
+                        implicitWidth: 40
+                        implicitHeight: 24
+                        radius: 3
+                        color: appSettings.containerColor
+                        border.color: swatchArea.containsMouse ? "#ffffff" : "#888888"
+
+                        MouseArea {
+                            id: swatchArea
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: {
+                                containerColorDialog.selectedColor = appSettings.containerColor
+                                containerColorDialog.open()
+                            }
+                        }
+                    }
+
+                    Label {
+                        text: appSettings.containerColor
+                        color: "#bbbbbb"
+                    }
+
+                    Item { Layout.fillWidth: true }
+
+                    Button {
+                        text: "Default"
+                        enabled: appSettings.containerColor !== appSettings.containerColorDefault
+                        onClicked: appSettings.resetContainerColor()
+                    }
+                }
+
+                Label {
+                    Layout.fillWidth: true
+                    wrapMode: Text.WordWrap
+                    text: "Shown where a container's picture doesn't reach (around a "
+                          + "Fit picture, or an empty container)."
+                    color: "#999999"
+                    font.pixelSize: 12
+                }
+
+                ColorDialog {
+                    id: containerColorDialog
+                    title: "Container Background"
+                    onAccepted: appSettings.containerColor = selectedColor.toString()
                 }
             }
 

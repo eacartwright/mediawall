@@ -31,14 +31,17 @@ Item {
     required property real objRotation
     required property int objZ
     required property bool lockContent
+    required property bool locked               // Lock Container
     required property string fitMode
     required property bool browseMode
     required property string browseFolder
     required property bool browseSubfolders
-    required property string mediaFilter        // "all", "image", or "video"
+    required property string mediaFilter        // core/scene.py MEDIA_FILTERS["container"]
     required property string sortBy             // core/scene.py SORT_KEYS
     required property bool sortDescending
     required property bool continuePlay
+    required property bool newFirst             // Show New Files First
+    required property var favorites             // paths, for Favorites Only
 
     required property string contentId
     required property real contentX
@@ -156,9 +159,15 @@ Item {
             browseFiles = []
             return
         }
-        browseFiles = browserBackend.scanFolder(browseFolder, browseSubfolders, mediaFilter,
-                                                sortBy, sortDescending, objectId)
+        browseFiles = browserBackend.scanContainerFolder(browseFolder, browseSubfolders, mediaFilter,
+                                                         sortBy, sortDescending, objectId, favorites)
             .filter(function(e) { return e.type === "image" || e.type === "video" })
+
+        // What's there now isn't new (a new folder, filter, or session).
+        if (!seenReady) {
+            markSeen(browseFiles)
+            seenReady = true
+        }
 
         // An empty container starts on the folder's first file, rather
         // than sitting empty until the first step. So does one given a
@@ -179,15 +188,103 @@ Item {
             sceneModel.showInContainer(objectId, browseFiles[0].path, browseFiles[0].type)
     }
 
-    onBrowseModeChanged: rescanBrowse()
-    onBrowseFolderChanged: rescanBrowse()
-    onBrowseSubfoldersChanged: rescanBrowse()
+    onBrowseModeChanged: { forgetSeen(); rescanBrowse() }
+    onBrowseFolderChanged: { forgetSeen(); rescanBrowse() }
+    onBrowseSubfoldersChanged: { forgetSeen(); rescanBrowse() }
     onSortByChanged: rescanBrowse()
     onSortDescendingChanged: rescanBrowse()
     // A new filter that hides the file shown moves on to the first one.
     onMediaFilterChanged: {
         startAtFirstFile = true
+        forgetSeen()
         rescanBrowse()
+    }
+    // Favorites Only: the list follows the marks (no other filter does).
+    onFavoritesChanged: if (mediaFilter === "favorites") rescanBrowse()
+    onNewFirstChanged: if (newFirst) { forgetSeen(); rescanBrowse() }
+
+
+    // -------------------------------------------------
+    // Favorites (the file shown): the star button, or right-click
+    // -------------------------------------------------
+
+    readonly property bool isFavorite:
+        hasContent && favorites.indexOf(contentSourcePath) >= 0
+
+    function toggleFavorite() {
+        if (hasContent && browseMode)
+            sceneModel.setFavorite(objectId, contentSourcePath, !isFavorite)
+    }
+
+
+    // -------------------------------------------------
+    // Show New Files First: each step looks at the folder again (at
+    // most once a second); files that weren't there before are shown
+    // first, newest first, then stepping goes on from the file shown
+    // before them. Session state, in this item only.
+    // -------------------------------------------------
+
+    property var seenPaths: ({})
+    property bool seenReady: false
+    property var newQueue: []           // entries, newest first
+    property string resumePath: ""      // shown before the new files
+    property double lastLook: 0
+
+    function forgetSeen() {
+        seenPaths = ({})
+        seenReady = false
+        newQueue = []
+        resumePath = ""
+    }
+
+    function markSeen(files) {
+        for (var i = 0; i < files.length; i++)
+            if (files[i].size > 0)       // empty: a download still being written
+                seenPaths[files[i].path] = true
+    }
+
+    function lookForNewFiles() {
+        var now = Date.now()
+        if (now - lastLook < 1000)
+            return
+        lastLook = now
+        rescanBrowse()
+        var fresh = browseFiles.filter(function(e) {
+            return e.size > 0 && !seenPaths[e.path]
+        })
+        if (fresh.length === 0)
+            return
+        markSeen(fresh)
+        newQueue = newQueue.concat(fresh).sort(function(a, b) { return b.mtime - a.mtime })
+    }
+
+    // The next new file (of `type`, if given), taken off the queue; or null.
+    function takeNewFile(type) {
+        if (!newFirst)
+            return null
+        lookForNewFiles()
+        for (var i = 0; i < newQueue.length; i++) {
+            var e = newQueue[i]
+            if (type && e.type !== type)
+                continue
+            newQueue = newQueue.slice(0, i).concat(newQueue.slice(i + 1))
+            if (resumePath === "")
+                resumePath = contentSourcePath
+            return e
+        }
+        return null
+    }
+
+    // Where stepping goes on from: the file shown before the new ones.
+    function stepOrigin() {
+        if (resumePath === "")
+            return browseIndex
+        var path = resumePath
+        resumePath = ""
+        for (var i = 0; i < browseFiles.length; i++)
+            if (browseFiles[i].path === path)
+                return i
+        return browseIndex
     }
 
     readonly property int browseIndex: {
@@ -209,7 +306,9 @@ Item {
 
     // Left/Right arrow keys (AppActions), thumb buttons, and the
     // horizontal wheel step through the folder while browsing.
-    readonly property bool stepsFiles: browseMode
+    readonly property bool stepsFiles: browseMode && !locked
+
+    onLockedChanged: if (locked) adjusting = false
 
     function stepFiles(delta) {
         browseStep(delta)
@@ -232,22 +331,34 @@ Item {
 
     // -1 = previous, +1 = next, wrapping around (as in a browser).
     function browseStep(delta) {
+        var fresh = takeNewFile("")
+        if (fresh) {
+            sceneModel.showInContainer(objectId, fresh.path, fresh.type)
+            return
+        }
         var n = browseFiles.length
         if (n === 0)
             return
-        var i = browseIndex < 0 ? (delta > 0 ? 0 : n - 1)
-                                : (browseIndex + delta + n) % n
+        var origin = stepOrigin()
+        var i = origin < 0 ? (delta > 0 ? 0 : n - 1)
+                           : (origin + delta + n) % n
         sceneModel.showInContainer(objectId, browseFiles[i].path, browseFiles[i].type)
     }
 
     // Continue Play: at the end of a video, play the folder's next video
     // (images are skipped). A video doesn't loop meanwhile.
-    readonly property bool playsThrough: browseMode && continuePlay
+    readonly property bool playsThrough: browseMode && continuePlay && !locked
 
     function playNextVideo() {
+        var fresh = takeNewFile("video")
+        if (fresh) {
+            sceneModel.showInContainer(objectId, fresh.path, "video")
+            return
+        }
         var n = browseFiles.length
+        var origin = stepOrigin()
         for (var k = 1; k <= n; k++) {
-            var i = ((browseIndex < 0 ? -1 : browseIndex) + k) % n
+            var i = ((origin < 0 ? -1 : origin) + k) % n
             if (browseFiles[i].type !== "video")
                 continue
             if (i === browseIndex)
@@ -384,10 +495,11 @@ Item {
 
     Rectangle {
         id: frame
+        objectName: "containerFrame"        // found by tests/app
 
         anchors.fill: parent
 
-        color: "#252525"
+        color: appSettings.containerColor      // Settings > General
         clip: true
 
         MediaView {
@@ -407,7 +519,7 @@ Item {
             missing: root.contentSourceMissing
             playing: root.contentPlaying
             muted: root.contentMuted
-            volume: root.contentVolume
+            volume: root.contentVolume * (root.sceneItem ? root.sceneItem.masterVolume : 1)
             loop: root.contentLoop && !root.playsThrough
             speed: root.contentSpeed
             preservePitch: root.contentPreservePitch
@@ -580,7 +692,7 @@ Item {
         // Over the border strip, or anywhere on an empty container
         // (never while adjusting, where every drag pans).
         function movesAt(px, py) {
-            return !root.adjusting && !root.presenting
+            return !root.adjusting && !root.presenting && !root.locked
                    && (!root.hasContent || root.inBorderStrip(px, py))
         }
 
@@ -606,7 +718,7 @@ Item {
             mode = ""
 
             if (mouse.button === Qt.BackButton || mouse.button === Qt.ForwardButton) {
-                if (root.browseMode)
+                if (root.stepsFiles)
                     fileStepper.begin(mouse.button === Qt.BackButton ? -1 : 1)
                 else
                     mouse.accepted = false
@@ -621,6 +733,10 @@ Item {
                     root.contextMenu.openFor(root)
                 return
             }
+
+            // Locked: nothing moves, pans, or zooms (the menu unlocks).
+            if (root.locked)
+                return
 
             if (mouse.button === Qt.MiddleButton) {
                 if (!root.adjusting)
@@ -667,7 +783,7 @@ Item {
             if (mouse.button !== Qt.LeftButton)
                 return
             if (!root.hasContent) {
-                if (!root.presenting && !(root.browseMode && root.browseFolder !== ""))
+                if (!root.presenting && !root.locked && !(root.browseMode && root.browseFolder !== ""))
                     sceneModel.startBrowsing(root.objectId)
                 return
             }
@@ -677,7 +793,7 @@ Item {
                 if (!root.contentPlaying)
                     sceneModel.setPlaying(root.contentId, true)
                 contentView.restartAnimation()
-            } else {
+            } else if (!root.locked) {
                 sceneModel.resetContentFraming(root.objectId)
             }
         }
@@ -686,6 +802,8 @@ Item {
         // an empty container), scale the whole container like a free
         // image.
         onWheel: function(wheel) {
+            if (root.locked)
+                return                      // taken, so nothing underneath zooms
             if (root.browseMode && fileStepper.wheel(wheel.angleDelta))
                 return
 
@@ -716,7 +834,7 @@ Item {
     // -------------------------------------------------
 
     ResizeHandles {
-        visible: root.selected && !root.adjusting
+        visible: root.selected && !root.adjusting && !root.locked
 
         target: root
         sceneItem: root.sceneItem
@@ -752,7 +870,7 @@ Item {
     RotationHandle {
         id: rotationHandle
 
-        visible: root.selected
+        visible: root.selected && !root.locked
 
         target: root
         sceneItem: root.sceneItem
@@ -836,10 +954,77 @@ Item {
             width: parent.width - 12
             elide: Text.ElideMiddle
             text: root.browseFiles.length === 0
-                  ? "Browsing · no media found"
+                  ? (root.mediaFilter === "favorites" ? "Browsing · no favorites yet"
+                                                      : "Browsing · no media found")
                   : "⇅"
             color: "#dddddd"
             font.pixelSize: 11
+        }
+    }
+
+
+    // -------------------------------------------------
+    // Top-right: the favorite star (a browsing container's file;
+    // selected or under the pointer) and the Locked badge (selected;
+    // right-click > Lock Container unlocks)
+    // -------------------------------------------------
+
+    Row {
+        anchors.right: parent.right
+        anchors.top: parent.top
+        anchors.margins: 12
+        spacing: 6
+        z: 25
+
+        Rectangle {
+            objectName: "favoriteStar"          // found by tests/app
+
+            width: 24
+            height: 22
+            radius: 3
+
+            visible: root.browseMode && root.hasContent && !root.adjusting
+                     && (root.selected || area.containsMouse || starArea.containsMouse)
+            color: "#cc202020"
+
+            Text {
+                anchors.centerIn: parent
+                text: root.isFavorite ? "★" : "☆"
+                color: root.isFavorite ? "#ffcc33" : "#dddddd"
+                font.pixelSize: 15
+            }
+
+            MouseArea {
+                id: starArea
+                anchors.fill: parent
+                hoverEnabled: true
+                cursorShape: Qt.PointingHandCursor
+                onClicked: root.toggleFavorite()
+            }
+
+            ToolTip.visible: starArea.containsMouse
+            ToolTip.text: root.isFavorite ? "Favorite (click to unmark)"
+                                          : "Mark as a favorite (Show Favorites Only lists them)"
+            ToolTip.delay: 600
+        }
+
+        Rectangle {
+            objectName: "lockedBadge"           // found by tests/app
+
+            width: lockedText.implicitWidth + 12
+            height: 22
+            radius: 3
+
+            visible: root.locked && root.selected
+            color: "#cc202020"
+
+            Text {
+                id: lockedText
+                anchors.centerIn: parent
+                text: "Locked"
+                color: "#e0a84c"
+                font.pixelSize: 11
+            }
         }
     }
 

@@ -94,8 +94,21 @@ Item {
         // while there is a glow: an effect whose source's layer is turned
         // on later never shows it.
         Loader {
+            id: glowLoader
             objectName: "glowLoader"         // found by tests/app
-            active: art.glow > 0
+            active: art.glow > 0 && !rebuilding
+
+            // The effect keeps its first size when the outline changes
+            // (arc, tilt, new words), so it is built again instead.
+            property bool rebuilding: false
+            readonly property var outline: art.shaped
+
+            onOutlineChanged: {
+                if (!active)
+                    return
+                rebuilding = true
+                Qt.callLater(function() { glowLoader.rebuilding = false })
+            }
 
             sourceComponent: Item {
                 readonly property real margin: 2 * art.glow + art.pad + 4
@@ -164,30 +177,62 @@ Item {
             }
         }
 
-        Shape {
-            id: front
+        // The letters' face. The curve renderer doesn't always redraw
+        // when a gradient's colours change (a new preset's outline and
+        // depth showed, but the old fill stayed), so the face is built
+        // again whenever the fill or its span changes: the Repeater's
+        // one-item model is that key. Swapped in the same frame, so it
+        // doesn't flicker.
+        Repeater {
+            objectName: "textFace"               // found by tests/app
+            model: [art.fill + "|" + art.fill2 + "|" + art.glyphs.y + "|" + art.glyphs.height]
 
-            x: body.originX
-            y: body.originY
-            preferredRendererType: Shape.CurveRenderer
+            Shape {
+                id: front
 
-            ShapePath {
-                fillColor: art.fill
-                fillGradient: art.fill2 !== "" ? front.fillGrad : null
-                strokeColor: art.outlineWidth > 0 ? art.outline : "transparent"
-                strokeWidth: art.outlineWidth
-                joinStyle: ShapePath.RoundJoin
-                PathSvg { path: art.shaped.path }
+                x: body.originX
+                y: body.originY
+                preferredRendererType: Shape.CurveRenderer
+
+                ShapePath {
+                    // Always the gradient (a plain fill is two equal stops).
+                    fillGradient: front.fillGrad
+                    strokeColor: art.outlineWidth > 0 ? art.outline : "transparent"
+                    strokeWidth: art.outlineWidth
+                    joinStyle: ShapePath.RoundJoin
+                    PathSvg { path: art.shaped.path }
+                }
+
+                // Top to bottom across the glyphs.
+                property LinearGradient fillGrad: LinearGradient {
+                    x1: 0
+                    y1: art.glyphs.y
+                    x2: 0
+                    y2: art.glyphs.y + art.glyphs.height
+                    GradientStop { position: 0; color: art.fill }
+                    GradientStop { position: 1; color: art.fill2 !== "" ? art.fill2 : art.fill }
+                }
             }
+        }
 
-            // Top to bottom across the glyphs.
-            property LinearGradient fillGrad: LinearGradient {
-                x1: 0
-                y1: art.glyphs.y
-                x2: 0
-                y2: art.glyphs.y + art.glyphs.height
-                GradientStop { position: 0; color: art.fill }
-                GradientStop { position: 1; color: art.fill2 !== "" ? art.fill2 : art.fill }
+        // Emoji, in colour: not part of the outline (textShaper gives
+        // each one's centre, size, and angle), so they take no fill,
+        // outline, depth, or glow.
+        Repeater {
+            objectName: "emojiRepeater"      // found by tests/app
+            model: art.shaped.emoji || []
+
+            Text {
+                required property var modelData
+
+                text: modelData.text
+                // Shown only where no emoji font has the picture (e.g.
+                // flags on Windows come out as two letters).
+                color: art.fill
+                font.pixelSize: Math.max(1, modelData.size)
+                x: body.originX + modelData.x - width / 2
+                y: body.originY + modelData.y - height / 2
+                rotation: modelData.angle
             }
         }
     }

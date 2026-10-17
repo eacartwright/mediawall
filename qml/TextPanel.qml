@@ -154,6 +154,7 @@ ScrollView {
                     Rectangle {
                         id: presetButton
                         required property var modelData
+                        objectName: "preset" + modelData.name      // found by tests/app
 
                         Layout.fillWidth: true
                         Layout.preferredHeight: 40
@@ -213,6 +214,34 @@ ScrollView {
                         panel.set({ italic: checked })
                         checked = Qt.binding(function() { return panel.style.italic === true })
                     }
+                }
+            }
+
+            // ---- Size: the letters' height on the canvas ----
+            RowLayout {
+                Layout.fillWidth: true
+                spacing: 6
+
+                Caption { text: "Size"; Layout.preferredWidth: 48 }
+
+                Slider {
+                    objectName: "sizeSlider"
+                    Layout.fillWidth: true
+                    from: 8
+                    to: 400
+                    stepSize: 1
+                    value: panel.target ? panel.target.letterSize : 60
+                    onMoved: panel.target.setLetterSize(value)
+                }
+
+                SpinBox {
+                    objectName: "sizeBox"
+                    Layout.preferredWidth: 84
+                    from: 4
+                    to: 2000
+                    editable: true
+                    value: panel.target ? Math.round(panel.target.letterSize) : 60
+                    onValueModified: panel.target.setLetterSize(value)
                 }
             }
 

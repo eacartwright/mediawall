@@ -79,6 +79,15 @@ class BrowserBackend(QObject):
         return self.media_browser.scan_folder(folder, recursive, media_filter,
                                               sort_by, descending, seed)
 
+    # A browsing container's scan: the same, plus its favorites (for the
+    # "favorites" filter).
+    @Slot(str, bool, str, str, bool, str, list, result=list)
+    def scanContainerFolder(self, folder, recursive, media_filter, sort_by, descending,
+                            seed, favorites):
+        return self.media_browser.scan_folder(folder, recursive, media_filter,
+                                              sort_by, descending, seed,
+                                              [str(p) for p in favorites])
+
 
 def main():
     # First, so startup messages are captured too: terminal output

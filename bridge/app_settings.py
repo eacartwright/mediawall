@@ -12,6 +12,7 @@ everywhere at once, and is saved immediately.
 """
 
 import os
+import re
 
 from PySide6.QtCore import Property, QObject, QSettings, Signal, Slot
 from PySide6.QtGui import QKeySequence
@@ -47,6 +48,13 @@ STEP_INTERVAL_DEFAULT = 150
 STEP_INTERVAL_RANGE = (30, 1000)
 
 
+# The colour behind a container's content (where the picture doesn't
+# reach), as "#rrggbb".
+CONTAINER_COLOR_KEY = "containers/backgroundColor"
+CONTAINER_COLOR_DEFAULT = "#252525"
+_HEX_COLOR = re.compile(r"#[0-9a-fA-F]{6}")
+
+
 # Recently opened or saved projects (Open Recent), newest first.
 RECENT_KEY = "recent/projects"
 
@@ -56,6 +64,7 @@ class AppSettings(QObject):
     zoomStepChanged = Signal()
     speedRangeChanged = Signal()
     stepRepeatChanged = Signal()
+    containerColorChanged = Signal()
     recentProjectsChanged = Signal()
 
     def __init__(self, parent=None):
@@ -200,6 +209,35 @@ class AppSettings(QObject):
     def resetStepRepeat(self):
         self._set_step_delay(STEP_DELAY_DEFAULT)
         self._set_step_interval(STEP_INTERVAL_DEFAULT)
+
+    # ---- Container background colour ----
+
+    def _get_container_color(self):
+        value = str(self._settings.value(CONTAINER_COLOR_KEY, CONTAINER_COLOR_DEFAULT))
+        return value.lower() if _HEX_COLOR.fullmatch(value) else CONTAINER_COLOR_DEFAULT
+
+    def _set_container_color(self, value):
+        # QML colours arrive as "#rrggbb" (or "#aarrggbb"; alpha dropped).
+        value = str(value).lower()
+        if len(value) == 9 and value.startswith("#"):
+            value = "#" + value[3:]
+        if not _HEX_COLOR.fullmatch(value) or value == self._get_container_color():
+            return
+        self._settings.setValue(CONTAINER_COLOR_KEY, value)
+        self._settings.sync()
+        self.containerColorChanged.emit()
+
+    containerColor = Property(str, _get_container_color, _set_container_color,
+                              notify=containerColorChanged)
+
+    def _get_container_color_default(self):
+        return CONTAINER_COLOR_DEFAULT
+
+    containerColorDefault = Property(str, _get_container_color_default, constant=True)
+
+    @Slot()
+    def resetContainerColor(self):
+        self._set_container_color(CONTAINER_COLOR_DEFAULT)
 
     # ---- Shortcut display (the Settings dialog's Shortcuts tab) ----
 

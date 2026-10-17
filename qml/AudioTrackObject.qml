@@ -38,7 +38,7 @@ Item {
         missing: root.sourceMissing
         playing: root.objPlaying
         muted: root.objMuted
-        volume: root.objVolume
+        volume: root.objVolume * (root.sceneItem ? root.sceneItem.masterVolume : 1)
         loop: root.objLoop
         speed: root.objSpeed
         preservePitch: root.objPreservePitch

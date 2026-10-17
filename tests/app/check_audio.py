@@ -1,6 +1,7 @@
 """
 Audio (readme section 14): the Playback tab, speed/A-B loop, the speed
-range setting, video as audio, and audio files (.m4a, .mp3).
+range setting, video as audio, audio files (.m4a, .mp3), and the master
+volume.
 """
 
 import os
@@ -136,9 +137,24 @@ def step_files():
         c.check(f"audio file {os.path.splitext(name)[1]} loads as a track and plays",
                 state == 1 and dur > 0, f"state {state}, {dur} ms")
     c.check("the Playback tab lists both tracks beside the two videos", rows() == 4, str(rows()))
+    c.sm.setVolume(c.files[0], 0.8)
+    x, y, w, _ = c.center_of("masterVolumeSlider")
+    c.click(x, y)                                   # the middle: 50%
+
+
+def step_master():
+    tid = c.files[0]
+    c.check("Master volume: the slider sets this window's master volume",
+            abs(c.js("scene.masterVolume") - 0.5) < 0.06, str(c.js("scene.masterVolume")))
+    c.check("...which scales every player's volume (track 80% -> 40%)",
+            abs(c.js(f"scene.viewFor('{tid}').volume") - 0.8 * c.js("scene.masterVolume")) < 0.001
+            and abs(c.js(f"scene.viewFor('{clip.id}').volume") - c.js("scene.masterVolume")) < 0.001)
+    c.check("...without changing the saved volumes, or marking the wall changed by itself",
+            c.scene.get(tid).volume == 0.8)
+    c.js("scene.masterVolume = 1")
     c.finish()
 
 
 c.run(scene, [(1500, step_list), (800, step_tab), (800, step_speed), (1000, step_loop),
               (1500, step_loop2), (1000, step_ab_button), (800, step_convert), (1500, step_convert2),
-              (2000, step_files)])
+              (2000, step_files), (500, step_master)])

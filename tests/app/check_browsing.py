@@ -145,7 +145,10 @@ def step_undo_and_reset():
 def step_after_reset():
     item, b = content(), c.scene.get(box.id)
     fitted = abs(item.height - b.height) < 0.5 or abs(item.width - b.width) < 0.5
-    c.check("double-click resets the zoom", fitted and item.x <= 0.5 and item.y <= 0.5)
+    centered = (abs(item.x + item.width / 2 - b.width / 2) < 0.5
+                and abs(item.y + item.height / 2 - b.height / 2) < 0.5)
+    c.check("double-click resets the zoom (Fit: whole picture, centered)", fitted and centered
+            and item.width <= b.width + 0.5 and item.height <= b.height + 0.5)
     c.sm.fitContent(box.id, False)                                  # Fit
     c.click(360, 290, Qt.ForwardButton)
     b, item = c.scene.get(box.id), content()

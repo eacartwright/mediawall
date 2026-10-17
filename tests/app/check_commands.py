@@ -1,6 +1,6 @@
 """
 Commands and shortcuts (qml/AppActions.qml, readme section 25), and the
-Settings dialog (zoom step, saved between runs).
+Settings dialog (zoom step, container background, saved between runs).
 """
 
 from harness import Check, Qt
@@ -82,6 +82,16 @@ def step_settings2():
     c.check("a new settings object (a restart) reads it back", AppSettings().zoomStep == 25.0)
     c.js("appSettings.resetZoomStep()")
     c.check("Default restores 10%", c.js("appSettings.zoomStep") == 10.0)
+    c.check("container background defaults to #252525",
+            c.item_js("containerFrame", "item.color.toString()") == "#252525")
+    c.js("appSettings.containerColor = '#336699'")
+    c.check("...and follows the setting at once, kept after a restart",
+            c.item_js("containerFrame", "item.color.toString()") == "#336699"
+            and AppSettings().containerColor == "#336699")
+    c.js("appSettings.containerColor = 'not a colour'")
+    c.check("...a bad value is ignored", c.js("appSettings.containerColor") == "#336699")
+    c.js("appSettings.resetContainerColor()")
+    c.check("...Default restores it", c.js("appSettings.containerColor") == "#252525")
     c.finish()
 
 

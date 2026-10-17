@@ -3,7 +3,7 @@ Text objects (readme section 5.4): adding one (toolbar) opens a field on
 the canvas ready to type, the box follows the words, Delete while typing
 edits the words (not the wall), styles, undo without refitting, wrap
 (the height follows the lines), arc, the font list, double-click to type,
-and Present.
+glow following the outline, Size, preset buttons, emoji, and Present.
 """
 
 from PySide6.QtTest import QTest
@@ -172,13 +172,88 @@ def step_double_click():
     c.sm.setTextStyle(existing.id, {"glow": 12})
 
 
+def glow_item():
+    return f"""(function() {{ var k = window.objectItem('{existing.id}').children[0].children[0].children
+        for (var i = 0; i < k.length; i++)
+            if (k[i].objectName === 'glowLoader') return k[i].item
+        return null }})()"""
+
+
 def step_glow():
     # Turned on after loading (it once only showed when loaded with one).
-    c.check("glow turned on later draws its effect",
-            c.js(f"""(function() {{ var k = window.objectItem('{existing.id}').children[0].children[0].children
-                for (var i = 0; i < k.length; i++)
-                    if (k[i].objectName === 'glowLoader') return k[i].item !== null
-                return false }})()""") is True)
+    c.check("glow turned on later draws its effect", c.js(glow_item() + " !== null") is True)
+    c.js(f"({glow_item()}).objectName = 'firstGlow'")
+    c.sm.setTextStyle(existing.id, {"arc": 150})
+
+
+def step_glow_arc():
+    body = f"window.objectItem('{existing.id}').children[0].children[0]"
+    # The effect kept its first size when the outline changed, so it is
+    # built again: a new item, sized to the new outline.
+    c.check("the glow is rebuilt to the new outline after an arc change",
+            c.js(f"(function() {{ var g = {glow_item()}; return g !== null && g.objectName !== 'firstGlow' }})()") is True
+            and abs(c.js(f"({glow_item()}).width - 2 * ({glow_item()}).margin") - c.js(body + ".width")) < 0.5)
+    c.sm.setTextStyle(existing.id, {"arc": 0, "glow": 0})
+    c.sm.select(existing.id)
+    c.js(f"scene.textEditRequested('{existing.id}')")
+
+
+def step_size():
+    c.js(f"window.objectItem('{existing.id}').setLetterSize(40)")
+    item = f"window.objectItem('{existing.id}')"
+    c.check("Size sets the letters' height on the canvas (one line: the box scales)",
+            abs(c.js(item + ".letterSize") - 40) < 0.5, str(c.js(item + ".letterSize")))
+    c.check("...and the Text tab shows it", c.item_js("sizeBox", "item.value") == 40)
+    c.js(f"{item}.setWrap(true)")
+
+
+def step_size_wrapped():
+    item = f"window.objectItem('{existing.id}')"
+    w = c.scene.get(existing.id).width
+    c.js(f"{item}.setLetterSize(80)")
+    o = c.scene.get(existing.id)
+    c.check("wrapped: Size sets the style's letter size, the box keeps its width",
+            o.text_style["size"] == 80 and abs(o.width - w) < 0.5, f"{o.text_style['size']}, {o.width:.0f}")
+    x, y, _, _ = c.center_of("presetSunset")
+    c.click(x, y)
+
+
+def step_preset():
+    o = c.scene.get(existing.id)
+    c.check("a preset button applies its colors", o.text_style["fill"] == "#ffd040"
+            and o.text_style["fill2"] == "#ff4020")
+    c.check("...and the canvas text is filled with them",
+            c.js(f"window.objectItem('{existing.id}').children[0].fill.toString()") == "#ffd040")
+    x, y, _, _ = c.center_of("presetCandy")
+    c.click(x, y)
+
+
+def face_colors():
+    # The colours the letters' face is drawn with (its gradient's stops).
+    return c.js(f"""(function() {{ var k = window.objectItem('{existing.id}').children[0].children[0].children
+        for (var i = 0; i < k.length; i++)
+            if (k[i].objectName === 'textFace') {{
+                var s = k[i].itemAt(0).data[0].fillGradient.stops
+                return [s[0].color.toString(), s[1].color.toString()] }}
+        return null }})()""")
+
+
+def step_preset2():
+    # One preset after another: the face once kept the old fill while
+    # the new outline and depth showed.
+    c.check("another preset redraws the face in its colours (Sunset -> Candy)",
+            face_colors() == ["#40c0ff", "#c040ff"], str(face_colors()))
+    # Emoji (e.g. from an emoji picker): drawn in colour beside the outline.
+    c.sm.setText(existing.id, "hi 😀 there 👍🏽")
+
+
+def step_emoji():
+    art = f"window.objectItem('{existing.id}').children[0]"
+    emoji = c.js(f"{art}.shaped.emoji.map(function(e) {{ return e.text }})")
+    c.check("emoji are found (skin tone kept with its emoji) and placed",
+            emoji == ["😀", "👍🏽"], ascii(emoji))
+    c.check("...and drawn as colour text items", c.item_js("emojiRepeater", "item.count") == 2)
+    c.grab("text-emoji.png")
     c.win.setProperty("presenting", True)
 
 
@@ -192,4 +267,5 @@ def step_present():
 c.run(scene, [(1500, step_add), (500, step_added), (600, step_typed), (400, step_delete_key),
               (500, step_styled), (500, step_undone), (400, step_wrap_on), (500, step_wrapped), (400, step_rewrapped),
               (400, step_arc), (400, step_unwrapped), (400, step_open_fonts), (600, step_font), (500, step_font2),
-              (600, step_double_click), (400, step_glow), (800, step_present)])
+              (600, step_double_click), (400, step_glow), (400, step_glow_arc), (600, step_size),
+              (500, step_size_wrapped), (500, step_preset), (500, step_preset2), (500, step_emoji), (800, step_present)])

@@ -573,6 +573,7 @@ Rectangle {
 
             playing: root.previewPlaying
             muted: root.currentMuted
+            volume: (root.sceneItem ? root.sceneItem.masterVolume : 1)
             loop: true
         }
 

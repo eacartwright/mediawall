@@ -8,6 +8,12 @@ arc, and tilts them in perspective by moving the outline's points, so
 the result stays a sharp vector shape at any size. It returns the path
 as SVG path data (for QML's PathSvg) with its bounds.
 
+Emoji are left out of the outline: colour emoji fonts (Noto Color Emoji
+on Linux) are pictures with no outline at all, and where a font has one
+(Segoe UI Emoji on Windows) it would come out in one colour. Instead
+each emoji's place, size, and angle (following the arc and tilt) is
+returned, and TextArt draws it in colour as ordinary text there.
+
 Everything is laid out with the font 100 px tall (TextArt's base size);
 TextArt scales the result to the box.
 """
@@ -15,16 +21,77 @@ TextArt scales the result to the box.
 import math
 from functools import lru_cache
 
-from PySide6.QtCore import QObject, QPointF, Slot
+from PySide6.QtCore import QObject, QPointF, QRectF, QTextBoundaryFinder, Slot
 from PySide6.QtGui import QFont, QFontMetricsF, QPainterPath
 
 
 BASE_PIXEL_SIZE = 100
 
+# An emoji's size, and the room it takes on its line, as fractions of
+# the font size. A fixed advance (rather than the emoji font's own)
+# spaces them the same on every system.
+EMOJI_SIZE = 0.85
+EMOJI_ADVANCE = 0.95
+
 # Straight edges and curves are cut into pieces at most this long (in
 # base units) before an arc or tilt moves their points, so they bend
 # smoothly instead of staying straight between far-apart points.
 MAX_SEGMENT = 8.0
+
+
+# ---- Emoji ----
+
+# Symbols below U+1F000 that show as emoji even without U+FE0F (Unicode
+# Emoji_Presentation). Other symbols there (★ ✓ ♥ →) are ordinary text,
+# drawn in the text's style, unless followed by U+FE0F.
+_EMOJI_PRESENTATION = set(
+    [0x231A, 0x231B, 0x23E9, 0x23EA, 0x23EB, 0x23EC, 0x23F0, 0x23F3, 0x25FD, 0x25FE,
+     0x2614, 0x2615, 0x267F, 0x2693, 0x26A1, 0x26AA, 0x26AB, 0x26BD, 0x26BE, 0x26C4,
+     0x26C5, 0x26CE, 0x26D4, 0x26EA, 0x26F2, 0x26F3, 0x26F5, 0x26FA, 0x26FD, 0x2705,
+     0x270A, 0x270B, 0x2728, 0x274C, 0x274E, 0x2753, 0x2754, 0x2755, 0x2757, 0x2795,
+     0x2796, 0x2797, 0x27B0, 0x27BF, 0x2B1B, 0x2B1C, 0x2B50, 0x2B55]
+    + list(range(0x2648, 0x2654)))              # zodiac signs
+
+
+def _is_emoji_char(code):
+    return 0x1F000 <= code <= 0x1FAFF or code in _EMOJI_PRESENTATION
+
+
+def split_emoji(text):
+    """
+    `text` as (piece, is_emoji) runs, emoji split per grapheme (one
+    emoji, with its skin tone, ZWJ family, or flag pair, is one piece).
+    """
+    finder = QTextBoundaryFinder(QTextBoundaryFinder.Grapheme, text)
+    runs = []
+    start = 0
+    # Positions are in UTF-16 units; walk them alongside the Python string.
+    utf16 = text.encode("utf-16-le")
+    while True:
+        end = finder.toNextBoundary()
+        if end < 0:
+            break
+        piece = utf16[start * 2:end * 2].decode("utf-16-le")
+        start = end
+        emoji = any(_is_emoji_char(ord(ch)) for ch in piece) or "️" in piece
+        if runs and runs[-1][1] == emoji and not emoji:
+            runs[-1] = (runs[-1][0] + piece, False)
+        elif emoji and runs and _is_flag_half(runs[-1][0]) and _is_flag_half(piece):
+            runs[-1] = (runs[-1][0] + piece, True)       # a flag: two letters
+        else:
+            runs.append((piece, emoji))
+    return runs
+
+
+def text_advance(metrics, text):
+    """The width of `text`, with each emoji EMOJI_ADVANCE wide."""
+    return sum(EMOJI_ADVANCE * BASE_PIXEL_SIZE if is_emoji else metrics.horizontalAdvance(piece)
+               for piece, is_emoji in split_emoji(text))
+
+
+def _is_flag_half(piece):
+    """One regional indicator letter (two make a flag)."""
+    return len(piece) == 1 and 0x1F1E6 <= ord(piece) <= 0x1F1FF
 
 
 def wrap_lines(text, advance, width):
@@ -176,19 +243,36 @@ def shape_text(text, family, bold, italic, wrap_width, align, arc, tilt):
     font.setHintingPreference(QFont.PreferNoHinting)
     metrics = QFontMetricsF(font)
 
-    lines = wrap_lines(text, metrics.horizontalAdvance, wrap_width)
+    def advance(s):
+        return text_advance(metrics, s)
+
+    lines = wrap_lines(text, advance, wrap_width)
     layout_width = wrap_width if wrap_width > 0 else max(
-        (metrics.horizontalAdvance(line) for line in lines), default=0.0)
+        (advance(line) for line in lines), default=0.0)
 
     path = QPainterPath()
+    emoji = []                   # [text, center x, center y, size] before warping
+    bounds = QRectF()
     baseline = metrics.ascent()
     for line in lines:
-        offset = layout_width - metrics.horizontalAdvance(line)
-        x = {"left": 0.0, "right": offset}.get(align, offset / 2)
-        path.addText(QPointF(x, baseline), font, line)
+        offset = layout_width - advance(line)
+        px = {"left": 0.0, "right": offset}.get(align, offset / 2)
+        for piece, is_emoji in split_emoji(line):
+            if not is_emoji:
+                path.addText(QPointF(px, baseline), font, piece)
+                px += metrics.horizontalAdvance(piece)
+                continue
+            # A square a little under the font size, centred in its
+            # room on the line and on the capitals' middle.
+            size = EMOJI_SIZE * BASE_PIXEL_SIZE
+            cx = px + EMOJI_ADVANCE * BASE_PIXEL_SIZE / 2
+            px += EMOJI_ADVANCE * BASE_PIXEL_SIZE
+            cy = baseline - metrics.capHeight() / 2
+            emoji.append([piece, cx, cy, size])
+            bounds = bounds.united(QRectF(cx - size / 2, cy - size / 2, size, size))
         baseline += metrics.lineSpacing()
 
-    bounds = path.boundingRect()
+    bounds = path.boundingRect().united(bounds) if not path.isEmpty() else bounds
     subpaths = _subpaths(path)
 
     warps = []
@@ -221,7 +305,24 @@ def shape_text(text, family, bold, italic, wrap_width, align, arc, tilt):
                 result.cubicTo(*points[0], *points[1], *points[2])
         parts.append("Z")
 
-    box = result.boundingRect() if warps else bounds
+    # Each emoji moves with the arc and tilt: its centre is warped, it
+    # turns with the line there, and shrinks or grows with the tilt.
+    placed = []
+    box = result.boundingRect() if warps and not result.isEmpty() else QRectF()
+    for piece, cx, cy, size in emoji:
+        x, y = warp((cx, cy))
+        angle, scale = 0.0, 1.0
+        if warps:
+            left, right = warp((cx - size / 2, cy)), warp((cx + size / 2, cy))
+            angle = math.degrees(math.atan2(right[1] - left[1], right[0] - left[0]))
+            scale = max(0.05, math.dist(left, right) / size)
+        s = size * scale
+        placed.append({"text": piece, "x": x, "y": y, "size": s, "angle": angle})
+        if warps:
+            box = box.united(QRectF(x - s / 2, y - s / 2, s, s))
+
+    if not warps:
+        box = bounds
     return {
         "path": "".join(parts),
         "x": box.x(),
@@ -229,6 +330,7 @@ def shape_text(text, family, bold, italic, wrap_width, align, arc, tilt):
         "width": box.width(),
         "height": box.height(),
         "lines": len(lines),
+        "emoji": placed,
     }
 
 
