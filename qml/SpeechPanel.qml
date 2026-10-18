@@ -370,7 +370,12 @@ ScrollView {
                 objectName: "speechAdd"
                 text: panel.editingId !== "" ? "Add as a New Track" : "Add to Playback"
                 enabled: textArea.text.trim() !== ""
-                onClicked: sceneModel.addSpeechTrack(panel.current())
+                // The track plays in the Playback tab, so the Preview stops
+                // (as adding an audio or video file does).
+                onClicked: {
+                    sceneModel.addSpeechTrack(panel.current())
+                    speechEngine.stop()
+                }
                 ToolTip.visible: hovered
                 ToolTip.text: "Add it as a speech track in the Playback tab"
                 ToolTip.delay: 500

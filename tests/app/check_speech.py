@@ -118,6 +118,7 @@ def step_added():
             len(calls()) == 1 and track_view(c.track, "player.playbackState") == 1
             and calls()[0]["out"].replace("\\", "/") in (track_view(c.track, "url") or ""),
             f"{len(calls())} calls, {track_view(c.track, 'url')}")
+    c.check("...and the Preview stops, so only the track plays", panel("item.previewing") is False)
     c.item_js("speechText", "item.text = ''")
     c.choose_tab("playbackTab")
 
