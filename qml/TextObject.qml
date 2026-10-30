@@ -161,6 +161,7 @@ Item {
         anchors.fill: parent
         text: root.objText
         style: root.textStyle
+        animated: true
     }
 
     // -------------------------------------------------

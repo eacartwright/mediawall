@@ -426,6 +426,48 @@ ScrollView {
                     ToolTip.delay: 600
                 }
             }
+
+            // ---- Animation: looping, on the canvas (TextArt) ----
+            RowLayout {
+                Layout.fillWidth: true
+                spacing: 6
+
+                Caption { text: "Animate"; Layout.preferredWidth: 48 }
+
+                ComboBox {
+                    objectName: "animationBox"           // found by tests/app
+                    Layout.fillWidth: true
+                    textRole: "text"
+                    valueRole: "value"
+                    model: [{ value: "", text: "None" },
+                            { value: "wiggle", text: "Wiggle" },
+                            { value: "pulse", text: "Pulse" },
+                            { value: "glow_pulse", text: "Glow pulse" },
+                            { value: "gradient_shift", text: "Gradient shift" },
+                            { value: "color_cycle", text: "Color cycle" }]
+                    currentIndex: indexOfValue(panel.style.animation || "")
+                    onActivated: (index) => panel.set({ animation: valueAt(index) })
+                }
+
+                ComboBox {
+                    objectName: "animationSpeedBox"      // found by tests/app
+                    Layout.preferredWidth: 90
+                    enabled: (panel.style.animation || "") !== ""
+                    textRole: "text"
+                    valueRole: "value"
+                    model: [{ value: "slow", text: "Slow" }, { value: "normal", text: "Normal" },
+                            { value: "fast", text: "Fast" }]
+                    currentIndex: indexOfValue(panel.style.animation_speed || "normal")
+                    onActivated: (index) => panel.set({ animation_speed: valueAt(index) })
+                }
+            }
+
+            Caption {
+                Layout.fillWidth: true
+                visible: panel.style.animation === "glow_pulse" && !(panel.style.glow > 0)
+                wrapMode: Text.WordWrap
+                text: "Glow pulse fades the glow in and out: set a Glow above to see it."
+            }
         }
 
         Item { Layout.preferredHeight: 6 }

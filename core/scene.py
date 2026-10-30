@@ -151,6 +151,8 @@ TEXT_STYLE_DEFAULTS = {
     "tilt": 0.0,                # perspective lean, degrees; > 0 top leans back
     "glow": 0.0,                # glow size, 0 .. TEXT_GLOW_MAX
     "glow_color": "#40c0ff",
+    "animation": "",            # TEXT_ANIMATIONS; "" = still
+    "animation_speed": "normal",    # TEXT_ANIMATION_SPEEDS
 }
 
 TEXT_OUTLINE_MAX = 20.0
@@ -161,6 +163,9 @@ TEXT_ALIGNS = ("left", "center", "right")
 TEXT_ARC_MAX = 360.0
 TEXT_TILT_MAX = 70.0
 TEXT_GLOW_MAX = 40.0
+# Looping animations (on the canvas only; preset tiles stay still).
+TEXT_ANIMATIONS = ("", "wiggle", "pulse", "glow_pulse", "gradient_shift", "color_cycle")
+TEXT_ANIMATION_SPEEDS = ("slow", "normal", "fast")
 
 _COLOR = re.compile(r"#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})")
 
@@ -183,6 +188,10 @@ def normalized_text_style(raw) -> dict:
             ok = isinstance(value, str) and _COLOR.fullmatch(value) is not None
         elif key == "align":
             ok = value in TEXT_ALIGNS
+        elif key == "animation":
+            ok = value in TEXT_ANIMATIONS
+        elif key == "animation_speed":
+            ok = value in TEXT_ANIMATION_SPEEDS
         elif key == "fill2":
             ok = isinstance(value, str) and (value == "" or _COLOR.fullmatch(value) is not None)
         else:
