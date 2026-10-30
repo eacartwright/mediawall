@@ -11,7 +11,7 @@ import QtQuick.Layouts
 ApplicationWindow {
     id: memoryWindow
 
-    title: "MediaWall — Media Memory"
+    title: "Mediawall — Media Memory"
 
     width: 760
     height: 520
@@ -67,7 +67,7 @@ ApplicationWindow {
                 visible: mediaMemory.gpuText !== ""
                 text: "GPU in use (all apps): " + mediaMemory.gpuText
                       + (mediaMemory.processText !== ""
-                         ? "  ·  MediaWall's video decoders: " + mediaMemory.processText : "")
+                         ? "  ·  Mediawall's video decoders: " + mediaMemory.processText : "")
                 color: "#cccccc"
             }
 

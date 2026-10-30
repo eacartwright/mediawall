@@ -190,14 +190,14 @@ def scene_from_dict(data, project_path=None):
     """Return (scene, warnings). Raises ProjectError if data isn't a project."""
     if not isinstance(data, dict) or data.get("format") != FORMAT:
         if isinstance(data, dict) and data.get("format") == "mediawall-layout":
-            raise ProjectError("This is a MediaWall layout, not a project. "
+            raise ProjectError("This is a Mediawall layout, not a project. "
                                "Use Layout > New from Layout… to start a wall from it.")
-        raise ProjectError("This file is not a MediaWall project.")
+        raise ProjectError("This file is not a Mediawall project.")
 
     version = data.get("version")
     if not isinstance(version, int) or version > VERSION:
         raise ProjectError(
-            f"This project was saved by a newer version of MediaWall "
+            f"This project was saved by a newer version of Mediawall "
             f"(format version {version!r})."
         )
 
@@ -361,6 +361,6 @@ def load_project(path):
     except OSError as exc:
         raise ProjectError(f"Couldn't open the file: {exc.strerror or exc}")
     except (json.JSONDecodeError, UnicodeDecodeError):
-        raise ProjectError("The file is damaged or not a MediaWall project.")
+        raise ProjectError("The file is damaged or not a Mediawall project.")
 
     return scene_from_dict(data, path)

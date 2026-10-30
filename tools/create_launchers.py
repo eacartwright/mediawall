@@ -1,5 +1,5 @@
 """
-Create double-clickable launchers for MediaWall on this machine.
+Create double-clickable launchers for Mediawall on this machine.
 
 Run once per machine, after creating the venv (paths are absolute, and
 each machine has its own venv):
@@ -7,11 +7,11 @@ each machine has its own venv):
     Windows:  venv\\Scripts\\python.exe tools\\create_launchers.py [--desktop] [--start-menu]
     Linux:    venv/bin/python tools/create_launchers.py [--desktop]
 
-Windows: "MediaWall.lnk" (no terminal) and "MediaWall (debug).lnk"
+Windows: "Mediawall.lnk" (no terminal) and "Mediawall (debug).lnk"
 (terminal stays open) in the project folder, and optionally on the
 Desktop / in the Start Menu. Pin either to the taskbar as usual.
 
-Linux: "MediaWall" and "MediaWall (debug)" entries in the application
+Linux: "Mediawall" and "Mediawall (debug)" entries in the application
 menu (~/.local/share/applications), and optionally on the Desktop.
 """
 
@@ -65,16 +65,16 @@ def create_windows(folders):
     for folder in folders:
         folder.mkdir(parents=True, exist_ok=True)
         _windows_shortcut(
-            folder / "MediaWall.lnk",
+            folder / "Mediawall.lnk",
             pythonw, f'"{APP_DIR / "launcher.pyw"}"',
-            "MediaWall",
+            "Mediawall",
         )
         # cmd /k keeps the terminal open after the app exits.
         _windows_shortcut(
-            folder / "MediaWall (debug).lnk",
+            folder / "Mediawall (debug).lnk",
             os.environ.get("COMSPEC", "cmd.exe"),
             f'/k ""{python}" "{APP_DIR / "main.py"}""',
-            "MediaWall with a terminal for messages",
+            "Mediawall with a terminal for messages",
         )
 
 
@@ -110,14 +110,14 @@ def create_linux(also_desktop):
     python = APP_DIR / "venv" / "bin" / "python"
     entries = {
         "mediawall.desktop": _desktop_entry(
-            "MediaWall",
+            "Mediawall",
             f'"{python}" "{APP_DIR / "main.py"}" %f',
             False, "Multimedia wall and presentation canvas",
         ),
         "mediawall-debug.desktop": _desktop_entry(
-            "MediaWall (debug)",
+            "Mediawall (debug)",
             f'sh "{APP_DIR / "tools" / "run_debug.sh"}" %f',
-            True, "MediaWall with a terminal for messages",
+            True, "Mediawall with a terminal for messages",
         ),
     }
 

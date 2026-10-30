@@ -1,5 +1,5 @@
 """
-Start MediaWall without a terminal window.
+Start Mediawall without a terminal window.
 
 Runs main.py with this project's own venv Python, passing any arguments
 on (e.g. a project file). On Windows the app gets a hidden console
@@ -26,14 +26,14 @@ def show_error(message):
     # pythonw has no terminal, so say what went wrong in a message box.
     if sys.platform == "win32":
         import ctypes
-        ctypes.windll.user32.MessageBoxW(None, message, "MediaWall", 0x10)
+        ctypes.windll.user32.MessageBoxW(None, message, "Mediawall", 0x10)
     else:
         print(message, file=sys.stderr)
 
 
 def main():
     if not PYTHON.exists():
-        show_error(f"MediaWall's virtual environment wasn't found:\n{PYTHON}\n\n"
+        show_error(f"Mediawall's virtual environment wasn't found:\n{PYTHON}\n\n"
                    "Create it first (see readme section 37).")
         return
 

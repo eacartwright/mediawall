@@ -78,14 +78,14 @@ def layout_from_dict(data):
     """Return (scene, warnings): a scene holding only the layout's containers."""
     if not isinstance(data, dict) or data.get("format") != LAYOUT_FORMAT:
         if isinstance(data, dict) and data.get("format") == FORMAT:
-            raise ProjectError("This is a MediaWall project, not a layout. "
+            raise ProjectError("This is a Mediawall project, not a layout. "
                                "Use Open to open it.")
-        raise ProjectError("This file is not a MediaWall layout.")
+        raise ProjectError("This file is not a Mediawall layout.")
 
     version = data.get("version")
     if not isinstance(version, int) or version > LAYOUT_VERSION:
         raise ProjectError(
-            f"This layout was saved by a newer version of MediaWall "
+            f"This layout was saved by a newer version of Mediawall "
             f"(format version {version!r})."
         )
 
@@ -111,7 +111,7 @@ def load_layout(path):
     except OSError as exc:
         raise ProjectError(f"Couldn't open the file: {exc.strerror or exc}")
     except (json.JSONDecodeError, UnicodeDecodeError):
-        raise ProjectError("The file is damaged or not a MediaWall layout.")
+        raise ProjectError("The file is damaged or not a Mediawall layout.")
     return layout_from_dict(data)
 
 

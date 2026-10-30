@@ -1,10 +1,10 @@
-# PyInstaller recipe for MediaWall. Run by packaging/build.py, which
+# PyInstaller recipe for Mediawall. Run by packaging/build.py, which
 # first renders the icons into build/icon/.
 #
-# Output: dist/MediaWall/, a self-contained app folder (Python, Qt,
+# Output: dist/Mediawall/, a self-contained app folder (Python, Qt,
 # FFmpeg, the QML files). On Windows it holds two programs:
-#   MediaWall.exe      the one to run: starts the app without a console
-#   MediaWall-app.exe  the app itself (a console program, for the Log)
+#   Mediawall.exe      the one to run: starts the app without a console
+#   Mediawall-app.exe  the app itself (a console program, for the Log)
 # On Linux it holds one program, mediawall.
 
 import sys
@@ -18,11 +18,11 @@ WINDOWS = sys.platform == "win32"
 # removed from the collected files below.)
 EXCLUDES = ["tkinter", "unittest", "pydoc_data", "test"]
 
-# Parts of Qt MediaWall doesn't use. PySide6 ships all of Qt and
+# Parts of Qt Mediawall doesn't use. PySide6 ships all of Qt and
 # PyInstaller collects every QML module it finds, so collected files
 # whose path contains any of these are dropped. (Qt names them
 # Qt6<Name>.dll / libQt6<Name>.so, qml/Qt<Name>, qml/QtQuick/<Name>.)
-# MediaWall's QML imports: QtQuick, QtQuick.Controls (Fusion style),
+# Mediawall's QML imports: QtQuick, QtQuick.Controls (Fusion style),
 # QtQuick.Layouts, QtQuick.Shapes, QtMultimedia, Qt.labs.qmlmodels.
 UNUSED_QT = [
     "WebEngine", "WebView", "WebChannel", "WebSockets", "3D", "Charts",
@@ -64,7 +64,7 @@ app_exe = EXE(
     app.scripts,
     [],
     exclude_binaries=True,
-    name="MediaWall-app" if WINDOWS else "mediawall",
+    name="Mediawall-app" if WINDOWS else "mediawall",
     icon=str(ICON_DIR / "mediawall.ico") if WINDOWS else None,
     console=True,
 )
@@ -78,7 +78,7 @@ if WINDOWS:
             launcher.scripts,
             [],
             exclude_binaries=True,
-            name="MediaWall",
+            name="Mediawall",
             icon=str(ICON_DIR / "mediawall.ico"),
             console=False,
         ),
@@ -86,4 +86,4 @@ if WINDOWS:
         launcher.datas,
     ]
 
-COLLECT(*parts, name="MediaWall")
+COLLECT(*parts, name="Mediawall")

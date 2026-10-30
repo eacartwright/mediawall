@@ -21,8 +21,8 @@ from core.project import (
 from core.scene import Scene
 
 
-FILE_FILTER = f"MediaWall Project (*{FILE_EXTENSION});;All Files (*)"
-LAYOUT_FILTER = f"MediaWall Layout (*{LAYOUT_EXTENSION});;All Files (*)"
+FILE_FILTER = f"Mediawall Project (*{FILE_EXTENSION});;All Files (*)"
+LAYOUT_FILTER = f"Mediawall Layout (*{LAYOUT_EXTENSION});;All Files (*)"
 
 # Warnings beyond this many are summarized as "...and N more".
 MAX_LISTED_WARNINGS = 8
@@ -61,7 +61,7 @@ class ProjectController(QObject):
     def _get_title(self):
         name = Path(self._path).stem if self._path else "Untitled"
         star = "*" if self._dirty else ""
-        return f"{name}{star} — MediaWall"
+        return f"{name}{star} — Mediawall"
 
     title = Property(str, _get_title, notify=titleChanged)
 

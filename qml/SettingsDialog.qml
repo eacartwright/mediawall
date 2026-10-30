@@ -355,7 +355,7 @@ Dialog {
                                  || appSettings.hwDecoding !== appSettings.hwDecodingActive
                         text: appSettings.hwDecodingExternal
                               ? "Set by QT_FFMPEG_DECODING_HW_DEVICE_TYPES"
-                              : "Restart MediaWall to apply"
+                              : "Restart Mediawall to apply"
                         color: "#e0c060"
                     }
                 }
@@ -441,8 +441,8 @@ Dialog {
                     text: "Speech turns typed words into a voice clip with Piper, a free "
                           + "text-to-speech program. Install Piper and download voices "
                           + "yourself (a voice is a .onnx file with its .onnx.json); "
-                          + "MediaWall doesn't include them. Clips are made when they're "
-                          + "needed and deleted when MediaWall closes; a project keeps "
+                          + "Mediawall doesn't include them. Clips are made when they're "
+                          + "needed and deleted when Mediawall closes; a project keeps "
                           + "only the words and settings."
                     color: "#bbbbbb"
                     font.pixelSize: 12
@@ -647,7 +647,7 @@ Dialog {
 
                 Label {
                     Layout.alignment: Qt.AlignHCenter
-                    text: "MediaWall"
+                    text: "Mediawall"
                     font.bold: true
                     font.pixelSize: 22
                 }
@@ -677,11 +677,11 @@ Dialog {
                     wrapMode: Text.WordWrap
                     textFormat: Text.StyledText
                     color: "#999999"
-                    text: "<b>New in 0.9.11</b><br>"
-                          + "• Speech: type words and hear them in a Piper voice, as a track in the Playback tab<br>"
-                          + "• Speech: voices, modes, speed, and pitch; set up Piper in Settings > Speech<br>"
-                          + "• Browsing containers: Continue Play replaces Loop (off = the video loops)<br>"
-                          + "• Wall Features tabs: Layers, Playback, Speech, Text"
+                    text: "<b>New in 0.9.12</b><br>"
+                          + "• Snapping: move and resize to the wall's edges and to other objects (hold Ctrl to skip)<br>"
+                          + "• Text animations: Wiggle, Pulse, Glow pulse, Gradient shift, Color cycle<br>"
+                          + "• Settings > Performance: hardware decoding, image size limit, and the Media Memory window<br>"
+                          + "• The app is now called Mediawall"
                 }
 
                 // The Log window: everything the app would print to a

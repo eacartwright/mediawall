@@ -1,5 +1,5 @@
 """
-MediaWall.exe on Windows: starts MediaWall-app.exe with a hidden console.
+Mediawall.exe on Windows: starts Mediawall-app.exe with a hidden console.
 
 The app itself is a console program, because the Log window can only
 capture FFmpeg's output when the process has a console (see
@@ -12,7 +12,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-APP = Path(sys.executable).resolve().parent / "MediaWall-app.exe"
+APP = Path(sys.executable).resolve().parent / "Mediawall-app.exe"
 
 try:
     subprocess.Popen(
@@ -24,5 +24,5 @@ try:
     )
 except OSError as error:
     import ctypes
-    ctypes.windll.user32.MessageBoxW(None, f"MediaWall couldn't start:\n{APP}\n\n{error}",
-                                     "MediaWall", 0x10)
+    ctypes.windll.user32.MessageBoxW(None, f"Mediawall couldn't start:\n{APP}\n\n{error}",
+                                     "Mediawall", 0x10)

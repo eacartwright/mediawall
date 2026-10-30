@@ -4,7 +4,7 @@ program the user installs (its path and the voices folder are app
 settings), to make clips for the Speech tab's Preview and for speech
 tracks.
 
-Clips are temporary: made into a folder that is deleted when MediaWall
+Clips are temporary: made into a folder that is deleted when Mediawall
 closes, and found again by speech_key(), so each set of words and
 settings is made once per session (identical tracks share a clip, and
 undo switches back at once). Speech tracks have no file of their own; a

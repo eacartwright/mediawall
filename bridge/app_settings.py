@@ -2,8 +2,8 @@
 App-wide settings (not per project), shown in the Settings dialog.
 
 Stored with Qt's QSettings: the registry on Windows
-(HKEY_CURRENT_USER\\Software\\MediaWall\\MediaWall), and
-~/.config/MediaWall/MediaWall.conf on Linux. Set the environment
+(HKEY_CURRENT_USER\\Software\\Mediawall\\Mediawall), and
+~/.config/Mediawall/Mediawall.conf on Linux. Set the environment
 variable MEDIAWALL_SETTINGS to an .ini file path to use that file
 instead (tests use this, so they never touch the real settings).
 
@@ -85,7 +85,15 @@ def _open_settings():
     path = os.environ.get("MEDIAWALL_SETTINGS")
     if path:
         return QSettings(path, QSettings.IniFormat)
-    return QSettings("MediaWall", "MediaWall")
+    settings = QSettings("Mediawall", "Mediawall")
+    if not settings.allKeys():
+        # Before 0.9.12 the app was "MediaWall". The registry ignores case,
+        # so this only finds something on Linux: copy the old settings over.
+        old = QSettings("MediaWall", "MediaWall")
+        for key in old.allKeys():
+            settings.setValue(key, old.value(key))
+        settings.sync()
+    return settings
 
 
 def apply_hw_decoding():

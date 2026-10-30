@@ -1,6 +1,6 @@
-# MediaWall
+# Mediawall
 
-MediaWall is a desktop app for building walls of media. Photos, animated GIFs, video, and audio go on one large canvas, where you can place, size, rotate, and layer them freely, then show the result full screen. It works like a mood board or digital scrapbook that plays, rather than like a slideshow editor or file manager. Media stays where it is on disk; a project only remembers where each file lives and how it is arranged.
+Mediawall is a desktop app for building walls of media. Photos, animated GIFs, video, and audio go on one large canvas, where you can place, size, rotate, and layer them freely, then show the result full screen. It works like a mood board or digital scrapbook that plays, rather than like a slideshow editor or file manager. Media stays where it is on disk; a project only remembers where each file lives and how it is arranged.
 
 It runs on Linux (Mint/Ubuntu, the primary platform) and Windows, built with Python, PySide6/QML, and Qt Multimedia (FFmpeg).
 
@@ -35,10 +35,10 @@ It runs on Linux (Mint/Ubuntu, the primary platform) and Windows, built with Pyt
 
 ## Installing
 
-Installers bundle everything MediaWall needs (Python, Qt, FFmpeg), so nothing else has to be installed first.
+Installers bundle everything Mediawall needs (Python, Qt, FFmpeg), so nothing else has to be installed first.
 
-- **Windows:** run `MediaWall-<version>-Setup.exe`. It installs for your user account without an admin prompt, adds a Start Menu entry (and optionally a desktop shortcut), and can make `.mediawall` files open in MediaWall. Uninstall from Settings › Apps.
-- **Linux (Mint/Ubuntu):** `sudo apt install ./MediaWall_<version>_amd64.deb`, or double-click the file. It adds MediaWall to the menu and the `mediawall` command, and apt fetches the few system libraries it needs if any are missing. Remove it with `sudo apt remove mediawall`.
+- **Windows:** run `Mediawall-<version>-Setup.exe`. It installs for your user account without an admin prompt, adds a Start Menu entry (and optionally a desktop shortcut), and can make `.mediawall` files open in Mediawall. Uninstall from Settings › Apps.
+- **Linux (Mint/Ubuntu):** `sudo apt install ./Mediawall_<version>_amd64.deb`, or double-click the file. It adds Mediawall to the menu and the `mediawall` command, and apt fetches the few system libraries it needs if any are missing. Remove it with `sudo apt remove mediawall`.
 
 Settings and logs are kept per user and survive an uninstall. To build the installers yourself: `packaging/build.py`, run on each platform (section 37, Installers).
 
@@ -73,7 +73,7 @@ The rest of this file is the design document: the principles, object model, and 
 
 ## 1.1 Concept
 
-MediaWall is a local desktop application for creating interactive multimedia walls, digital scrapbooks, visual installations, presentations, and live media compositions.
+Mediawall is a local desktop application for creating interactive multimedia walls, digital scrapbooks, visual installations, presentations, and live media compositions.
 
 The central concept is a large visual canvas on which the user arranges media and viewports, rather than a conventional document editor.
 
@@ -946,7 +946,7 @@ Panels find a video's player (for its position) through a registry on the scene 
 
 **Audio tracks** (MP3, M4A, and other audio files) are added from a Browser: double-click the preview, or use **Add to Audio** (the Add to Canvas button's label for audio files). A track is an object of type `audio` with a source and the same playback settings as a video, saved and undoable like any other object, but with no place on the canvas: no geometry, no stacking, not in the Layers list (`NON_VISUAL_TYPES` in `core/scene.py`). On the QML side it is a row of `sceneModel` whose delegate (`AudioTrackObject.qml`) draws nothing and only hosts a player. Tracks start **audible and looping** (canvas videos start muted). They are listed first in the Playback tab, with a ✕ to remove them and, if the file is missing, **Locate…**. Adding a track opens the Playback tab and pauses the browser's preview of that file, so it isn't heard twice. Audio previews in a browser are audible by default, with their own mute state separate from video previews.
 
-**Master volume** (top of the Playback tab): one slider for the whole window, multiplied into every player's volume (videos, containers, audio tracks, browser previews). It is **not saved and not undone**, and belongs to that window only, so with several MediaWall windows open each has its own (each is its own process; the system mixer sees them separately too). Clicking the percentage sets it back to 100%.
+**Master volume** (top of the Playback tab): one slider for the whole window, multiplied into every player's volume (videos, containers, audio tracks, browser previews). It is **not saved and not undone**, and belongs to that window only, so with several Mediawall windows open each has its own (each is its own process; the system mixer sees them separately too). Clicking the percentage sets it back to 100%.
 
 Video as audio is described in section 14.2. The mouse wheel changes volume only over a card's volume slider; elsewhere it scrolls the list. Solo and audio stream selection were dropped.
 
@@ -956,7 +956,7 @@ The panel's **Speech** tab (between Playback and Text) turns typed words into a 
 
 The tab has the words (several lines are fine; a line without an ending gets a full stop, since some Piper versions keep only the last line), the **voice**, a **mode** (Normal, Deep, Very Deep, Bright, Chipmunk, Monster, Whisper: each a starting pitch and speed), **Speed** and **Pitch** sliders (0.5x to 2x, multiplied with the mode's; double-click the value for 1x), and the **pause between sentences**. **Preview** makes the clip and plays it (through the master volume); **Stop** stops the preview, and stops making it (the Piper process is killed) unless a track is waiting for the same clip. **Add to Playback** adds a speech track. **What's in the tab is saved with the project** (`speech_draft` at the top level of the `.mediawall` file, written a moment after each change; the same fields as a track's `speech`, left out when empty), so it's there next time the project is opened. It is workspace state, like a browser's folder: saving it marks the project changed, but undo never changes it (it lives on `Scene`, outside the objects that undo snapshots copy).
 
-**A speech track has no file.** It is an `audio` object with no source, whose `speech` (`text`, `voice`, `mode`, `speed`, `pitch`, `silence`; `core/speech.py` `normalized_speech`, `{}` for other tracks) is its source; the project saves only that. Its clip is **made when it's needed**: when the project opens, for tracks saved playing, or at a paused track's first Play. Clips go in a temporary folder that is **deleted when MediaWall closes**, so nothing piles up on disk or is left orphaned. Within a session each set of words and settings is made once (`speech_key`, a hash of the speech): identical tracks share a clip, the Preview's clip is used by the track added from it, and undo/redo switch back at once. The track starts audible and looping, like other tracks, and plays as soon as its clip is ready; until then its Playback card says **Making…**, or why it can't be made (Piper not set up, its voice not in the folder, Piper's error), and it tries again when the settings or voices change. Its card shows a **speech** badge and its first words as the name, and has **Edit…**, which brings its words and settings back to the Speech tab (with a note if its voice is no longer in the folder): **Update Track** changes the track (undoable) and **Add as a New Track** adds another. A project with speech tracks needs Piper and the same voices to play them; without them the tracks stay silent but keep their words. Piper adds a little randomness, so a remade clip may differ very slightly from the last session's. (Speech tracks saved with a file, briefly, on 2026-10-17, drop the file when loaded.)
+**A speech track has no file.** It is an `audio` object with no source, whose `speech` (`text`, `voice`, `mode`, `speed`, `pitch`, `silence`; `core/speech.py` `normalized_speech`, `{}` for other tracks) is its source; the project saves only that. Its clip is **made when it's needed**: when the project opens, for tracks saved playing, or at a paused track's first Play. Clips go in a temporary folder that is **deleted when Mediawall closes**, so nothing piles up on disk or is left orphaned. Within a session each set of words and settings is made once (`speech_key`, a hash of the speech): identical tracks share a clip, the Preview's clip is used by the track added from it, and undo/redo switch back at once. The track starts audible and looping, like other tracks, and plays as soon as its clip is ready; until then its Playback card says **Making…**, or why it can't be made (Piper not set up, its voice not in the folder, Piper's error), and it tries again when the settings or voices change. Its card shows a **speech** badge and its first words as the name, and has **Edit…**, which brings its words and settings back to the Speech tab (with a note if its voice is no longer in the folder): **Update Track** changes the track (undoable) and **Add as a New Track** adds another. A project with speech tracks needs Piper and the same voices to play them; without them the tracks stay silent but keep their words. Piper adds a little randomness, so a remade clip may differ very slightly from the last session's. (Speech tracks saved with a file, briefly, on 2026-10-17, drop the file when loaded.)
 
 How it runs (`bridge/speech.py`, `SpeechEngine`): one clip is made at a time, from a queue (a Preview goes first), by running Piper with `QProcess` (`--model`, `--output_file`, `--length_scale`, `--sentence_silence`, the words on stdin as UTF-8), so the window never waits. Piper is stopped when the app quits. Piper has no pitch setting, so pitch is changed afterwards by rewriting the WAV's sample rate (`repitch_wav`; Python's `wave` module, no sox), which changes the speed by the same factor; Piper is asked for a length that cancels it out (`length_scale = pitch / speed`, and the pause is scaled the same way). Lowering the pitch this way also lowers the highest frequencies, which is what the original script's "deep" low-pass did. Piper's errors are shown in the tab or the track's card and written to the Log. `.wav` is now an audio file type everywhere (browsers too).
 
@@ -1428,7 +1428,7 @@ Every app command is defined once in `qml/AppActions.qml` as a Qt Quick `Action`
 
 ### Settings
 
-The **Settings** button on the toolbar opens app-wide settings (not per project; `bridge/app_settings.py`, `qml/SettingsDialog.qml`). Changes apply at once and are saved immediately with Qt's `QSettings`: the registry on Windows (`HKEY_CURRENT_USER\Software\MediaWall\MediaWall`), `~/.config/MediaWall/MediaWall.conf` on Linux. The environment variable `MEDIAWALL_SETTINGS` can point at an `.ini` file to use instead (tests do this, so they never touch real settings).
+The **Settings** button on the toolbar opens app-wide settings (not per project; `bridge/app_settings.py`, `qml/SettingsDialog.qml`). Changes apply at once and are saved immediately with Qt's `QSettings`: the registry on Windows (`HKEY_CURRENT_USER\Software\Mediawall\Mediawall`), `~/.config/Mediawall/Mediawall.conf` on Linux. The environment variable `MEDIAWALL_SETTINGS` can point at an `.ini` file to use instead (tests do this, so they never touch real settings).
 
 Settings so far:
 
@@ -1832,12 +1832,12 @@ Windows:  venv\Scripts\python.exe tools\create_launchers.py [--desktop] [--start
 Linux:    venv/bin/python tools/create_launchers.py [--desktop]
 ```
 
-- **Windows** gets `MediaWall.lnk` (no terminal window) and `MediaWall (debug).lnk` (terminal stays open after exit) in the project folder, and optionally on the Desktop / in the Start Menu. The shortcuts are machine-specific and not committed. `MediaWall.lnk` runs `launcher.pyw`, which starts `main.py` with a *hidden* console rather than none, because on Windows FFmpeg's output can only be captured when the process has a console.
-- **Linux** gets "MediaWall" and "MediaWall (debug)" in the application menu (`~/.local/share/applications`), and optionally on the Desktop. The debug entry runs `tools/run_debug.sh` in a terminal.
+- **Windows** gets `Mediawall.lnk` (no terminal window) and `Mediawall (debug).lnk` (terminal stays open after exit) in the project folder, and optionally on the Desktop / in the Start Menu. The shortcuts are machine-specific and not committed. `Mediawall.lnk` runs `launcher.pyw`, which starts `main.py` with a *hidden* console rather than none, because on Windows FFmpeg's output can only be captured when the process has a console.
+- **Linux** gets "Mediawall" and "Mediawall (debug)" in the application menu (`~/.local/share/applications`), and optionally on the Desktop. The debug entry runs `tools/run_debug.sh` in a terminal.
 
 ### Log window
 
-Everything the app would print to a terminal (FFmpeg, Qt warnings and QML errors, Python output and uncaught exceptions) is captured by `bridge/log_capture.py` and shown in the **Log** window (Settings → About → **Open Log…**; on the toolbar until 0.9.8), with Copy All and Clear. It is also written to `logs/mediawall.log` (the previous run is kept as `mediawall.previous.log`); an installed copy writes it to the user's own data folder instead (`%LOCALAPPDATA%/MediaWall/logs` on Windows, `~/.local/state/MediaWall/logs` on Linux), since its install folder may not be writable. That way a start that fails before the window appears still leaves a trace. When the app is started from a terminal, the output appears there too.
+Everything the app would print to a terminal (FFmpeg, Qt warnings and QML errors, Python output and uncaught exceptions) is captured by `bridge/log_capture.py` and shown in the **Log** window (Settings → About → **Open Log…**; on the toolbar until 0.9.8), with Copy All and Clear. It is also written to `logs/mediawall.log` (the previous run is kept as `mediawall.previous.log`); an installed copy writes it to the user's own data folder instead (`%LOCALAPPDATA%/Mediawall/logs` on Windows, `~/.local/state/Mediawall/logs` on Linux), since its install folder may not be writable. That way a start that fails before the window appears still leaves a trace. When the app is started from a terminal, the output appears there too.
 
 The capture works by redirecting file descriptors 1 and 2 into a pipe, since FFmpeg writes to stderr directly. On Windows it also points the process's standard output and error handles at the pipe (`SetStdHandle`): `python.exe` does that as part of the redirect, but the installed build's launcher doesn't, and without it FFmpeg's messages went missing there.
 
@@ -1855,7 +1855,7 @@ python -m unittest
 
 The tests cover `core/` only and need no display or Qt, so they run in milliseconds. Run them after any change to `core/`.
 
-**App checks** (`tests/app/`): each `check_*.py` starts the real MediaWall on a project it builds and drives it with mouse, keyboard, and wheel events, checking the results (about 250 checks: browsing containers, favorites and new files, Lock Container, the Browser, Present, Layers, resizing, audio, speech (with a stand-in Piper, `fake_piper.py`), layouts, commands and settings, undo history, video sizing, animated images, text and its animations). They need a display and the sample media in `tests/media/`, take about a minute and a half, and are kept apart from the unit tests (they're named `check_*`, so `python -m unittest` doesn't run them):
+**App checks** (`tests/app/`): each `check_*.py` starts the real Mediawall on a project it builds and drives it with mouse, keyboard, and wheel events, checking the results (about 250 checks: browsing containers, favorites and new files, Lock Container, the Browser, Present, Layers, resizing, audio, speech (with a stand-in Piper, `fake_piper.py`), layouts, commands and settings, undo history, video sizing, animated images, text and its animations). They need a display and the sample media in `tests/media/`, take about a minute and a half, and are kept apart from the unit tests (they're named `check_*`, so `python -m unittest` doesn't run them):
 
 ```text
 Windows:  venv\Scripts\python.exe tests\app\run.py [name ...]
@@ -1881,31 +1881,31 @@ Results so far: Windows 11 (fresh venv, Python 3.13, PySide6 6.11.2), 2026-10-03
 `packaging/build.py` builds the installer for the platform it runs on, in about a minute:
 
 ```text
-Windows:  venv\Scripts\python.exe packaging\build.py      -> dist\MediaWall-<version>-Setup.exe
-Linux:    venv/bin/python packaging/build.py                -> dist/MediaWall_<version>_amd64.deb
+Windows:  venv\Scripts\python.exe packaging\build.py      -> dist\Mediawall-<version>-Setup.exe
+Linux:    venv/bin/python packaging/build.py                -> dist/Mediawall_<version>_amd64.deb
 ```
 
-One-time setup: `pip install -r requirements-build.txt` (PyInstaller), plus Inno Setup 6 on Windows (`winget install JRSoftware.InnoSetup`); Linux needs `dpkg-deb`, which Mint and Ubuntu already have. Each platform's installer has to be built on that platform. `--app-only` stops after the app folder (`dist/MediaWall/`), which runs without installing. `build/` and `dist/` are gitignored. The version comes from `core/version.py`.
+One-time setup: `pip install -r requirements-build.txt` (PyInstaller), plus Inno Setup 6 on Windows (`winget install JRSoftware.InnoSetup`); Linux needs `dpkg-deb`, which Mint and Ubuntu already have. Each platform's installer has to be built on that platform. `--app-only` stops after the app folder (`dist/Mediawall/`), which runs without installing. `build/` and `dist/` are gitignored. The version comes from `core/version.py`.
 
 How it works:
 
 1. The icon (`assets/mediawall.svg`) is rendered to PNGs and a Windows `.ico` in `build/icon/`.
-2. PyInstaller (`packaging/mediawall.spec`) makes `dist/MediaWall/`: Python, PySide6/Qt, Qt's FFmpeg libraries, the QML files, and the icon, so nothing needs to be installed first. Parts of Qt MediaWall doesn't use (web engine, 3D, charts, PDF, other Controls styles, and so on) are left out by name in the spec; if a new QML import is added, check it isn't on that list. QtMultimedia is named as a hidden import because only QML uses it.
+2. PyInstaller (`packaging/mediawall.spec`) makes `dist/Mediawall/`: Python, PySide6/Qt, Qt's FFmpeg libraries, the QML files, and the icon, so nothing needs to be installed first. Parts of Qt Mediawall doesn't use (web engine, 3D, charts, PDF, other Controls styles, and so on) are left out by name in the spec; if a new QML import is added, check it isn't on that list. QtMultimedia is named as a hidden import because only QML uses it.
 3. The installer:
-   - **Windows:** Inno Setup (`packaging/windows/mediawall.iss`) makes one `Setup.exe` (about 40 MB). It installs per user without an admin prompt (or for everyone, if chosen), adds a Start Menu shortcut, an optional desktop shortcut, an uninstaller, and (optional, on by default) makes `.mediawall` files open in MediaWall. The app folder has two programs: `MediaWall.exe`, a small windowed launcher, starts `MediaWall-app.exe` (the app, a console program) with a hidden console, for the same reason as `launcher.pyw` (section 37, Launchers).
-   - **Linux:** a `.deb` that installs the app in `/opt/mediawall`, `mediawall` on the PATH, a menu entry, the icon, and the `.mediawall` file type (`packaging/linux/`). Its `Depends` lists the few system libraries PySide6 doesn't bundle (e.g. `libxcb-cursor0`), so installing it with `sudo apt install ./MediaWall_<version>_amd64.deb` (or double-clicking it) fetches any that are missing.
+   - **Windows:** Inno Setup (`packaging/windows/mediawall.iss`) makes one `Setup.exe` (about 40 MB). It installs per user without an admin prompt (or for everyone, if chosen), adds a Start Menu shortcut, an optional desktop shortcut, an uninstaller, and (optional, on by default) makes `.mediawall` files open in Mediawall. The app folder has two programs: `Mediawall.exe`, a small windowed launcher, starts `Mediawall-app.exe` (the app, a console program) with a hidden console, for the same reason as `launcher.pyw` (section 37, Launchers).
+   - **Linux:** a `.deb` that installs the app in `/opt/mediawall`, `mediawall` on the PATH, a menu entry, the icon, and the `.mediawall` file type (`packaging/linux/`). Its `Depends` lists the few system libraries PySide6 doesn't bundle (e.g. `libxcb-cursor0`), so installing it with `sudo apt install ./Mediawall_<version>_amd64.deb` (or double-clicking it) fetches any that are missing.
 
 The installers bundle their own Python and libraries rather than installing Python on the user's machine: that is the usual approach for Python desktop apps, it needs no internet or admin rights, and it can't break on a mismatched system Python. Settings (QSettings) and logs are per user and survive an uninstall.
 
 **Releases** go on GitHub (github.com/eacartwright/mediawall, Releases), never in git. For a new version: set `core/version.py`, commit, build on each platform, then tag and publish with the GitHub CLI (`gh`):
 
 ```text
-git tag -a v<version> -m "MediaWall <version>"  &&  git push origin v<version>
-gh release create v<version> dist/MediaWall-<version>-Setup.exe --title "MediaWall <version>" --notes "..."
-gh release upload v<version> dist/MediaWall_<version>_amd64.deb      # later, from Linux
+git tag -a v<version> -m "Mediawall <version>"  &&  git push origin v<version>
+gh release create v<version> dist/Mediawall-<version>-Setup.exe --title "Mediawall <version>" --notes "..."
+gh release upload v<version> dist/Mediawall_<version>_amd64.deb      # later, from Linux
 ```
 
-Do not depend on any other project's virtual environment (for example ComfyUI's). MediaWall has its own environment and dependency set.
+Do not depend on any other project's virtual environment (for example ComfyUI's). Mediawall has its own environment and dependency set.
 
 ---
 
@@ -1968,7 +1968,7 @@ mediawall/
 ├── packaging/              installers (section 37, Installers)
 │   ├── build.py            builds this platform's installer into dist/
 │   ├── mediawall.spec      PyInstaller recipe
-│   ├── windows_launcher.py MediaWall.exe: starts the app without a console
+│   ├── windows_launcher.py Mediawall.exe: starts the app without a console
 │   ├── windows/            Inno Setup script
 │   └── linux/              .desktop entry, .mediawall file type
 │
@@ -2179,7 +2179,7 @@ Implement:
 
 Done: Full Screen and Present modes, hidden editor UI, view-only canvas, keyboard shortcuts and a mouse-only exit (section 15). Browsers stay visible in Present by choice.
 
-Done also: the mouse pointer hides while idle in Present. Scaling the wall to other screen sizes is not planned: positions are in screen units from the top-left, so a wall made on a 1080p screen opens at the same size on a 4K screen, top-left, with more canvas around it; a wall spanning two monitors is better done as a separate MediaWall window/instance per screen.
+Done also: the mouse pointer hides while idle in Present. Scaling the wall to other screen sizes is not planned: positions are in screen units from the top-left, so a wall made on a 1080p screen opens at the same size on a 4K screen, top-left, with more canvas around it; a wall spanning two monitors is better done as a separate Mediawall window/instance per screen.
 
 ---
 
@@ -2536,7 +2536,7 @@ The prototype currently provides:
 - Speech: text to speech with Piper (installed by the user, set up in Settings), added as speech tracks that keep only their words and settings (clips are made when needed and deleted when the app closes), so they can be edited; the tab's contents are saved with the project (section 14.6)
 - new container content framed with Fit (the whole picture) by default
 - unit tests for `core/`, and app checks that drive the real app (section 37)
-- installers: a Windows `Setup.exe` and a Linux `.deb`, built by `packaging/build.py` (section 37); 0.9.11 built (Windows installer; the `.deb` is built on Linux Mint)
+- installers: a Windows `Setup.exe` and a Linux `.deb`, built by `packaging/build.py` (section 37); 0.9.12 built (Linux `.deb`; the Windows installer is built on Windows)
 
 ### How interactions reach the model
 
@@ -2571,22 +2571,23 @@ Waiting on an answer or more information (2026-09-30):
 - **Adding single files**: does this mean adding a file from a file dialog, with no browser (needed if the browser is folded into containers)?
 - **Linux: no sound until the app is restarted** (other apps play fine; nothing in the log). Watching; next time, note what was playing and copy the Log window.
 
-In progress on branch `video-memory` (2026-10-29), resumed in a Windows VM. The branch has `origin/main` (0.9.11) merged in (`1db4635`); merge it into `main` when the items below are done.
+Branch `video-memory` was merged into `main` and released as 0.9.12 (2026-10-29, from the Mint dev VM). Still open from it:
 
-- **Bug: Speech's "Pause between sentences" does nothing** (Linux Mint, real Piper; changing the value has no effect). `bridge/speech.py` passes `--sentence_silence`, the old C++ Piper's spelling. Ideas to check first: (1) newer Piper (the Python `piper1-gpl`) may spell its options with hyphens (`--sentence-silence`), so check `piper --help` on the VM; (2) the words are fed one line per sentence (`core/speech.py`), and Piper may only add the pause *between* sentences within a line, so a pause after each line would need adding by MediaWall itself (e.g. splitting into sentences and joining the clips with silence). `tests/app/fake_piper.py` accepts the underscore spelling, so the checks can't catch this. Set up the VM with real Piper and a couple of voices (Settings → Speech) to test it. **Checked on the Windows VM (2026-10-29), Piper 1.8.0 (`piper-tts`):** both ideas are ruled out there. It accepts both spellings, and `piper_text` already joins the lines into one, and on one line the pause works (a 1 s pause made a two-sentence clip 1.2 s longer). **Through the app's own `SpeechEngine`, the pause works on the VM** with both the standalone `piper.exe` (each second of pause adds about 3 s to a three-sentence clip: silence after every sentence) and `piper-tts` 1.8.0 (about 2 s: between sentences only), in Normal and Deep modes, with the words typed on separate lines. Next: on the Mint machine where it happened, find out which Piper it runs (`piper --help`, `pip show piper-tts`) and try a 0 s and a 3 s pause on three short sentences. **Checked on the Mint dev VM (2026-10-29): the pause works there too, so it isn't Linux.** Through `SpeechEngine`, three sentences on separate lines, `en_US-lessac-medium`: `piper-tts` 1.8.0 went from 3.8 s at 0 s to 9.6 s at 3 s (Normal; Deep 4.0 → 9.9 s), and the standalone build (1.2.0, `piper_linux_x86_64.tar.gz` 2023.11.14-2) from 3.8 to 12.6 s (Deep 4.0 → 12.8 s), the same as on Windows. Fed to `piper-tts` 1.8.0 as separate lines (not joined by `piper_text`), the 3 s pause added only 0.3 s, because it synthesizes each line on its own and puts the pause only between sentences within a line; so a Piper (or an older MediaWall) that gets the words line by line would match the bug. What's left is that machine's Piper: run the commands above there.
+- **Bug: Speech's "Pause between sentences" does nothing** (Linux Mint, real Piper; changing the value has no effect). `bridge/speech.py` passes `--sentence_silence`, the old C++ Piper's spelling. Ideas to check first: (1) newer Piper (the Python `piper1-gpl`) may spell its options with hyphens (`--sentence-silence`), so check `piper --help` on the VM; (2) the words are fed one line per sentence (`core/speech.py`), and Piper may only add the pause *between* sentences within a line, so a pause after each line would need adding by Mediawall itself (e.g. splitting into sentences and joining the clips with silence). `tests/app/fake_piper.py` accepts the underscore spelling, so the checks can't catch this. Set up the VM with real Piper and a couple of voices (Settings → Speech) to test it. **Checked on the Windows VM (2026-10-29), Piper 1.8.0 (`piper-tts`):** both ideas are ruled out there. It accepts both spellings, and `piper_text` already joins the lines into one, and on one line the pause works (a 1 s pause made a two-sentence clip 1.2 s longer). **Through the app's own `SpeechEngine`, the pause works on the VM** with both the standalone `piper.exe` (each second of pause adds about 3 s to a three-sentence clip: silence after every sentence) and `piper-tts` 1.8.0 (about 2 s: between sentences only), in Normal and Deep modes, with the words typed on separate lines. Next: on the Mint machine where it happened, find out which Piper it runs (`piper --help`, `pip show piper-tts`) and try a 0 s and a 3 s pause on three short sentences. **Checked on the Mint dev VM (2026-10-29): the pause works there too, so it isn't Linux.** Through `SpeechEngine`, three sentences on separate lines, `en_US-lessac-medium`: `piper-tts` 1.8.0 went from 3.8 s at 0 s to 9.6 s at 3 s (Normal; Deep 4.0 → 9.9 s), and the standalone build (1.2.0, `piper_linux_x86_64.tar.gz` 2023.11.14-2) from 3.8 to 12.6 s (Deep 4.0 → 12.8 s), the same as on Windows. Fed to `piper-tts` 1.8.0 as separate lines (not joined by `piper_text`), the 3 s pause added only 0.3 s, because it synthesizes each line on its own and puts the pause only between sentences within a line; so a Piper (or an older Mediawall) that gets the words line by line would match the bug. What's left is that machine's Piper: run the commands above there.
   - **Setting up Piper and the English voices on the Mint dev VM** (as on the Windows VM; nothing goes in the project's `venv/`):
     1. `sudo apt install python3-venv` (if `python3 -m venv` complains), then `python3 -m venv ~/piper/venv`
     2. `~/piper/venv/bin/pip install piper-tts huggingface_hub` (Piper, and the Hugging Face CLI, `hf`)
     3. `~/piper/venv/bin/piper --help` (note the version: `~/piper/venv/bin/pip show piper-tts`)
     4. `~/piper/venv/bin/hf download rhasspy/piper-voices --include "en/*" --local-dir ~/piper/voices` (all the en_GB and en_US voices, 38, about 2.6 GB; each is a `.onnx` with its `.onnx.json`)
-    5. MediaWall → Settings → Speech: Piper program `/home/<user>/piper/venv/bin/piper`, voices folder `/home/<user>/piper/voices`.
+    5. Mediawall → Settings → Speech: Piper program `/home/<user>/piper/venv/bin/piper`, voices folder `/home/<user>/piper/voices`.
     6. Optional, to compare with the standalone build used on Windows (`C:\dev\piper`): `piper_linux_x86_64.tar.gz` from the rhasspy/piper GitHub releases, unpacked; point Settings at its `piper`.
     7. In the Speech tab: three short sentences on separate lines, voice `en_US-lessac-medium`, Preview at pause 0 s and 3 s. On the Windows VM the 3 s clip is about 6 s longer with `piper-tts` 1.8.0 (silence between sentences) and about 9 s longer with the standalone build (after each one).
 - **Done, checked since the merge** (all app checks pass, 2026-10-29, Windows VM):
   - Flip Horizontally turns off when a browsing container shows the next file (`show_file_in_container`; unit test passes).
   - **Snapping**: `core/snap.py` (+ `tests/test_snap.py`), `SceneModel.snapMove` / `snapResize`, the snap helpers and pink guide lines in `Main.qml`'s scene, moves in Media/Container/TextObject, resizes in `ResizeHandles.qml` (unrotated objects; keeping the aspect ratio, only the nearer axis snaps). Containers, media, and text snap; browsers don't. The wall's edges are the screen's (`Screen.width/height`, what Present shows), and its middle lines count too. Settings → General has a switch (default on); holding Ctrl skips it for one drag. `tests/app/check_snap.py` passes 8/8. Readme written: section 25 (Snapping), 50, 55.
   - **Text animations** (Wiggle, Pulse, Glow pulse, Gradient shift, Color cycle; Slow / Normal / Fast): built on the new `TextArt` (section 5.4, 55); `tests/app/check_text_animation.py` passes 16/16. The old attempt in the Windows stash can be dropped.
-- **To do:** check the sentence pause on the Mint machine where it happened (above; the Mint dev VM is fine); then merge into `main`.
+- **To do:** check the sentence pause on the Mint machine where it happened (above; the Mint dev VM is fine). Build the 0.9.12 Windows installer and add it to the release (`gh release upload v0.9.12 dist/Mediawall-0.9.12-Setup.exe`).
+- **`check_text` is flaky on the Mint dev VM** (2026-10-29): a few different steps fail each run (canvas typing focus, the glow rebuilt after an arc change), the same with 0.9.11, so it's the fixed step delays on a slower machine, not a regression. All other checks pass there.
 
 Testing (2026-10-29):
 
@@ -2614,7 +2615,7 @@ Done since the review: browsing containers (section 6.4), layouts (section 17), 
 
 ### Soon
 
-- **Trim the Linux build**: the `.deb` installs 237 MB against about 140 MB on Windows. `UNUSED_QT` in `packaging/mediawall.spec` probably misses Qt parts under their Linux file names (`libQt6*.so*`, plugins). List the largest files in `dist/MediaWall/_internal` on Linux, add what isn't used, and check the app still runs.
+- **Trim the Linux build**: the `.deb` installs 237 MB against about 140 MB on Windows. `UNUSED_QT` in `packaging/mediawall.spec` probably misses Qt parts under their Linux file names (`libQt6*.so*`, plugins). List the largest files in `dist/Mediawall/_internal` on Linux, add what isn't used, and check the app still runs.
 - **Duplicate by mouse**, e.g. Alt+drag. A double right-click is awkward, since the first right-click already opens the menu.
 
 ### Later (kept on the roadmap)
@@ -2764,7 +2765,7 @@ QML       Audio Rack
 
 # 54. Design Philosophy in One Sentence
 
-**MediaWall should let the user treat their filesystem as a huge media collection, browse and experiment with that collection directly on a visual canvas, arrange media into independent viewports and compositions, and then turn that workspace into a fullscreen multimedia presentation without copying or unnecessarily converting the original media.**
+**Mediawall should let the user treat their filesystem as a huge media collection, browse and experiment with that collection directly on a visual canvas, arrange media into independent viewports and compositions, and then turn that workspace into a fullscreen multimedia presentation without copying or unnecessarily converting the original media.**
 
 ---
 
@@ -2841,11 +2842,11 @@ The following design decisions are currently established:
 - The speed slider's range is a setting (default 0.5x to 3x); core keeps 0.25x to 4x as the outer limits (2026-09-29).
 - Phone videos stored sideways with a rotation flag get their displayed (upright) size: MediaView reports the stored size in the orientation actually drawn, once it has settled; a size report that is the old one turned sideways re-sizes (fits within its box) and re-frames everything already placed, which also repairs older walls (2026-09-26).
 - Speed changes pitch by default (Keep pitch off), as in Celluloid (2026-09-26).
-- The application's name is written **MediaWall** (one word) everywhere (2026-09-26).
+- The application's name is written **Mediawall** (one word) everywhere (2026-09-26).
 - Undo history is kept between sessions in a separate `<project>.history` file (last 50 steps), matched to the project by fingerprint, not inside the project file (2026-09-26). **Superseded 2026-10-15:** dropped. Undo across sessions was rarely needed, and one file per wall is preferred; storing it inside the project file was rejected, since every step is a whole scene and the file would grow. History now lasts for the session (in memory).
 - Free media always keeps its aspect ratio; no Contain/Cover/Free/Stretch modes for it (2026-09-26).
 - No audio solo, and no choosing between audio streams in one file (2026-09-26).
-- The wall is not scaled to the screen: a larger screen shows more canvas, with the wall at the same size in the top-left; multi-monitor walls use one MediaWall instance per screen (2026-09-26).
+- The wall is not scaled to the screen: a larger screen shows more canvas, with the wall at the same size in the top-left; multi-monitor walls use one Mediawall instance per screen (2026-09-26).
 - The window uses 4x MSAA so rotated edges are smooth (2026-09-26).
 - Installers bundle Python and all libraries (PyInstaller) rather than installing Python or downloading dependencies at install time: Inno Setup on Windows, a `.deb` on Linux, both built by one script (2026-09-29).
 - An installed copy writes its logs to the user's data folder; running from source keeps `logs/` in the project folder (2026-09-29).
@@ -2853,7 +2854,7 @@ The following design decisions are currently established:
 - Resize corners, edge bars, and the rotation knob are about 30% smaller than before; their grab areas stay about the same size (2026-09-29).
 - Later the same day, the corner squares went down again (11 → 9 px) and the edge bars got shorter (25 → 19 px); the rotation knob stayed. The Settings dialog got a lighter border (`palette.midlight`), since Fusion's default barely showed on the dark canvas.
 - Selection outlines are 1 px for every object type (media, browsers, containers); only Adjust mode's orange outline stays 2 px. A browser's **New Container** button puts the current file in a new container beside it, like Add to Canvas (2026-09-29).
-- The sidebar's Audio tab is now **Playback** (flyout: "Layers · Playback"): it holds speed, pitch, A-B loops, and volume for videos as well as audio tracks. The browser's Add to Audio and the Convert to Audio Track command keep their names, since they do make audio tracks. The Windows installer shows as "MediaWall 0.9.2" in Installed apps (`AppVerName`), not Inno's default "MediaWall version 0.9.2" (2026-09-30).
+- The sidebar's Audio tab is now **Playback** (flyout: "Layers · Playback"): it holds speed, pitch, A-B loops, and volume for videos as well as audio tracks. The browser's Add to Audio and the Convert to Audio Track command keep their names, since they do make audio tracks. The Windows installer shows as "Mediawall 0.9.2" in Installed apps (`AppVerName`), not Inno's default "Mediawall version 0.9.2" (2026-09-30).
 - The publisher is **evans.tools** (the Windows installer's `AppPublisher`, shown in Installed apps; the `.deb`'s Maintainer, with the GitHub noreply address, since dpkg needs an email). evans.tools is the owner's domain for this and related projects (2026-09-30).
 - Converting a container's video to an audio track removes the container as well; an empty container left behind was just clutter. Undo brings back both (2026-09-30).
 - File stepping (browsers and browsing containers) also works by holding a thumb button (400 ms, then every 150 ms; two fixed-interval timers, since changing a running Timer's interval stopped its repeating), by tilting the wheel (one step per notch; sideways trackpad swipes add up), and with the Left/Right arrow keys on the selected one (`previousFile` / `nextFile` in AppActions). Planned arrow-key nudging will apply to other objects (2026-09-30).
@@ -2864,7 +2865,7 @@ The following design decisions are currently established:
 - Containers' right-click menu has **Browse Folder…** (choose a folder) beside Browse This Folder (the shown file's folder, now only offered when there is one), so a filled container can switch folders without being emptied first (2026-09-30).
 - Type filter for browsers and browsing containers: one saved field, `media_filter` ("all" or a media type; containers can't choose audio), set from the right-click menu. A ComboBox in the browser header was tried and dropped: it crowded the folder name out (2026-09-30).
 - Linux: if Qt's default UI font is fixed-width, the app uses the system's sans-serif font instead (`bridge/ui_font.py`). Only a fixed-width default is replaced, so a desktop font the user chose is kept (2026-10-01; confirmed on Mint).
-- The `.deb` file is named `MediaWall_<version>_<arch>.deb` to match the Windows installer; the package inside stays `mediawall`, since Debian package names must be lowercase (so it's still `sudo apt remove mediawall`) (2026-10-02).
+- The `.deb` file is named `Mediawall_<version>_<arch>.deb` to match the Windows installer; the package inside stays `mediawall`, since Debian package names must be lowercase (so it's still `sudo apt remove mediawall`) (2026-10-02).
 - **All containers behave the same, like qView** (2026-10-02): pan and wheel-zoom the picture, double-click to reset, in every container, browsing or not, selected or not, and in Present. The wheel on the border strip (or anywhere on an empty container) scales the container, with no selection needed, so layouts are quick to build. Double-click no longer enters Adjust mode. Adjust mode stays (from the right-click menu) for free content rotation, without its Fit/Fill/Done toolbar; Ctrl + knob also turns the content, so both ways can be tried.
 - Mirroring is one per-instance flag (`mirrored`), horizontal only, applied to the picture in `MediaView` (not to overlays such as error boxes) (2026-10-02).
 - Containers show no outline once filled unless selected (1 px green) or being adjusted (2 px orange), so a finished wall reads as pictures rather than boxes; an empty container keeps a faint grey outline (hidden in Present) until it's filled. A browsing container's badge is just `⇅`, without the `n / total` count (2026-09-29).
@@ -2896,6 +2897,8 @@ The following design decisions are currently established:
 - **Speech runs Piper as a separate program** (2026-10-17), set up in Settings, rather than bundling it: Piper and its voices are large and the voices are the user's choice. Speech tracks are `audio` objects, so playback, saving, undo, and overlapping come for free. the tab's own contents are saved with the project (`speech_draft`, workspace state, not undone). Pitch is a sample-rate change with Piper's length compensating, instead of sox, so it needs nothing beyond Python and works the same on Windows and Linux. Speech tracks loop, like other tracks (playing once was tried first).
 - **Speech clips are temporary** (2026-10-17): a speech track has no file; its words and settings are its source, and its clip is made when it's needed and kept in a temporary folder deleted when the app closes. Saving clips as WAVs next to the project (the first version) left files behind: Update Track kept the old file for undo, and a `speech` folder shared by several projects could never be cleaned up safely. The cost: a project's speech needs Piper and the same voices to play, and a remade clip may differ very slightly (Piper adds a little randomness). An Export WAV… on the card could be added if a portable copy is ever needed. The tab's own contents are saved with the project (`speech_draft`, workspace state, not undone).
 - **Video memory** (2026-10-29): hardware video decoding is a setting (Automatic / Off / one backend), applied through Qt's `QT_FFMPEG_DECODING_HW_DEVICE_TYPES` at startup, so it takes a restart; Qt can't switch per player. Still images can be limited to 4096 / 2048 / 1024 px on the long side (live). A separate **Media Memory** window, rather than log lines, shows estimated video memory per loaded media, the measured total from `nvidia-smi`, and decoder fallbacks counted from the log; it refreshes in place every two seconds. Both are in a new Settings tab, **Performance** (General, Performance, Shortcuts, About).
+
+- **Renamed MediaWall to Mediawall** (2026-10-29, 0.9.12): everywhere the name appears, and in the internal names too. On Linux the settings move from `~/.config/MediaWall/MediaWall.conf` to `~/.config/Mediawall/Mediawall.conf`: when the new one is empty the old settings are copied over (`_open_settings`; the old file is left in place), and the installed app renames `~/.local/state/MediaWall` (the logs). Windows ignores case in the registry and in paths, so nothing moves there; the installer's `AppId` is unchanged, so 0.9.12 upgrades an older install. The file formats (`mediawall-project`, `.mediawall`) were already lower case.
 
 ### Open decisions
 

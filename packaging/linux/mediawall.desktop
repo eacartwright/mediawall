@@ -1,6 +1,6 @@
 [Desktop Entry]
 Type=Application
-Name=MediaWall
+Name=Mediawall
 Comment=Arrange images, GIFs, video, and audio on a free canvas
 Exec=mediawall %f
 Icon=mediawall

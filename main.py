@@ -42,8 +42,8 @@ ICON_PATH = APP_DIR / "assets" / "mediawall.svg"
 def log_dir():
     """
     Run from source: logs/ in the project folder. Installed: the user's
-    own data folder, %LOCALAPPDATA%/MediaWall/logs on Windows and
-    ~/.local/state/MediaWall/logs on Linux ($XDG_STATE_HOME if set).
+    own data folder, %LOCALAPPDATA%/Mediawall/logs on Windows and
+    ~/.local/state/Mediawall/logs on Linux ($XDG_STATE_HOME if set).
     """
     if not FROZEN:
         return APP_DIR / "logs"
@@ -51,7 +51,14 @@ def log_dir():
         base = Path(os.environ.get("LOCALAPPDATA") or Path.home() / "AppData" / "Local")
     else:
         base = Path(os.environ.get("XDG_STATE_HOME") or Path.home() / ".local" / "state")
-    return base / "MediaWall" / "logs"
+    folder = base / "Mediawall"
+    old = base / "MediaWall"               # before 0.9.12 (only differs on Linux)
+    if old.is_dir() and not folder.exists():
+        try:
+            old.rename(folder)
+        except OSError:
+            pass
+    return folder / "logs"
 
 
 LOG_PATH = log_dir() / "mediawall.log"

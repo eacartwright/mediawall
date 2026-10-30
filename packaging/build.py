@@ -1,5 +1,5 @@
 """
-Build MediaWall's installer for the platform this runs on.
+Build Mediawall's installer for the platform this runs on.
 
     Windows:  venv\\Scripts\\python.exe packaging\\build.py
     Linux:    venv/bin/python packaging/build.py
@@ -10,12 +10,12 @@ dpkg-deb on Linux (already on Mint/Ubuntu).
 
 Steps:
 1. Icons: build/icon/ (a .ico and PNGs) from assets/mediawall.svg.
-2. The app folder: dist/MediaWall/ (PyInstaller, packaging/mediawall.spec).
+2. The app folder: dist/Mediawall/ (PyInstaller, packaging/mediawall.spec).
 3. The installer, in dist/:
-   Windows  MediaWall-<version>-Setup.exe  (packaging/windows/mediawall.iss)
-   Linux    MediaWall_<version>_<arch>.deb (files in packaging/linux/)
+   Windows  Mediawall-<version>-Setup.exe  (packaging/windows/mediawall.iss)
+   Linux    Mediawall_<version>_<arch>.deb (files in packaging/linux/)
 
-`--app-only` stops after step 2 (to try dist/MediaWall/ directly).
+`--app-only` stops after step 2 (to try dist/Mediawall/ directly).
 Each platform's installer must be built on that platform.
 """
 
@@ -101,7 +101,7 @@ def write_ico(pngs, path):
 # ---- 2. The app folder ----
 
 def build_app():
-    shutil.rmtree(DIST / "MediaWall", ignore_errors=True)
+    shutil.rmtree(DIST / "Mediawall", ignore_errors=True)
     subprocess.run([sys.executable, "-m", "PyInstaller", "--noconfirm",
                     "--distpath", str(DIST), "--workpath", str(BUILD / "pyinstaller"),
                     str(PACKAGING / "mediawall.spec")], check=True, cwd=ROOT)
@@ -129,11 +129,11 @@ def build_windows_installer():
                  "and run this again.")
     subprocess.run([iscc, "/Qp",
                     f"/DAppVersion={VERSION}",
-                    f"/DSourceDir={DIST / 'MediaWall'}",
+                    f"/DSourceDir={DIST / 'Mediawall'}",
                     f"/DOutputDir={DIST}",
                     f"/DIconFile={ICON_DIR / 'mediawall.ico'}",
                     str(PACKAGING / "windows" / "mediawall.iss")], check=True)
-    return DIST / f"MediaWall-{VERSION}-Setup.exe"
+    return DIST / f"Mediawall-{VERSION}-Setup.exe"
 
 
 # ---- 3b. Linux installer (.deb) ----
@@ -147,7 +147,7 @@ def build_deb():
     shutil.rmtree(tree, ignore_errors=True)
 
     # The app in /opt, started as `mediawall` from the PATH.
-    shutil.copytree(DIST / "MediaWall", tree / "opt" / "mediawall", symlinks=True)
+    shutil.copytree(DIST / "Mediawall", tree / "opt" / "mediawall", symlinks=True)
     (tree / "usr" / "bin").mkdir(parents=True)
     (tree / "usr" / "bin" / "mediawall").symlink_to("/opt/mediawall/mediawall")
 
@@ -173,7 +173,7 @@ def build_deb():
         "Section: graphics",
         "Priority: optional",
         "Description: Arrange images, GIFs, video, and audio on a free canvas",
-        " MediaWall is a desktop app for building walls of media: place, size,",
+        " Mediawall is a desktop app for building walls of media: place, size,",
         " rotate, and layer photos, GIFs, and videos on one canvas, browse",
         " folders beside it, and present the result full screen.",
         "",
@@ -191,7 +191,7 @@ def build_deb():
 
     # The package name must be lowercase (Debian rule), but the file name
     # is free: capitalised to match the Windows installer.
-    out = DIST / f"MediaWall_{VERSION}_{arch}.deb"
+    out = DIST / f"Mediawall_{VERSION}_{arch}.deb"
     subprocess.run(["dpkg-deb", "--root-owner-group", "--build", str(tree), str(out)], check=True)
     return out
 
@@ -204,12 +204,12 @@ def copy(source, target):
 # ----
 
 def main():
-    step(f"MediaWall {VERSION}: icons")
+    step(f"Mediawall {VERSION}: icons")
     render_icons()
     step("App folder (PyInstaller)")
     build_app()
     if "--app-only" in sys.argv:
-        print(f"\nDone: {DIST / 'MediaWall'}")
+        print(f"\nDone: {DIST / 'Mediawall'}")
         return
     step("Installer")
     out = build_windows_installer() if sys.platform == "win32" else build_deb()

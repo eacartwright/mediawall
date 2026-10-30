@@ -7,7 +7,7 @@ are app settings. bridge/speech.py runs it.
 A speech track is an audio track with no file: its `speech` dict (the
 words, the voice, and the settings) is its source. Its clip is made when
 it's needed (when the project opens, or at its first Play) into a
-temporary folder that is deleted when MediaWall closes, so no clips pile
+temporary folder that is deleted when Mediawall closes, so no clips pile
 up on disk. Clips are found again by speech_key(), so identical tracks
 share one, and undo switches back without making it again.
 

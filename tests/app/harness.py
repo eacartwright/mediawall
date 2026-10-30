@@ -1,7 +1,7 @@
 """
 Shared setup for the app-level checks (tests/app/check_*.py).
 
-Each check script starts the real MediaWall (main.main()) with a project
+Each check script starts the real Mediawall (main.main()) with a project
 it builds, runs timed steps against the live window (mouse, keys, wheel,
 QML expressions), prints PASS/FAIL lines and a final "N/M passed", and
 quits. tests/app/run.py runs them all in separate processes.
@@ -69,7 +69,7 @@ def folder_files(kinds=("image", "video")):
 
 class Check:
     """
-    Build a project, start MediaWall on it, and run `steps` one after
+    Build a project, start Mediawall on it, and run `steps` one after
     another: each is (delay_ms, function). Access the model as `c.sm`,
     the project controller as `c.pc`, and the window as `c.win`.
     """

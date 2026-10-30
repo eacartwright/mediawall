@@ -388,7 +388,7 @@ ApplicationWindow {
 
             // Master volume for this window (the Playback tab): every
             // player's volume is multiplied by it. Not saved, not undone,
-            // and separate for each MediaWall window.
+            // and separate for each Mediawall window.
             property real masterVolume: 1.0
 
             // Media players by media instance id, so panels and menus

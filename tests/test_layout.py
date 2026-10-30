@@ -89,7 +89,7 @@ class LayoutTests(unittest.TestCase):
         for chosen in ["halves", "halves.layout", "halves.mediawall",
                        "halves.mediawall.layout",
                        "Untitled.mediawall.layout.mediawall.layout",   # Windows dialog
-                       "halves.MediaWall.Layout"]:
+                       "halves.Mediawall.Layout"]:
             self.assertEqual(Path(with_layout_extension(chosen)).name.lower(),
                              ("untitled" if chosen.startswith("Untitled") else "halves")
                              + LAYOUT_EXTENSION, chosen)
