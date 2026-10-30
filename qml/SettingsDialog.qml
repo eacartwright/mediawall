@@ -294,6 +294,27 @@ Dialog {
                     title: "Container Background"
                     onAccepted: appSettings.containerColor = selectedColor.toString()
                 }
+
+                // ---- Snapping ----
+
+                CheckBox {
+                    objectName: "snappingBox"            // found by tests/app
+                    Layout.topMargin: 8
+                    text: "Snap to the wall's edges and other objects"
+                    font.bold: true
+                    checked: appSettings.snapping
+                    onToggled: appSettings.snapping = checked
+                }
+
+                Label {
+                    Layout.fillWidth: true
+                    wrapMode: Text.WordWrap
+                    text: "Moving or resizing a container, picture, video, or text lines its "
+                          + "edges and middle up with the screen's edges and other objects. "
+                          + "Hold Ctrl while dragging to place it freely."
+                    color: "#999999"
+                    font.pixelSize: 12
+                }
             }
 
             // =============================================

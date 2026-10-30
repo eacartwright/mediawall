@@ -277,11 +277,16 @@ Item {
                 return
             moved = true
 
-            root.x = startPos.x + dx
-            root.y = startPos.y + dy
+            // Snap to the wall's edges and other objects (Ctrl: don't).
+            var s = root.sceneItem.snapMove(root.objectId, startPos.x + dx, startPos.y + dy,
+                                            root.width, root.height, root.rotation,
+                                            mouse.modifiers)
+            root.x = s.x
+            root.y = s.y
         }
 
         onReleased: {
+            root.sceneItem.clearSnapGuides()
             if (dragging && moved)
                 root.commit()
             dragging = false
@@ -318,6 +323,9 @@ Item {
 
         target: root
         sceneItem: root.sceneItem
+
+        snapping: true
+        objectId: root.objectId
 
         keepAspect: !root.stretch && !root.wrap && root.objText !== ""
         aspectRatio: art.naturalAspect

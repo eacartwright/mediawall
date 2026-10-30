@@ -67,6 +67,10 @@ _HEX_COLOR = re.compile(r"#[0-9a-fA-F]{6}")
 RECENT_KEY = "recent/projects"
 
 
+# Snapping while moving or resizing (hold Ctrl to skip it for one drag).
+SNAP_KEY = "editing/snapping"
+
+
 # Hardware video decoding (core/media_cost.py): "auto", "software", or
 # one backend. Qt reads it once, so a change applies after a restart.
 HW_DECODING_KEY = "performance/hwDecoding"
@@ -117,6 +121,7 @@ class AppSettings(QObject):
     hwDecodingChanged = Signal()
     maxImageSizeChanged = Signal()
     speechChanged = Signal()
+    snappingChanged = Signal()
 
     def __init__(self, hw_decoding=(HW_AUTO, False), parent=None):
         super().__init__(parent)
@@ -353,6 +358,25 @@ class AppSettings(QObject):
     @Slot()
     def clearRecentProjects(self):
         self._set_recent_projects([])
+
+    # ---- Snapping ----
+
+    def _get_snapping(self):
+        value = self._settings.value(SNAP_KEY, True)
+        if isinstance(value, str):          # ini files store "true"/"false"
+            return value.lower() != "false"
+        return bool(value)
+
+    def _set_snapping(self, on):
+        on = bool(on)
+        if on == self._get_snapping():
+            return
+        self._settings.setValue(SNAP_KEY, on)
+        self._settings.sync()
+        self.snappingChanged.emit()
+
+    # Objects snap to the wall's edges and each other (default on).
+    snapping = Property(bool, _get_snapping, _set_snapping, notify=snappingChanged)
 
     # ---- Performance: hardware video decoding ----
 

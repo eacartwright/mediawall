@@ -1245,8 +1245,8 @@ class Scene:
         Show another file in a container (browsing): the content keeps
         its id and playback settings (volume, mute, loop, speed), takes
         the new source, starts playing, and is framed with the
-        container's Fit/Fill mode. A-B loop points belonged to the old
-        file, so they're cleared. An empty container
+        container's Fit/Fill mode. A-B loop points and Flip Horizontally
+        belonged to the old file, so they're cleared. An empty container
         gets new content.
 
         A locked container refuses, except for Continue Play
@@ -1270,6 +1270,7 @@ class Scene:
         content.source_id = source_id
         content.playing = True           # every file starts playing, as in a browser
         content.loop_a = content.loop_b = -1.0
+        content.mirrored = False
         content.pending_size = source.aspect <= 0
         self._frame_content(container, content, source.aspect, container.fit_mode)
         return True

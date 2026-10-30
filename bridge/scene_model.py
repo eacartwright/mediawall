@@ -36,6 +36,7 @@ from core.media_browser import (
     AUDIO_EXTENSIONS, IMAGE_EXTENSIONS, VIDEO_EXTENSIONS, is_animatable,
 )
 from core.scene import FIT_CONTAIN, FIT_COVER, Scene
+from core.snap import bounding_box, snap_move, snap_resize
 
 
 # Browser fields are workspace state: saved with the project, but not
@@ -1164,6 +1165,37 @@ class SceneModel(QAbstractListModel):
         if self._scene.fill_along(object_id, axis, canvas_width, canvas_height):
             self._emit_row(object_id, GEOMETRY_ROLES + CONTENT_ROLES)
             self._changed()
+
+    # ---- Snapping (core/snap.py): asked on every mouse move ----
+
+    # Objects that snap, and that others snap to. Browsers are workspace
+    # tools, not part of the wall.
+    SNAP_TYPES = ("container", "media", "text")
+
+    def _snap_boxes(self, object_id):
+        return [bounding_box(o.x, o.y, o.width, o.height, o.rotation)
+                for o in self._scene.objects
+                if o.id != object_id and o.parent_id is None and o.type in self.SNAP_TYPES]
+
+    @Slot(str, float, float, float, float, float, float, float, result="QVariantMap")
+    def snapMove(self, object_id, x, y, width, height, rotation, wall_width, wall_height):
+        """A position being dragged to -> {x, y, guides: [[x1, y1, x2, y2]]}."""
+        box = bounding_box(x, y, width, height, rotation)
+        dx, dy, guides = snap_move(box, self._snap_boxes(object_id),
+                                   (wall_width, wall_height))
+        return {"x": x + dx, "y": y + dy, "guides": [list(g) for g in guides]}
+
+    @Slot(str, float, float, float, float, int, int, float, float, result="QVariantMap")
+    def snapResize(self, object_id, left, top, right, bottom, sx, sy, wall_width, wall_height):
+        """
+        The dragged edges of an unrotated box being resized ->
+        {dx, dy, guidesX, guidesY}: how far each dragged edge should move.
+        """
+        dx, dy, gx, gy = snap_resize((left, top, right, bottom), sx, sy,
+                                     self._snap_boxes(object_id),
+                                     (wall_width, wall_height))
+        return {"dx": dx, "dy": dy, "guidesX": [list(g) for g in gx],
+                "guidesY": [list(g) for g in gy]}
 
     @Slot(str, float, float, float)
     def scaleObject(self, object_id, px, py, factor):
