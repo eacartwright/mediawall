@@ -4,14 +4,15 @@ import QtQuick.Layouts
 
 // App-wide settings (bridge/app_settings.py). Changes apply at once and
 // are saved immediately; Close just closes. Opened from the toolbar.
-// Tabs: General (the settings), Shortcuts (every key and modifier the
-// app responds to, read from AppActions where they're defined), About
-// (with the button that opens the Log window).
+// Tabs: General (the settings), Performance (video decoding, image
+// size, and the Media Memory window), Shortcuts (every key and modifier
+// the app responds to, read from AppActions where they're defined),
+// About (with the button that opens the Log window).
 
 Dialog {
     id: dialog
 
-    // AppActions, for the Shortcuts tab's key list and About's Log button.
+    // AppActions, for the Shortcuts tab's key list and the window buttons.
     property var actions
 
     title: "Settings"
@@ -44,6 +45,7 @@ Dialog {
             Layout.fillWidth: true
 
             TabButton { text: "General" }
+            TabButton { text: "Performance" }
             TabButton { text: "Shortcuts" }
             TabButton { text: "About" }
         }
@@ -220,6 +222,117 @@ Dialog {
                           + "stepping until let go (default " + appSettings.stepRepeatDelayDefault
                           + " ms, then every " + appSettings.stepRepeatIntervalDefault
                           + " ms). A held tilt can't step faster than the mouse sends it."
+                    color: "#999999"
+                    font.pixelSize: 12
+                }
+            }
+
+            // =============================================
+            // Performance
+            // =============================================
+
+            ColumnLayout {
+                spacing: 6
+
+                // ---- Hardware video decoding (applies after a restart) ----
+
+                Label {
+                    text: "Hardware video decoding"
+                    font.bold: true
+                }
+
+                RowLayout {
+                    spacing: 8
+
+                    ComboBox {
+                        id: hwBox
+                        objectName: "hwDecodingBox"      // found by tests/app
+                        Layout.preferredWidth: 220
+
+                        model: appSettings.hwDecodingChoices
+                        textRole: "text"
+                        valueRole: "value"
+                        enabled: !appSettings.hwDecodingExternal
+
+                        Component.onCompleted: currentIndex = indexOfValue(appSettings.hwDecoding)
+                        onActivated: appSettings.hwDecoding = currentValue
+                    }
+
+                    Label {
+                        Layout.fillWidth: true
+                        wrapMode: Text.WordWrap
+                        visible: appSettings.hwDecodingExternal
+                                 || appSettings.hwDecoding !== appSettings.hwDecodingActive
+                        text: appSettings.hwDecodingExternal
+                              ? "Set by QT_FFMPEG_DECODING_HW_DEVICE_TYPES"
+                              : "Restart MediaWall to apply"
+                        color: "#e0c060"
+                    }
+                }
+
+                Label {
+                    Layout.fillWidth: true
+                    wrapMode: Text.WordWrap
+                    text: "Each video decoded on the graphics card keeps a pool of frames in "
+                          + "video memory (roughly 60–100 MB at 1080p, several hundred at 4K). "
+                          + "Off decodes on the CPU instead: far less video memory, more CPU. "
+                          + "When the card runs out, FFmpeg falls back to the CPU for that video "
+                          + "by itself."
+                    color: "#999999"
+                    font.pixelSize: 12
+                }
+
+                // ---- Largest still image size ----
+
+                Label {
+                    Layout.topMargin: 12
+                    text: "Largest still image size"
+                    font.bold: true
+                }
+
+                ComboBox {
+                    id: maxImageSizeBox
+                    objectName: "maxImageSizeBox"        // found by tests/app
+                    Layout.preferredWidth: 220
+
+                    model: appSettings.maxImageSizeChoices
+                    textRole: "text"
+                    valueRole: "value"
+
+                    function showSetting() { currentIndex = indexOfValue(appSettings.maxImageSize) }
+                    Component.onCompleted: showSetting()
+                    onActivated: appSettings.maxImageSize = currentValue
+
+                    Connections {
+                        target: appSettings
+                        function onMaxImageSizeChanged() { maxImageSizeBox.showSetting() }
+                    }
+                }
+
+                Label {
+                    Layout.fillWidth: true
+                    wrapMode: Text.WordWrap
+                    text: "Photos are loaded no bigger than this (applies at once). A 24-megapixel "
+                          + "photo takes about 128 MB of video memory at full size, 15 MB at "
+                          + "2048 px. Zoomed far in, a smaller limit looks softer. GIFs and "
+                          + "videos aren't affected."
+                    color: "#999999"
+                    font.pixelSize: 12
+                }
+
+                Button {
+                    objectName: "openMemoryButton"       // found by tests/app
+                    Layout.topMargin: 12
+                    action: dialog.actions ? dialog.actions.memory : null
+                    text: "Open Media Memory…"
+                }
+
+                Label {
+                    Layout.fillWidth: true
+                    wrapMode: Text.WordWrap
+                    text: "Every loaded image and video with the video memory it's estimated to "
+                          + "use, biggest first, and the graphics card's actual usage where "
+                          + "nvidia-smi is available."
                     color: "#999999"
                     font.pixelSize: 12
                 }

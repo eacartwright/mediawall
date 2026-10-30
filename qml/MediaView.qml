@@ -36,6 +36,12 @@ Item {
     // Show the red "Missing / Can't display" box inside this view.
     property bool showErrorState: true
 
+    // For the Media Memory window (bridge/media_memory.py): where this
+    // view is ("canvas", "container", "browser", "audio track"), and the
+    // object to select when its row is clicked.
+    property string memoryPlace: "canvas"
+    property string memoryObjectId: ""
+
     // url, type, and animatable often change together but through
     // separate bindings (e.g. the browser moving to the next file), so
     // they update one at a time. Apply them as one change on the next
@@ -119,6 +125,10 @@ Item {
     // Emitted once the media's natural size is known.
     signal ready(real naturalWidth, real naturalHeight)
 
+    // Still images are loaded at most this big on the long side, to
+    // save video memory (Settings > Performance; 0 = full size).
+    readonly property int maxImageSize: appSettings.maxImageSize
+
     // Emitted when a player has loaded its media (a good moment to seek).
     signal mediaLoaded()
 
@@ -155,8 +165,27 @@ Item {
             mipmap: true            // clean downscaling (fine detail, text)
             cache: true
 
+            // The file's size (header only), when a limit is set.
+            readonly property var fullSize: view.maxImageSize > 0
+                                            ? mediaMemory.imageSize(view._url) : [0, 0]
+            readonly property real limitScale: fullSize[0] > 0 && fullSize[1] > 0
+                ? Math.min(1, view.maxImageSize / Math.max(fullSize[0], fullSize[1])) : 1
+
+            // Larger than maxImageSize: load it scaled down to fit (exact
+            // dimensions: a square box would be filled, not fitted). A
+            // change reloads.
+            sourceSize: limitScale < 1
+                        ? Qt.size(Math.round(fullSize[0] * limitScale),
+                                  Math.round(fullSize[1] * limitScale))
+                        : undefined
+
             onStatusChanged: {
-                if (status === Image.Ready)
+                if (status !== Image.Ready)
+                    return
+                // Loaded smaller than the file: report the file's size.
+                if (limitScale < 1)
+                    view.ready(fullSize[0], fullSize[1])
+                else
                     view.ready(implicitWidth, implicitHeight)
             }
         }
@@ -193,6 +222,10 @@ Item {
 
             property alias player: mediaPlayer
             property bool failed: false
+
+            // The decoded frame size (Media Memory window).
+            readonly property real frameWidth: videoOutput.sourceRect.width
+            readonly property real frameHeight: videoOutput.sourceRect.height
 
             function sync() {
                 if (view.playing)
@@ -328,6 +361,44 @@ Item {
             }
         }
     }
+
+
+    // -------------------------------------------------
+    // Media Memory window: report what this view has loaded
+    // -------------------------------------------------
+
+    readonly property int _memoryToken: mediaMemory.newToken()
+
+    readonly property var _memoryInfo: {
+        var item = loader.item
+        var kind = "none"
+        var w = 0, h = 0
+        if (item && !missing && !failed) {
+            if (isVideo) {
+                kind = "video"
+                w = item.frameWidth || 0
+                h = item.frameHeight || 0
+            } else if (_type === "audio") {
+                kind = "audio"
+            } else if (item.status === Image.Ready) {
+                kind = isAnimated ? "animated" : "image"
+                w = item.implicitWidth
+                h = item.implicitHeight
+            }
+        }
+        return {
+            name: name || path.replace(/^.*[\\/]/, ""),
+            place: memoryPlace,
+            url: _url,
+            objectId: memoryObjectId,
+            kind: kind,
+            width: Math.round(w),
+            height: Math.round(h)
+        }
+    }
+
+    on_MemoryInfoChanged: mediaMemory.report(_memoryToken, _memoryInfo)
+    Component.onDestruction: mediaMemory.forget(_memoryToken)
 
 
     // Error state (readme section 45)

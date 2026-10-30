@@ -133,6 +133,8 @@ Item {
         mirrored: root.objMirrored
         name: root.sourceName
         path: root.sourcePath
+        memoryPlace: "canvas"
+        memoryObjectId: root.objectId
 
         Component.onCompleted: if (root.sceneItem) root.sceneItem.registerView(root.objectId, view)
         Component.onDestruction: if (root.sceneItem) root.sceneItem.unregisterView(root.objectId, view)

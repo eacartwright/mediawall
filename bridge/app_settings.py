@@ -12,10 +12,18 @@ everywhere at once, and is saved immediately.
 """
 
 import os
+import sys
 
 from PySide6.QtCore import Property, QObject, QSettings, Signal, Slot
 from PySide6.QtGui import QKeySequence
 
+from core.media_cost import (
+    HW_AUTO,
+    HW_ENV,
+    hw_choices,
+    hw_env_value,
+    hw_mode_from_env,
+)
 from core.recent import with_recent, without_recent
 
 
@@ -51,20 +59,53 @@ STEP_INTERVAL_RANGE = (30, 1000)
 RECENT_KEY = "recent/projects"
 
 
+# Hardware video decoding (core/media_cost.py): "auto", "software", or
+# one backend. Qt reads it once, so a change applies after a restart.
+HW_DECODING_KEY = "performance/hwDecoding"
+
+# Still images are loaded at most this many pixels on the long side
+# (0 = full size), to save video memory. Applies at once.
+MAX_IMAGE_SIZE_KEY = "performance/maxImageSize"
+MAX_IMAGE_SIZE_CHOICES = (0, 4096, 2048, 1024)
+
+
+def _open_settings():
+    path = os.environ.get("MEDIAWALL_SETTINGS")
+    if path:
+        return QSettings(path, QSettings.IniFormat)
+    return QSettings("MediaWall", "MediaWall")
+
+
+def apply_hw_decoding():
+    """
+    Set Qt's hardware decoding variable from the setting, before Qt
+    Multimedia starts. A variable already set outside the app wins.
+    Returns (the mode in effect for this run, whether it came from
+    outside the app).
+    """
+    from_env = hw_mode_from_env(os.environ.get(HW_ENV))
+    if from_env is not None:
+        return from_env, True
+    mode = str(_open_settings().value(HW_DECODING_KEY, HW_AUTO) or HW_AUTO)
+    value = hw_env_value(mode)
+    if value is not None:
+        os.environ[HW_ENV] = value
+    return mode, False
+
+
 class AppSettings(QObject):
 
     zoomStepChanged = Signal()
     speedRangeChanged = Signal()
     stepRepeatChanged = Signal()
     recentProjectsChanged = Signal()
+    hwDecodingChanged = Signal()
+    maxImageSizeChanged = Signal()
 
-    def __init__(self, parent=None):
+    def __init__(self, hw_decoding=(HW_AUTO, False), parent=None):
         super().__init__(parent)
-        path = os.environ.get("MEDIAWALL_SETTINGS")
-        if path:
-            self._settings = QSettings(path, QSettings.IniFormat)
-        else:
-            self._settings = QSettings("MediaWall", "MediaWall")
+        self._settings = _open_settings()
+        self._hw_active, self._hw_external = hw_decoding
 
     # ---- Mouse-wheel zoom step ----
 
@@ -242,3 +283,66 @@ class AppSettings(QObject):
     @Slot()
     def clearRecentProjects(self):
         self._set_recent_projects([])
+
+    # ---- Performance: hardware video decoding ----
+
+    def _get_hw_decoding(self):
+        return str(self._settings.value(HW_DECODING_KEY, HW_AUTO) or HW_AUTO)
+
+    def _set_hw_decoding(self, mode):
+        if mode == self._get_hw_decoding():
+            return
+        self._settings.setValue(HW_DECODING_KEY, mode)
+        self._settings.sync()
+        self.hwDecodingChanged.emit()
+
+    # The saved choice, applied at the next start.
+    hwDecoding = Property(str, _get_hw_decoding, _set_hw_decoding,
+                          notify=hwDecodingChanged)
+
+    def _get_hw_decoding_active(self):
+        return self._hw_active
+
+    # The mode this run started with.
+    hwDecodingActive = Property(str, _get_hw_decoding_active, constant=True)
+
+    def _get_hw_decoding_external(self):
+        return self._hw_external
+
+    # True if the mode was set by QT_FFMPEG_DECODING_HW_DEVICE_TYPES
+    # outside the app, which overrides the setting.
+    hwDecodingExternal = Property(bool, _get_hw_decoding_external, constant=True)
+
+    def _get_hw_choices(self):
+        return [{"value": v, "text": t} for v, t in hw_choices(sys.platform)]
+
+    # [{value, text}] for the Performance tab's list.
+    hwDecodingChoices = Property(list, _get_hw_choices, constant=True)
+
+    # ---- Performance: largest still image size ----
+
+    def _get_max_image_size(self):
+        try:
+            value = int(self._settings.value(MAX_IMAGE_SIZE_KEY, 0))
+        except (TypeError, ValueError):
+            value = 0
+        return value if value in MAX_IMAGE_SIZE_CHOICES else 0
+
+    def _set_max_image_size(self, value):
+        value = int(value)
+        if value not in MAX_IMAGE_SIZE_CHOICES or value == self._get_max_image_size():
+            return
+        self._settings.setValue(MAX_IMAGE_SIZE_KEY, value)
+        self._settings.sync()
+        self.maxImageSizeChanged.emit()
+
+    # Pixels on the long side (0 = full size).
+    maxImageSize = Property(int, _get_max_image_size, _set_max_image_size,
+                            notify=maxImageSizeChanged)
+
+    def _get_max_image_size_choices(self):
+        return [{"value": n, "text": f"{n} px on the long side" if n else "Full size"}
+                for n in MAX_IMAGE_SIZE_CHOICES]
+
+    # [{value, text}] for the Performance tab's list.
+    maxImageSizeChoices = Property(list, _get_max_image_size_choices, constant=True)

@@ -1416,8 +1416,12 @@ Settings so far:
 - **Mouse-wheel zoom step**: percent per wheel notch, 1 to 50, default 10. Used by every wheel zoom: free images, containers and their pictures, and browser previews.
 - **Playback speed range**: the slowest and fastest speed offered by the Playback tab's speed slider, default **0.5× to 3×** (slowest 0.25–1×, fastest 1–4×, in 0.25× steps). Core's limits (`SPEED_MIN` / `SPEED_MAX`, 0.25× to 4×) remain the outer bounds any saved speed is kept within; a video already set outside the chosen range keeps its speed.
 - **Holding previous / next file**: holding Left/Right, a thumb button, a sideways wheel tilt, or a browser's ◀ ▶ steps once, waits (default **400 ms**, 100–2000), then steps every **150 ms** (30–1000) until let go. A held tilt arrives as whole notches at the mouse driver's pace; `FileStepper` paces those the same way, so it can't step faster than the driver sends (trackpad swipes, in small deltas, are left alone).
+- **Hardware video decoding** (Performance tab; applies after a restart): Automatic (Qt's choice), Off (software only), or one backend (Linux: CUDA or VA-API; Windows: D3D11 or CUDA). `main.py` sets Qt's `QT_FFMPEG_DECODING_HW_DEVICE_TYPES` from it before anything plays (`apply_hw_decoding`; `,`, an empty list, turns hardware decoders off). If that variable is already set outside the app, it wins and the setting is greyed out. Each hardware-decoded video keeps a pool of frames in video memory (roughly 60–100 MB at 1080p); when the card runs out, FFmpeg logs `CUDA_ERROR_OUT_OF_MEMORY` / `hwaccel initialisation returned error` and decodes that video on the CPU instead.
+- **Largest still image size** (Performance tab; applies at once): Full size (default), 4096, 2048, or 1024 px on the long side. Larger stills are loaded scaled down (`sourceSize` in `MediaView`, exact dimensions from the file header, since a square box makes Qt fill rather than fit); the file's real size is still what's reported and saved. GIFs and videos aren't affected.
 
-The dialog has three tabs: **General** (the settings above), **Shortcuts** (every key and modifier the app responds to; command keys are read from `AppActions`, so the list can't drift from the real bindings, and are shown in the platform's spelling via `appSettings.shortcutText`), and **About** (the icon, version from `core/version.py`, and a link to evans.tools).
+**Media Memory window** (Settings → Performance → Open Media Memory…; `qml/MemoryWindow.qml`, `bridge/media_memory.py`, `core/media_cost.py`): every loaded image, GIF, and video (free, in containers, in browser previews), with its decoded size and estimated video memory, biggest first, refreshed in place every two seconds (Pause / Refresh). Clicking a row selects its object. Estimates: stills w×h×4 plus a third for mipmaps, charged once per file and size (Qt shares the texture; further copies show "shared"); animated images one frame; videos one RGBA frame plus, when hardware-decoded, about 20 NV12 frames. The summary adds the GPU's measured use from `nvidia-smi` (all apps; plus this process's CUDA memory where the driver reports it, i.e. Linux), and counts of hardware decoder fallbacks and GPU out-of-memory messages seen in the log since start. Each `MediaView` reports what it has loaded (`mediaMemory.report` / `forget`); nothing is computed while the window is closed.
+
+The dialog has four tabs: **General** (the first three settings above), **Performance** (hardware decoding, image size, Media Memory), **Shortcuts** (every key and modifier the app responds to; command keys are read from `AppActions`, so the list can't drift from the real bindings, and are shown in the platform's spelling via `appSettings.shortcutText`), and **About** (the icon, version from `core/version.py`, and a link to evans.tools).
 
 ### Context menus
 
@@ -1919,6 +1923,7 @@ mediawall/
 │   ├── ObjectContextMenu.qml  shared right-click menu
 │   ├── SettingsDialog.qml  the Settings dialog
 │   ├── LogWindow.qml       the Log window
+│   ├── MemoryWindow.qml    the Media Memory window (estimated video memory per media)
 │   ├── Sidebar.qml         Wall Features flyout (left edge): Layers, Playback, Text tabs
 │   └── Zoom.js             shared mouse-wheel zoom step
 │
@@ -2475,7 +2480,7 @@ The prototype currently provides:
 - text objects ("WordArt"): one line of text with presets, font, gradient fill, outline, and 3D depth, edited in the Text tab (section 5.4)
 - video on the canvas, in containers, and in browser previews, with per-instance play/pause, mute, and loop (right-click menu), and an on-object seek bar when selected
 - per-video speed (0.5x to 3x by default; the range is a setting), Keep pitch, and A-B loop; a Playback tab in the Wall Features panel with every video's sound and playback settings (section 14.5)
-- a Settings dialog (toolbar): the mouse-wheel zoom step, the speed range, and the hold-to-step pace; a Shortcuts tab listing every key; an About tab with the version (section 25)
+- a Settings dialog (toolbar): the mouse-wheel zoom step, the speed range, and the hold-to-step pace; a Performance tab (hardware video decoding, largest still image size, the Media Memory window); a Shortcuts tab listing every key; an About tab with the version (section 25)
 - audio tracks added from a browser (double-click or Add to Audio), controlled in the Playback tab
 - video as audio: Convert to Audio Track (right-click a video), or Add to Audio for a video in a browser (section 14.2)
 - browsing containers: viewer-style (qView) controls: pan, wheel zoom, back/forward buttons, double-click reset; moved by the border strip or middle-drag; also in Present (section 6.4); containers remember Fit/Fill
@@ -2503,8 +2508,9 @@ During a drag, resize, or rotate, QML moves the item directly so interaction sta
 - **Rotation has no angle snapping** yet (e.g. to 15° steps).
 - **Resize has no modifier options** yet (e.g. resize from center, or free aspect on images).
 - **Browser folders are saved as absolute paths only** (by decision; section 16), so on a machine with a different folder layout a browser shows "Folder not found" until a folder is chosen again.
-- **Each video instance runs its own decoder.** Two instances of the same file play independently, not in sync. Many simultaneous videos will be limited by decoding performance.
-- **Hardware video decoding hasn't been verified** on the target machines. Qt prints "No HW decoder found" when it falls back to software decoding.
+- **Each video instance runs its own decoder.** Two instances of the same file play independently, not in sync. Many simultaneous videos will be limited by decoding performance, and with hardware decoding by video memory: an 8 GB card filled up on a busy wall on Linux Mint (CUDA out of memory; FFmpeg then decodes the extra videos on the CPU). Settings → Performance can turn hardware decoding off or limit still image size, and the Media Memory window shows which media are the heavy ones (section 25, Settings).
+- **Media Memory figures are estimates** from decoded sizes: Qt doesn't report GPU memory per image or player, or whether a given player actually got a hardware decoder. Driver overhead (e.g. a CUDA context per decoder) isn't counted.
+- **Off-screen and hidden videos keep decoding** (and keep their decoders' memory).
 - **Harmless FFmpeg messages in the Log.** `[aac @ …] Could not update timestamps for skipped samples` repeats for some video/audio files (e.g. `test_mov.mov` in tests/media): FFmpeg trimming the encoder's start-up delay samples. Playback is unaffected. The `Input #0, …` summaries printed whenever a file is opened are normal too. (FFmpeg's log level could be lowered if the noise ever matters.)
 
 ---
@@ -2522,6 +2528,10 @@ Waiting on an answer or more information (2026-09-30):
 - **Speed/pitch copied on duplicate**: Duplicate copies an instance's whole playback state today, by design. Which case should start fresh: duplicating a browsing container, adding a file from a browser, or every duplicate?
 - **Adding single files**: does this mean adding a file from a file dialog, with no browser (needed if the browser is folded into containers)?
 - **Linux: no sound until the app is restarted** (other apps play fine; nothing in the log). Watching; next time, note what was playing and copy the Log window.
+
+Testing (2026-10-29):
+
+- **Video memory full on busy walls** (Linux Mint, 8 GB NVIDIA card; log: `CUDA_ERROR_OUT_OF_MEMORY`, `Failed setup for format cuda: hwaccel initialisation returned error`). Added Settings → Performance (hardware decoding on/off/backend, largest still image size) and the Media Memory window. Next: on the Mint wall, compare Automatic / Off / VA-API and image limits in the Media Memory window; if videos are the cost, consider pausing and releasing off-screen or hidden videos.
 
 Waiting on an answer (2026-10-15):
 
@@ -2560,7 +2570,7 @@ Done since the review: browsing containers (section 6.4), layouts (section 17), 
 - Resize modifiers (e.g. Alt to resize around the center).
 - Background folder scanning (scanning is fast enough so far; revisit if large folders or network drives freeze the app).
 - Duplicate videos playing in sync / sharing one decoder (each instance decodes separately today).
-- Checking hardware video decoding on the target machines (the Log window shows Qt's "No HW decoder found" when it falls back to software).
+- Pausing and releasing the decoders of off-screen or hidden videos, if the Media Memory window shows videos are what fills video memory (2026-10-29).
 - Frosted-glass (acrylic) browser background: blur the canvas behind a browser with `MultiEffect`, as an option in Settings, falling back to the plain translucent grey.
 
 ### Dropped
@@ -2800,6 +2810,7 @@ The following design decisions are currently established:
 - Animated images get a **Speed** submenu (0.25×–4×) in the right-click menu, reusing the per-instance `speed` field; no slider in the Playback tab, which would fill up on GIF-heavy walls. The menu builds the submenu in or out per object, since a Qt Quick submenu can't be hidden like an item (2026-10-15).
 - **Animated Only** filter (`media_filter` "animated") for browsers and browsing containers: animation is detected by reading the file (a GIF's second frame, a WebP's animation flag), so still GIFs and WebPs are left out. Filtering moved into `MediaBrowser.scan_folder` (the QML passes the filter) (2026-10-15).
 - **Text objects** ("WordArt"; section 5.4), first pass: one top-level type `text` with `text` and a single `text_style` dict (one role and one setter, `setTextStyle(id, changes)`, rather than a field and role per style value), drawn as vector shapes scaled to the box, edited in the Text tab rather than on the canvas. The box follows the text's proportions only after the user's own edits (`SceneModel.textEdited`), merged into the same undo step, so undo and loading never resize anything (2026-10-15).
+- **Video memory** (2026-10-29): hardware video decoding is a setting (Automatic / Off / one backend), applied through Qt's `QT_FFMPEG_DECODING_HW_DEVICE_TYPES` at startup, so it takes a restart; Qt can't switch per player. Still images can be limited to 4096 / 2048 / 1024 px on the long side (live). A separate **Media Memory** window, rather than log lines, shows estimated video memory per loaded media, the measured total from `nvidia-smi`, and decoder fallbacks counted from the log; it refreshes in place every two seconds. Both are in a new Settings tab, **Performance** (General, Performance, Shortcuts, About).
 
 ### Open decisions
 

@@ -35,6 +35,8 @@ Item {
 
         url: root.sourceUrl
         type: "audio"
+        memoryPlace: "audio track"
+        memoryObjectId: root.objectId
         missing: root.sourceMissing
         playing: root.objPlaying
         muted: root.objMuted

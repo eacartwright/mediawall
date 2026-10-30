@@ -103,6 +103,11 @@ ApplicationWindow {
         palette: window.palette
     }
 
+    MemoryWindow {
+        id: memoryWindow
+        palette: window.palette
+    }
+
     SettingsDialog {
         id: settingsDialog
         actions: appActions
@@ -175,6 +180,7 @@ ApplicationWindow {
         window: window
         settingsDialog: settingsDialog
         logWindow: logWindow
+        memoryWindow: memoryWindow
     }
 
     Shortcut {

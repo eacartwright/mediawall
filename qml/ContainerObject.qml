@@ -391,6 +391,8 @@ Item {
             loopB: root.contentLoopB
             mirrored: root.contentMirrored
             name: root.contentSourceName
+            memoryPlace: "container"
+            memoryObjectId: root.objectId
 
             // Registered under the content's id (it changes when the
             // content is replaced or removed).

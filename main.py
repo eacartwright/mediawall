@@ -14,9 +14,10 @@ from PySide6.QtQml import QQmlApplicationEngine
 from PySide6.QtQuickControls2 import QQuickStyle
 from PySide6.QtWidgets import QApplication, QFileDialog
 
-from bridge.app_settings import AppSettings
+from bridge.app_settings import AppSettings, apply_hw_decoding
 from bridge.key_release import KeyReleaseWatcher
 from bridge.log_capture import LogCapture
+from bridge.media_memory import MediaMemory
 from bridge.project_controller import ProjectController
 from bridge.scene_model import SceneModel
 from bridge.ui_font import fix_linux_ui_font
@@ -81,6 +82,10 @@ def main():
     # (FFmpeg, Qt, Python) goes to the in-app Log window and LOG_PATH.
     log_capture = LogCapture(LOG_PATH)
 
+    # Hardware video decoding (Settings > Performance): Qt reads it once,
+    # so it's set before anything can play.
+    hw_decoding = apply_hw_decoding()
+
     # 4x multisample anti-aliasing, so the edges of rotated media and
     # containers are smooth instead of jagged. (Per-item antialiasing
     # can't smooth a rotated container's clip.) Must be set before the
@@ -100,7 +105,13 @@ def main():
     # last button of a row with white text on a light face.)
     QQuickStyle.setStyle("Fusion")
 
-    app_settings = AppSettings()
+    app_settings = AppSettings(hw_decoding)
+
+    # The Media Memory window: estimated video memory per loaded media,
+    # and hardware decoder failures counted from the log.
+    media_memory = MediaMemory(hw_decoding[0])
+    log_capture.model.lineAdded.connect(media_memory.onLogLine)
+    app.aboutToQuit.connect(media_memory.shutdown)
 
     # Held Left/Right step at the app's pace (bridge/key_release.py).
     key_release = KeyReleaseWatcher()
@@ -116,6 +127,7 @@ def main():
     context.setContextProperty("projectController", project_controller)
     context.setContextProperty("appLog", log_capture.model)
     context.setContextProperty("appSettings", app_settings)
+    context.setContextProperty("mediaMemory", media_memory)
     context.setContextProperty("keyRelease", key_release)
     context.setContextProperty("appVersion", VERSION)
     context.setContextProperty("appIconUrl", QUrl.fromLocalFile(str(ICON_PATH)))
