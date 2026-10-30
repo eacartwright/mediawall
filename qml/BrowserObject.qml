@@ -570,6 +570,8 @@ Rectangle {
             animatable: root.currentEntry ? root.currentEntry.animatable : false
             name: root.currentEntry ? root.currentEntry.name : ""
             path: root.currentEntry ? root.currentEntry.path : ""
+            memoryPlace: "browser"
+            memoryObjectId: root.objectId
 
             playing: root.previewPlaying
             muted: root.currentMuted

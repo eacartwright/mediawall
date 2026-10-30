@@ -133,6 +133,8 @@ Item {
         mirrored: root.objMirrored
         name: root.sourceName
         path: root.sourcePath
+        memoryPlace: "canvas"
+        memoryObjectId: root.objectId
 
         Component.onCompleted: if (root.sceneItem) root.sceneItem.registerView(root.objectId, view)
         Component.onDestruction: if (root.sceneItem) root.sceneItem.unregisterView(root.objectId, view)
@@ -253,8 +255,12 @@ Item {
                 return
             moved = true
 
-            root.x = startPos.x + dx
-            root.y = startPos.y + dy
+            // Snap to the wall's edges and other objects (Ctrl: don't).
+            var s = root.sceneItem.snapMove(root.objectId, startPos.x + dx, startPos.y + dy,
+                                            root.width, root.height, root.rotation,
+                                            mouse.modifiers)
+            root.x = s.x
+            root.y = s.y
 
             // Highlight the container under the pointer (Shift = place on top).
             var shift = (mouse.modifiers & Qt.ShiftModifier) !== 0
@@ -273,6 +279,7 @@ Item {
                 return
 
             dragging = false
+            root.sceneItem.clearSnapGuides()
 
             var target = sceneModel.dropTargetId
             sceneModel.setDropTarget("")
@@ -320,6 +327,9 @@ Item {
 
         target: root
         sceneItem: root.sceneItem
+
+        snapping: true
+        objectId: root.objectId
 
         keepAspect: true
         aspectRatio: (root.sourceWidth > 0 && root.sourceHeight > 0)

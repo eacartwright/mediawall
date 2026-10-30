@@ -63,14 +63,14 @@ def step_settings2():
     c.js("appSettings.resetStepRepeat()")
     c.check("Default restores 400 / 150 ms",
             (c.js("appSettings.stepRepeatDelay"), c.js("appSettings.stepRepeatInterval")) == (400, 150))
-    c.item_js("settingsTabs", "item.currentIndex = 2")
+    c.item_js("settingsTabs", "item.currentIndex = 3")
     rows = c.item_js("shortcutsList", "item.rows") or []
     keys = {r[1]: r[2] for r in rows}
     c.check("Shortcuts tab: keys read from the commands",
             keys.get("Duplicate") == "Ctrl+D" and "Ctrl+Y" in keys.get("Redo", "")
             and keys.get("Present") == "F5", str(keys))
     c.grab("settings-shortcuts.png")
-    c.item_js("settingsTabs", "item.currentIndex = 3")
+    c.item_js("settingsTabs", "item.currentIndex = 4")
     from core.version import VERSION
     c.check("About tab: the version", c.item_js("aboutVersion", "item.text") == "Version " + VERSION)
     c.grab("settings-about.png")

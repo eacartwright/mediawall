@@ -103,6 +103,11 @@ ApplicationWindow {
         palette: window.palette
     }
 
+    MemoryWindow {
+        id: memoryWindow
+        palette: window.palette
+    }
+
     SettingsDialog {
         id: settingsDialog
         actions: appActions
@@ -175,6 +180,7 @@ ApplicationWindow {
         window: window
         settingsDialog: settingsDialog
         logWindow: logWindow
+        memoryWindow: memoryWindow
     }
 
     Shortcut {
@@ -421,6 +427,65 @@ ApplicationWindow {
             // Type a text object's words on the canvas (TextObject.qml);
             // the panel shows its Text tab too, for the style.
             signal textTypeRequested(string objectId)
+
+            // ---- Snapping (core/snap.py; readme section 25) ----
+            //
+            // Moving or resizing containers, media, and text snaps to
+            // the wall's edges (the screen, as Present shows it) and to
+            // each other. Off in Settings, or hold Ctrl for one drag.
+
+            // Guide lines while snapped: [[x1, y1, x2, y2]].
+            property var snapGuides: []
+
+            function snapActive(modifiers) {
+                return appSettings.snapping && (modifiers & Qt.ControlModifier) === 0
+            }
+
+            // Where a dragged object should go: a point (x, y).
+            function snapMove(objectId, x, y, w, h, rotation, modifiers) {
+                if (!snapActive(modifiers)) {
+                    snapGuides = []
+                    return Qt.point(x, y)
+                }
+                var r = sceneModel.snapMove(objectId, x, y, w, h, rotation,
+                                            Screen.width, Screen.height)
+                snapGuides = r.guides
+                return Qt.point(r.x, r.y)
+            }
+
+            // The dragged edges of an unrotated box being resized:
+            // {dx, dy, guidesX, guidesY}, or null when not snapping.
+            function snapResize(objectId, left, top, right, bottom, sx, sy, modifiers) {
+                if (!snapActive(modifiers)) {
+                    snapGuides = []
+                    return null
+                }
+                return sceneModel.snapResize(objectId, left, top, right, bottom, sx, sy,
+                                             Screen.width, Screen.height)
+            }
+
+            function clearSnapGuides() {
+                if (snapGuides.length > 0)
+                    snapGuides = []
+            }
+
+            Repeater {
+                model: scene.snapGuides
+
+                Rectangle {
+                    required property var modelData
+
+                    readonly property bool vertical: modelData[0] === modelData[2]
+
+                    x: vertical ? modelData[0] - 0.5 : Math.min(modelData[0], modelData[2])
+                    y: vertical ? Math.min(modelData[1], modelData[3]) : modelData[1] - 0.5
+                    width: vertical ? 1 : Math.abs(modelData[2] - modelData[0])
+                    height: vertical ? Math.abs(modelData[3] - modelData[1]) : 1
+                    z: 2000000000           // above everything, browsers too
+
+                    color: "#ff4fa3"
+                }
+            }
 
             // Where a new player should start (e.g. a video converted to
             // an audio track continues from where it was), by media id.

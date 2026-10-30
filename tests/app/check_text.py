@@ -173,7 +173,7 @@ def step_double_click():
 
 
 def glow_item():
-    return f"""(function() {{ var k = window.objectItem('{existing.id}').children[0].children[0].children
+    return f"""(function() {{ var k = window.objectItem('{existing.id}').children[0].children[0].children[0].children
         for (var i = 0; i < k.length; i++)
             if (k[i].objectName === 'glowLoader') return k[i].item
         return null }})()"""
@@ -187,7 +187,7 @@ def step_glow():
 
 
 def step_glow_arc():
-    body = f"window.objectItem('{existing.id}').children[0].children[0]"
+    body = f"window.objectItem('{existing.id}').children[0].children[0].children[0]"
     # The effect kept its first size when the outline changed, so it is
     # built again: a new item, sized to the new outline.
     c.check("the glow is rebuilt to the new outline after an arc change",
@@ -230,7 +230,7 @@ def step_preset():
 
 def face_colors():
     # The colours the letters' face is drawn with (its gradient's stops).
-    return c.js(f"""(function() {{ var k = window.objectItem('{existing.id}').children[0].children[0].children
+    return c.js(f"""(function() {{ var k = window.objectItem('{existing.id}').children[0].children[0].children[0].children
         for (var i = 0; i < k.length; i++)
             if (k[i].objectName === 'textFace') {{
                 var s = k[i].itemAt(0).data[0].fillGradient.stops

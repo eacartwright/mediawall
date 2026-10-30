@@ -16,6 +16,7 @@ Item {
     required property var window
     property var settingsDialog
     property var logWindow
+    property var memoryWindow
 
     readonly property bool editing: !window.presenting
     readonly property bool hasSelection: sceneModel.selectedId !== ""
@@ -258,6 +259,16 @@ Item {
             actions.logWindow.show()
             actions.logWindow.raise()
             actions.logWindow.requestActivate()
+        }
+    }
+
+    // Estimated video memory per loaded image and video.
+    readonly property Action memory: Action {
+        text: "Media Memory"
+        onTriggered: {
+            actions.memoryWindow.show()
+            actions.memoryWindow.raise()
+            actions.memoryWindow.requestActivate()
         }
     }
 }

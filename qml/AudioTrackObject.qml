@@ -63,6 +63,8 @@ Item {
 
         url: root.isSpeech ? root.speechUrl : root.sourceUrl
         type: "audio"
+        memoryPlace: "audio track"
+        memoryObjectId: root.objectId
         missing: root.isSpeech ? false : root.sourceMissing
         playing: root.objPlaying
         muted: root.objMuted

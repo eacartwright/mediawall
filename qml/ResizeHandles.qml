@@ -13,6 +13,11 @@ import QtQuick
 //
 // The handles write the target's x/y/width/height directly during the
 // drag; the owner commits to the model in onFinished.
+//
+// With snapping (and the object unrotated), the dragged edges snap to
+// the wall's edges and other objects (Main.qml's scene.snapResize; hold
+// Ctrl to skip). Keeping the aspect ratio, only one axis can snap: the
+// nearer one, and the other dimension follows.
 
 Item {
     id: handles
@@ -25,6 +30,10 @@ Item {
 
     property bool keepAspect: false
     property real aspectRatio: 1        // width / height, when keepAspect
+
+    // Snap the dragged edges (containers, media, text; not browsers).
+    property bool snapping: false
+    property string objectId: ""
 
     property real minWidth: 40
     property real minHeight: 40
@@ -104,6 +113,10 @@ Item {
             }
         }
 
+        var snapped = snapSize(state, sx, sy, w, h, mouse.modifiers)
+        w = snapped.width
+        h = snapped.height
+
         // New center: from the pinned point, half the new size toward
         // the dragged side(s), in the object's frame.
         var off = rotated(sx * w / 2, sy * h / 2, state.theta)
@@ -112,6 +125,68 @@ Item {
         t.height = h
         t.x = state.pinned.x + off.x - w / 2
         t.y = state.pinned.y + off.y - h / 2
+    }
+
+    // The size after snapping the dragged edges (unrotated objects only).
+    function snapSize(state, sx, sy, w, h, modifiers) {
+        var scene = handles.sceneItem
+        var unrotated = Math.abs(state.theta % 360) < 0.01
+        if (!handles.snapping || !unrotated || !scene || !scene.snapResize) {
+            if (scene && scene.clearSnapGuides)
+                scene.clearSnapGuides()
+            return Qt.size(w, h)
+        }
+
+        // The box as dragged so far: the pinned point is the opposite
+        // edge (or, on an axis not dragged, the middle).
+        var px = state.pinned.x
+        var py = state.pinned.y
+        var left = sx > 0 ? px : sx < 0 ? px - w : px - w / 2
+        var top = sy > 0 ? py : sy < 0 ? py - h : py - h / 2
+        var r = scene.snapResize(handles.objectId, left, top, left + w, top + h,
+                                 sx, sy, modifiers)
+        if (!r)
+            return Qt.size(w, h)
+
+        var guides = []
+        var nw = w, nh = h
+        var useX = r.guidesX.length > 0
+        var useY = r.guidesY.length > 0
+        if (handles.keepAspect && handles.aspectRatio > 0) {
+            // One axis only: the nearer snap.
+            if (useX && useY) {
+                if (Math.abs(r.dx) <= Math.abs(r.dy))
+                    useY = false
+                else
+                    useX = false
+            }
+            if (useX) {
+                nw = w + sx * r.dx
+                nh = nw / handles.aspectRatio
+                guides = r.guidesX
+            } else if (useY) {
+                nh = h + sy * r.dy
+                nw = nh * handles.aspectRatio
+                guides = r.guidesY
+            }
+        } else {
+            if (useX) {
+                nw = w + sx * r.dx
+                guides = guides.concat(r.guidesX)
+            }
+            if (useY) {
+                nh = h + sy * r.dy
+                guides = guides.concat(r.guidesY)
+            }
+        }
+
+        // Snapping never makes it smaller than the minimum.
+        if (nw < handles.minWidth || nh < handles.minHeight) {
+            scene.clearSnapGuides()
+            return Qt.size(w, h)
+        }
+        scene.snapGuides = guides
+        return Qt.size(nw, nh)
     }
 
     component Grip: MouseArea {
@@ -129,7 +204,11 @@ Item {
             if (pressed)
                 handles.drag(grip, sx, sy, mouse)
         }
-        onReleased: handles.finished()
+        onReleased: {
+            if (handles.sceneItem && handles.sceneItem.clearSnapGuides)
+                handles.sceneItem.clearSnapGuides()
+            handles.finished()
+        }
         onDoubleClicked: {
             if (sx === 0 || sy === 0)
                 handles.edgeDoubleClicked(sx, sy)

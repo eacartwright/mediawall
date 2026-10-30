@@ -530,6 +530,8 @@ Item {
             loopB: root.contentLoopB
             mirrored: root.contentMirrored
             name: root.contentSourceName
+            memoryPlace: "container"
+            memoryObjectId: root.objectId
 
             onEndedChanged: {
                 if (ended && root.playsThrough)
@@ -760,8 +762,14 @@ Item {
 
             if (mode === "move") {
                 var p = area.mapToItem(root.sceneItem, mouse.x, mouse.y)
-                root.x = startPos.x + (p.x - startMouse.x)
-                root.y = startPos.y + (p.y - startMouse.y)
+                // Snap to the wall's edges and other objects (Ctrl: don't).
+                var s = root.sceneItem.snapMove(root.objectId,
+                                                startPos.x + (p.x - startMouse.x),
+                                                startPos.y + (p.y - startMouse.y),
+                                                root.width, root.height, root.rotation,
+                                                mouse.modifiers)
+                root.x = s.x
+                root.y = s.y
             } else if (mode === "pan") {
                 cg.cx = startPos.x + (mouse.x - startMouse.x)
                 cg.cy = startPos.y + (mouse.y - startMouse.y)
@@ -772,6 +780,7 @@ Item {
 
         onReleased: {
             fileStepper.end()
+            root.sceneItem.clearSnapGuides()
             if (mode === "move")
                 root.commit()
             else if (mode === "pan")
@@ -841,6 +850,9 @@ Item {
 
         target: root
         sceneItem: root.sceneItem
+
+        snapping: true
+        objectId: root.objectId
 
         minWidth: 60
         minHeight: 40

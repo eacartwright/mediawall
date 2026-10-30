@@ -151,6 +151,8 @@ TEXT_STYLE_DEFAULTS = {
     "tilt": 0.0,                # perspective lean, degrees; > 0 top leans back
     "glow": 0.0,                # glow size, 0 .. TEXT_GLOW_MAX
     "glow_color": "#40c0ff",
+    "animation": "",            # TEXT_ANIMATIONS; "" = still
+    "animation_speed": "normal",    # TEXT_ANIMATION_SPEEDS
 }
 
 TEXT_OUTLINE_MAX = 20.0
@@ -161,6 +163,9 @@ TEXT_ALIGNS = ("left", "center", "right")
 TEXT_ARC_MAX = 360.0
 TEXT_TILT_MAX = 70.0
 TEXT_GLOW_MAX = 40.0
+# Looping animations (on the canvas only; preset tiles stay still).
+TEXT_ANIMATIONS = ("", "wiggle", "pulse", "glow_pulse", "gradient_shift", "color_cycle")
+TEXT_ANIMATION_SPEEDS = ("slow", "normal", "fast")
 
 _COLOR = re.compile(r"#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})")
 
@@ -183,6 +188,10 @@ def normalized_text_style(raw) -> dict:
             ok = isinstance(value, str) and _COLOR.fullmatch(value) is not None
         elif key == "align":
             ok = value in TEXT_ALIGNS
+        elif key == "animation":
+            ok = value in TEXT_ANIMATIONS
+        elif key == "animation_speed":
+            ok = value in TEXT_ANIMATION_SPEEDS
         elif key == "fill2":
             ok = isinstance(value, str) and (value == "" or _COLOR.fullmatch(value) is not None)
         else:
@@ -1245,8 +1254,8 @@ class Scene:
         Show another file in a container (browsing): the content keeps
         its id and playback settings (volume, mute, loop, speed), takes
         the new source, starts playing, and is framed with the
-        container's Fit/Fill mode. A-B loop points belonged to the old
-        file, so they're cleared. An empty container
+        container's Fit/Fill mode. A-B loop points and Flip Horizontally
+        belonged to the old file, so they're cleared. An empty container
         gets new content.
 
         A locked container refuses, except for Continue Play
@@ -1270,6 +1279,7 @@ class Scene:
         content.source_id = source_id
         content.playing = True           # every file starts playing, as in a browser
         content.loop_a = content.loop_b = -1.0
+        content.mirrored = False
         content.pending_size = source.aspect <= 0
         self._frame_content(container, content, source.aspect, container.fit_mode)
         return True

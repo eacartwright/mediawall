@@ -40,6 +40,14 @@ class TextStyleTests(unittest.TestCase):
         self.assertTrue(style["wrap"])
         self.assertEqual(normalized_text_style({"align": "right"})["align"], "right")
 
+    def test_animation_values_are_checked(self):
+        style = normalized_text_style({"animation": "spin", "animation_speed": "ludicrous"})
+        self.assertEqual(style["animation"], "")
+        self.assertEqual(style["animation_speed"], "normal")
+        style = normalized_text_style({"animation": "glow_pulse", "animation_speed": "fast"})
+        self.assertEqual((style["animation"], style["animation_speed"]), ("glow_pulse", "fast"))
+        self.assertEqual(normalized_text_style({"animation": 3})["animation"], "")
+
     def test_gradient_end_may_be_empty(self):
         self.assertEqual(normalized_text_style({"fill2": ""})["fill2"], "")
         self.assertEqual(normalized_text_style({"fill2": "#102030"})["fill2"], "#102030")

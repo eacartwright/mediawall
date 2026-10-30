@@ -318,6 +318,7 @@ class BrowsingContainerTests(unittest.TestCase):
         self.scene.set_playing(content.id, False)
         self.scene.set_media_option(content.id, "volume", 0.3)
         self.scene.set_loop(content.id, 1000, 2000)
+        self.scene.set_media_option(content.id, "mirrored", True)
 
         self.assertTrue(self.scene.show_file_in_container(self.box.id, self.tall.id))
 
@@ -326,6 +327,7 @@ class BrowsingContainerTests(unittest.TestCase):
         self.assertEqual(content.source_id, self.tall.id)
         self.assertTrue(content.playing)                           # each file plays
         self.assertEqual((content.loop_a, content.loop_b), (-1.0, -1.0))
+        self.assertFalse(content.mirrored)                         # flip belonged to the old file
         # 1:2 into 360x260, contain (the default): height matches
         self.assertAlmostEqual(content.width, 130)
         self.assertAlmostEqual(content.height, 260)
