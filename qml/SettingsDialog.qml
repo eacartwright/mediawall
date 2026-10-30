@@ -576,6 +576,8 @@ Dialog {
                             "Hold Ctrl while dragging the rotate knob"])
                     r.push(["Dragging media", "Place on top instead of into a container",
                             "Hold Shift while dragging"])
+                    r.push(["Moving and resizing", "Place freely, without snapping",
+                            "Hold Ctrl while dragging or resizing"])
                     return r
                 }
 
