@@ -24,9 +24,10 @@ import os
 import tempfile
 from pathlib import Path
 
+from core.speech import normalized_speech
 from core.scene import (
-    CLIP_SHAPES, FIT_COVER, FIT_MODES, MEDIA_FILTERS, OBJECT_TYPES, PLAYABLE_TYPES,
-    MediaSource, Scene, SceneObject,
+    CLIP_SHAPES, FIT_CONTAIN, FIT_MODES, MEDIA_FILTERS, OBJECT_TYPES, PLAYABLE_TYPES,
+    SORT_KEYS, MediaSource, Scene, SceneObject,
     clamp_speed, new_id, normalized_loop, normalized_text_style, one_line,
 )
 
@@ -41,12 +42,14 @@ COMMON_FIELDS = ["id", "type", "x", "y", "width", "height", "rotation", "z"]
 TYPE_FIELDS = {
     "media": ["source_id", "playing", "parent_id", "muted", "volume", "loop",
               "speed", "preserve_pitch", "loop_a", "loop_b", "mirrored"],
-    "browser": ["folder", "current_index", "include_subfolders", "media_filter"],
-    "container": ["lock_content", "clip_shape", "fit_mode",
+    "browser": ["folder", "current_index", "include_subfolders", "media_filter",
+                "sort_by", "sort_descending"],
+    "container": ["lock_content", "locked", "clip_shape", "fit_mode",
                   "browse_mode", "browse_folder", "browse_subfolders",
-                  "media_filter"],
+                  "media_filter", "sort_by", "sort_descending", "continue_play",
+                  "new_first", "favorites"],
     "audio": ["source_id", "playing", "muted", "volume", "loop",
-              "speed", "preserve_pitch", "loop_a", "loop_b"],
+              "speed", "preserve_pitch", "loop_a", "loop_b", "speech"],
     "text": ["text", "text_style"],
 }
 
@@ -104,12 +107,15 @@ def scene_to_dict(scene: Scene, project_path=None) -> dict:
             fields = COMMON_FIELDS + TYPE_FIELDS.get(item.type, [])
             objects.append({name: getattr(item, name) for name in fields})
 
-    return {
+    data = {
         "format": FORMAT,
         "version": VERSION,
         "media_sources": sources,
         "objects": objects,
     }
+    if scene.speech_draft:
+        data["speech_draft"] = scene.speech_draft
+    return data
 
 
 def write_json_atomic(path, data) -> None:
@@ -258,7 +264,15 @@ def scene_from_dict(data, project_path=None):
             except (TypeError, ValueError) as exc:
                 warnings.append(f"Ignored bad value for {name!r} ({exc}).")
 
-        if object_type in PLAYABLE_TYPES and obj.source_id not in scene.sources:
+        # A speech track has no file: its speech is its source (readme
+        # 14.6). One saved with a file (before 2026-10-17) drops it.
+        if object_type == "audio":
+            obj.speech = normalized_speech(obj.speech)
+            if obj.speech:
+                obj.source_id = None
+
+        if (object_type in PLAYABLE_TYPES and obj.source_id not in scene.sources
+                and not (object_type == "audio" and obj.speech)):
             warnings.append("Skipped a media object whose source is unknown.")
             continue
 
@@ -271,8 +285,14 @@ def scene_from_dict(data, project_path=None):
                 obj.loop_a = obj.loop_b = -1.0
 
         if object_type == "container" and obj.fit_mode not in FIT_MODES:
-            warnings.append(f"Unknown fit mode {obj.fit_mode!r}; using Fill.")
-            obj.fit_mode = FIT_COVER
+            warnings.append(f"Unknown fit mode {obj.fit_mode!r}; using Fit.")
+            obj.fit_mode = FIT_CONTAIN
+
+        if object_type == "container" and (
+                not isinstance(obj.favorites, list)
+                or not all(isinstance(p, str) for p in obj.favorites)):
+            warnings.append("Ignored a bad favorites list.")
+            obj.favorites = [p for p in obj.favorites if isinstance(p, str)]                 if isinstance(obj.favorites, list) else []
 
         if object_type == "container" and obj.clip_shape not in CLIP_SHAPES:
             warnings.append(
@@ -288,12 +308,19 @@ def scene_from_dict(data, project_path=None):
             warnings.append(f"Unknown media filter {obj.media_filter!r}; showing all.")
             obj.media_filter = "all"
 
+        if obj.sort_by not in SORT_KEYS:
+            warnings.append(f"Unknown sort order {obj.sort_by!r}; sorting by name.")
+            obj.sort_by = "name"
+
         scene.objects.append(obj)
 
     _check_containment(scene, warnings)
 
     scene._normalize_z()
     scene.refresh_missing()
+
+    # What was in the Speech tab (readme 14.6).
+    scene.speech_draft = normalized_speech(data.get("speech_draft"))
 
     return scene, warnings
 

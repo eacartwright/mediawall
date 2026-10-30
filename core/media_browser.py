@@ -1,11 +1,12 @@
 import os
+import random
 import re
 from pathlib import Path
 
 
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".webp"}
 VIDEO_EXTENSIONS = {".mp4", ".avi", ".mkv", ".mov", ".wmv", ".3gp"}
-AUDIO_EXTENSIONS = {".mp3", ".m4a"}
+AUDIO_EXTENSIONS = {".mp3", ".m4a", ".wav"}
 
 # Image formats that may contain animation. Displayed with an animated
 # image element; a static file in one of these formats still just shows
@@ -107,14 +108,16 @@ def is_animated(path):
     return result
 
 
-def matches_filter(entry, media_filter):
+def matches_filter(entry, media_filter, favorites=()):
     """
     True if a scanned entry passes a browser or container's filter:
-    "all", a type ("image", "video", "audio"), or "animated" (animated
-    GIF/WebP only).
+    "all", a type ("image", "video", "audio"), "animated" (animated
+    GIF/WebP only), or "favorites" (its path is in `favorites`).
     """
     if media_filter in ("all", "", None):
         return True
+    if media_filter == "favorites":
+        return entry["path"] in favorites
     if media_filter == "animated":
         return entry["animatable"] and is_animated(entry["path"])
     return entry["type"] == media_filter
@@ -128,7 +131,17 @@ def natural_key(text):
     ]
 
 
+def _stat(file_path):
+    """(modification time, size), or (0.0, 0) if unreadable."""
+    try:
+        st = file_path.stat()
+        return st.st_mtime, st.st_size
+    except OSError:
+        return 0.0, 0
+
+
 def _entry(file_path, root):
+    mtime, size = _stat(file_path)
     return {
         "path": str(file_path),
         # as_uri() percent-encodes #, ?, %, spaces, and handles
@@ -140,6 +153,10 @@ def _entry(file_path, root):
         "relpath": file_path.relative_to(root).as_posix(),
         "type": media_type_for(file_path),
         "animatable": is_animatable(file_path),
+        "mtime": mtime,
+        # 0 while a download is still being written (e.g. Firefox's
+        # placeholder beside its .part file).
+        "size": size,
     }
 
 
@@ -150,9 +167,36 @@ def _sort_key(entry):
     return ([natural_key(p) for p in parts[:-1]], natural_key(parts[-1]))
 
 
+# Grouped this way by "type": images (still, then animated), videos, audio.
+_TYPE_ORDER = {"image": 0, "video": 1, "audio": 2}
+
+
+def sort_entries(entries, sort_by="name", descending=False, seed=""):
+    """
+    Put scanned entries in a browser or container's order (SORT_KEYS in
+    core/scene.py): "name" (natural, folder by folder), "date" (modified),
+    "type" (then extension, then name), or "random". The random order is
+    fixed by `seed` (the object's id), so stepping back and forth and
+    rescanning keep the same order; descending doesn't apply to it.
+    """
+    entries = sorted(entries, key=_sort_key)
+    if sort_by == "random":
+        random.Random(seed).shuffle(entries)
+        return entries
+    if sort_by == "date":
+        entries.sort(key=lambda e: e["mtime"])          # stable: ties by name
+    elif sort_by == "type":
+        entries.sort(key=lambda e: (_TYPE_ORDER.get(e["type"], 3), e["animatable"],
+                                    Path(e["name"]).suffix.lower()))
+    if descending:
+        entries.reverse()
+    return entries
+
+
 class MediaBrowser:
 
-    def scan_folder(self, folder, recursive=False, media_filter="all"):
+    def scan_folder(self, folder, recursive=False, media_filter="all",
+                    sort_by="name", descending=False, seed="", favorites=()):
         """
         Return supported media files in a folder as a list of dicts:
 
@@ -162,11 +206,15 @@ class MediaBrowser:
                 "name":    file name,
                 "relpath": path relative to the chosen folder,
                 "type":    "image" | "video" | "audio",
-                "animatable": True for GIF/WebP
+                "animatable": True for GIF/WebP,
+                "mtime":   modification time (seconds),
+                "size":    size in bytes
             }
 
         With recursive=True, subfolders are included. media_filter keeps
-        only matching files (matches_filter). Hidden folders
+        only matching files (matches_filter; "favorites" keeps the paths
+        in `favorites`); sort_by, descending, and seed
+        set the order (sort_entries). Hidden folders
         (names starting with ".") are skipped, symlinked folders are
         not followed (avoids loops), and unreadable folders are skipped
         rather than failing the whole scan.
@@ -206,6 +254,6 @@ class MediaBrowser:
                 if media_type_for(item) is not None:
                     entries.append(_entry(item, root))
 
-        entries = [e for e in entries if matches_filter(e, media_filter)]
-        entries.sort(key=_sort_key)
-        return entries
+        favorites = set(favorites or ())
+        entries = [e for e in entries if matches_filter(e, media_filter, favorites)]
+        return sort_entries(entries, sort_by, descending, seed)

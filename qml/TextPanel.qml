@@ -154,6 +154,7 @@ ScrollView {
                     Rectangle {
                         id: presetButton
                         required property var modelData
+                        objectName: "preset" + modelData.name      // found by tests/app
 
                         Layout.fillWidth: true
                         Layout.preferredHeight: 40
@@ -166,7 +167,7 @@ ScrollView {
                             anchors.margins: 5
                             text: "Aa"
                             style: Object.assign({}, panel.style, presetButton.modelData.style,
-                                                 { stretch: false })
+                                                 { stretch: false, wrap: false, arc: 0, tilt: 0 })
                         }
 
                         MouseArea {
@@ -186,21 +187,11 @@ ScrollView {
             // ---- Font ----
             Caption { text: "Font" }
 
-            ComboBox {
-                id: fontBox
+            FontPicker {
+                objectName: "fontPicker"
                 Layout.fillWidth: true
-                // "" (first) is the app's own font.
-                model: [""].concat(Qt.fontFamilies())
-                displayText: currentIndex <= 0 ? "Default" : currentText
-                currentIndex: Math.max(0, model.indexOf(panel.style.font || ""))
-                delegate: ItemDelegate {
-                    required property string modelData
-                    required property int index
-                    width: ListView.view.width
-                    text: index === 0 ? "Default" : modelData
-                    highlighted: fontBox.highlightedIndex === index
-                }
-                onActivated: function(index) { panel.set({ font: index === 0 ? "" : model[index] }) }
+                family: panel.style.font || ""
+                onPicked: function(name) { panel.set({ font: name }) }
             }
 
             RowLayout {
@@ -223,6 +214,34 @@ ScrollView {
                         panel.set({ italic: checked })
                         checked = Qt.binding(function() { return panel.style.italic === true })
                     }
+                }
+            }
+
+            // ---- Size: the letters' height on the canvas ----
+            RowLayout {
+                Layout.fillWidth: true
+                spacing: 6
+
+                Caption { text: "Size"; Layout.preferredWidth: 48 }
+
+                Slider {
+                    objectName: "sizeSlider"
+                    Layout.fillWidth: true
+                    from: 8
+                    to: 400
+                    stepSize: 1
+                    value: panel.target ? panel.target.letterSize : 60
+                    onMoved: panel.target.setLetterSize(value)
+                }
+
+                SpinBox {
+                    objectName: "sizeBox"
+                    Layout.preferredWidth: 84
+                    from: 4
+                    to: 2000
+                    editable: true
+                    value: panel.target ? Math.round(panel.target.letterSize) : 60
+                    onValueModified: panel.target.setLetterSize(value)
                 }
             }
 
@@ -292,9 +311,108 @@ ScrollView {
                 }
             }
 
+            // ---- Glow ----
+            RowLayout {
+                Layout.fillWidth: true
+                spacing: 6
+
+                Caption { text: "Glow"; Layout.preferredWidth: 48 }
+                Swatch { key: "glow_color"; current: panel.style.glow_color || "#40c0ff" }
+
+                Slider {
+                    objectName: "glowSlider"
+                    Layout.fillWidth: true
+                    from: 0
+                    to: 40
+                    stepSize: 1
+                    value: panel.style.glow || 0
+                    onMoved: panel.set({ glow: value })
+                }
+            }
+
+            // ---- Shape: arc and tilt (0 in the middle) ----
+            component CenteredSlider: RowLayout {
+                id: centered
+                property string caption
+                property string key
+                property real limit
+                Layout.fillWidth: true
+                spacing: 6
+
+                Caption { text: centered.caption; Layout.preferredWidth: 48 }
+
+                Slider {
+                    id: centeredSlider
+                    objectName: centered.key + "Slider"
+                    Layout.fillWidth: true
+                    from: -centered.limit
+                    to: centered.limit
+                    stepSize: 1
+                    value: panel.style[centered.key] || 0
+                    // Snaps to straight near the middle.
+                    onMoved: panel.set({ [centered.key]: Math.abs(value) < centered.limit / 30 ? 0 : value })
+                }
+
+                Text {
+                    Layout.preferredWidth: 34
+                    horizontalAlignment: Text.AlignRight
+                    text: Math.round(panel.style[centered.key] || 0) + "°"
+                    color: "#cccccc"
+                    font.pixelSize: 11
+                    MouseArea {
+                        anchors.fill: parent
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: panel.set({ [centered.key]: 0 })
+                    }
+                }
+            }
+
+            CenteredSlider { caption: "Arc"; key: "arc"; limit: 360 }
+            CenteredSlider { caption: "Tilt"; key: "tilt"; limit: 70 }
+
+            // ---- Wrap ----
             RowLayout {
                 Layout.fillWidth: true
                 spacing: 4
+
+                CheckBox {
+                    objectName: "wrapBox"
+                    text: "Wrap to box"
+                    checked: panel.style.wrap === true
+                    onToggled: {
+                        panel.target.setWrap(checked)
+                        checked = Qt.binding(function() { return panel.style.wrap === true })
+                    }
+                    ToolTip.visible: hovered
+                    ToolTip.text: "Wrap the words onto lines as wide as the box; resize it to rewrap"
+                    ToolTip.delay: 600
+                }
+
+                Item { Layout.fillWidth: true }
+
+                Repeater {
+                    model: [{ value: "left", text: "Left" }, { value: "center", text: "Center" },
+                            { value: "right", text: "Right" }]
+
+                    Button {
+                        required property var modelData
+                        visible: panel.style.wrap === true
+                        text: modelData.text
+                        checkable: true
+                        checked: panel.style.align === modelData.value
+                        implicitWidth: 52
+                        onClicked: {
+                            panel.set({ align: modelData.value })
+                            checked = Qt.binding(function() { return panel.style.align === modelData.value })
+                        }
+                    }
+                }
+            }
+
+            RowLayout {
+                Layout.fillWidth: true
+                spacing: 4
+                visible: panel.style.wrap !== true
 
                 CheckBox {
                     text: "Stretch to box"

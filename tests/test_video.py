@@ -42,9 +42,9 @@ class VideoSceneTests(unittest.TestCase):
         changed = self.scene.set_source_size(self.src.id, 180, 320)
 
         self.assertEqual(changed, [box.id])
-        # cover-fit a 9:16 video into 360x260: width matches, height overflows
-        self.assertAlmostEqual(content.width, 360)
-        self.assertAlmostEqual(content.height, 640)
+        # fit a 9:16 video into 360x260 (contain): height matches
+        self.assertAlmostEqual(content.width, 146.25)
+        self.assertAlmostEqual(content.height, 260)
 
     def test_sideways_size_correction_resizes_everything(self):
         # First report: the stored (sideways) size; then the displayed one.

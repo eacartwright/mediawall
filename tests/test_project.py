@@ -41,7 +41,10 @@ class ProjectTests(unittest.TestCase):
         br = scene.add_object("browser", 50, 60)
         scene.set_browser_state(br.id, str(self.media_dir), 3)
         scene.set_browser_subfolders(br.id, False)
+        scene.set_sort(br.id, "date", True)
         c = scene.add_object("container", 5, 5)
+        scene.set_sort(c.id, "random")
+        scene.set_continue_play(c.id, True)
         scene.send_to_back(c.id)
         return scene, a, b, br, c
 
@@ -68,6 +71,11 @@ class ProjectTests(unittest.TestCase):
         self.assertEqual(lbr.folder, str(self.media_dir))
         self.assertEqual(lbr.current_index, 3)
         self.assertFalse(lbr.include_subfolders)
+        self.assertEqual((lbr.sort_by, lbr.sort_descending), ("date", True))
+
+        lc = loaded.get(c.id)
+        self.assertEqual((lc.sort_by, lc.sort_descending, lc.continue_play),
+                         ("random", False, True))
 
         # Two instances still share one source
         self.assertEqual(len(loaded.sources), 1)
@@ -153,6 +161,13 @@ class ProjectTests(unittest.TestCase):
         self.assertEqual(len({o.id for o in scene.objects}), 2)
         self.assertEqual(scene.objects[0].x, 0.0)
         self.assertGreaterEqual(len(warnings), 3)
+
+    def test_unknown_sort_order_falls_back_to_name(self):
+        data = {"format": FORMAT, "version": 1, "media_sources": {},
+                "objects": [{"id": "b", "type": "browser", "sort_by": "colour"}]}
+        scene, warnings = scene_from_dict(data)
+        self.assertEqual(scene.get("b").sort_by, "name")
+        self.assertEqual(len(warnings), 1)
 
     def test_not_a_project(self):
         self.project.write_text('{"hello": "world"}', encoding="utf-8")

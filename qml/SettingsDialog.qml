@@ -1,13 +1,15 @@
 import QtQuick
 import QtQuick.Controls
+import QtQuick.Dialogs
 import QtQuick.Layouts
 
 // App-wide settings (bridge/app_settings.py). Changes apply at once and
 // are saved immediately; Close just closes. Opened from the toolbar.
 // Tabs: General (the settings), Performance (video decoding, image
-// size, and the Media Memory window), Shortcuts (every key and modifier
-// the app responds to, read from AppActions where they're defined),
-// About (with the button that opens the Log window).
+// size, and the Media Memory window), Speech (Piper and its voices;
+// readme section 14.6), Shortcuts (every key and modifier the app
+// responds to, read from AppActions where they're defined), About (with
+// the button that opens the Log window).
 
 Dialog {
     id: dialog
@@ -29,6 +31,12 @@ Dialog {
         radius: 2
     }
 
+    // Open on the Speech tab (from the Speech panel).
+    function openSpeech() {
+        tabs.currentIndex = speechTabButton.TabBar.index
+        open()
+    }
+
     // A shortcut as the platform writes it ("Ctrl+D", or a StandardKey).
     function keys(shortcut) {
         return appSettings.shortcutText(shortcut)
@@ -46,6 +54,7 @@ Dialog {
 
             TabButton { text: "General" }
             TabButton { text: "Performance" }
+            TabButton { id: speechTabButton; text: "Speech"; objectName: "speechSettingsTab" }
             TabButton { text: "Shortcuts" }
             TabButton { text: "About" }
         }
@@ -225,6 +234,66 @@ Dialog {
                     color: "#999999"
                     font.pixelSize: 12
                 }
+
+                // ---- Container background ----
+
+                Label {
+                    Layout.topMargin: 12
+                    text: "Container background"
+                    font.bold: true
+                }
+
+                RowLayout {
+                    spacing: 8
+
+                    Rectangle {
+                        objectName: "containerColorSwatch"   // found by tests/app
+                        implicitWidth: 40
+                        implicitHeight: 24
+                        radius: 3
+                        color: appSettings.containerColor
+                        border.color: swatchArea.containsMouse ? "#ffffff" : "#888888"
+
+                        MouseArea {
+                            id: swatchArea
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: {
+                                containerColorDialog.selectedColor = appSettings.containerColor
+                                containerColorDialog.open()
+                            }
+                        }
+                    }
+
+                    Label {
+                        text: appSettings.containerColor
+                        color: "#bbbbbb"
+                    }
+
+                    Item { Layout.fillWidth: true }
+
+                    Button {
+                        text: "Default"
+                        enabled: appSettings.containerColor !== appSettings.containerColorDefault
+                        onClicked: appSettings.resetContainerColor()
+                    }
+                }
+
+                Label {
+                    Layout.fillWidth: true
+                    wrapMode: Text.WordWrap
+                    text: "Shown where a container's picture doesn't reach (around a "
+                          + "Fit picture, or an empty container)."
+                    color: "#999999"
+                    font.pixelSize: 12
+                }
+
+                ColorDialog {
+                    id: containerColorDialog
+                    title: "Container Background"
+                    onAccepted: appSettings.containerColor = selectedColor.toString()
+                }
             }
 
             // =============================================
@@ -335,6 +404,99 @@ Dialog {
                           + "nvidia-smi is available."
                     color: "#999999"
                     font.pixelSize: 12
+                }
+            }
+
+            // =============================================
+            // Speech
+            // =============================================
+
+            ColumnLayout {
+                spacing: 6
+
+                Label {
+                    Layout.fillWidth: true
+                    wrapMode: Text.WordWrap
+                    text: "Speech turns typed words into a voice clip with Piper, a free "
+                          + "text-to-speech program. Install Piper and download voices "
+                          + "yourself (a voice is a .onnx file with its .onnx.json); "
+                          + "MediaWall doesn't include them. Clips are made when they're "
+                          + "needed and deleted when MediaWall closes; a project keeps "
+                          + "only the words and settings."
+                    color: "#bbbbbb"
+                    font.pixelSize: 12
+                }
+
+                // One path: a field (saved when edited) and Browse….
+                component PathRow: RowLayout {
+                    id: pathRow
+                    property string value
+                    property string placeholder
+                    signal edited(string text)
+                    signal browse()
+                    spacing: 8
+                    Layout.fillWidth: true
+
+                    TextField {
+                        Layout.fillWidth: true
+                        text: pathRow.value
+                        placeholderText: pathRow.placeholder
+                        selectByMouse: true
+                        onEditingFinished: pathRow.edited(text)
+                    }
+                    Button {
+                        text: "Browse…"
+                        onClicked: pathRow.browse()
+                    }
+                }
+
+                Label {
+                    Layout.topMargin: 8
+                    text: "Piper program"
+                    font.bold: true
+                }
+
+                PathRow {
+                    value: appSettings.piperPath
+                    placeholder: Qt.platform.os === "windows" ? "e.g. C:\piper\piper.exe"
+                                                               : "e.g. ~/venv/bin/piper"
+                    onEdited: function(text) { appSettings.piperPath = text }
+                    onBrowse: piperDialog.open()
+                }
+
+                Label {
+                    Layout.topMargin: 8
+                    text: "Voices folder"
+                    font.bold: true
+                }
+
+                PathRow {
+                    value: appSettings.voicesFolder
+                    placeholder: "The folder holding your downloaded voices"
+                    onEdited: function(text) { appSettings.voicesFolder = text }
+                    onBrowse: voicesDialog.open()
+                }
+
+                Label {
+                    Layout.fillWidth: true
+                    wrapMode: Text.WordWrap
+                    objectName: "speechSetupStatus"     // found by tests/app
+                    text: speechEngine.problem !== "" ? speechEngine.problem
+                          : speechEngine.voices.length + (speechEngine.voices.length === 1
+                                                          ? " voice found." : " voices found.")
+                    color: speechEngine.problem !== "" ? "#e0a84c" : "#88cc88"
+                    font.pixelSize: 12
+                }
+
+                FileDialog {
+                    id: piperDialog
+                    title: "Choose the Piper Program"
+                    onAccepted: appSettings.piperPath = appSettings.localPath(selectedFile)
+                }
+                FolderDialog {
+                    id: voicesDialog
+                    title: "Choose the Voices Folder"
+                    onAccepted: appSettings.voicesFolder = appSettings.localPath(selectedFolder)
                 }
             }
 
@@ -492,11 +654,11 @@ Dialog {
                     wrapMode: Text.WordWrap
                     textFormat: Text.StyledText
                     color: "#999999"
-                    text: "<b>New in 0.9.8</b><br>"
-                          + "• Text: WordArt-style titles with presets, gradient fill, outline, and 3D depth<br>"
-                          + "• Animated images: double-click to restart, Speed menu, Animated Only filter<br>"
-                          + "• The Wall Features panel (Layers, Playback, Text) is on the left<br>"
-                          + "• Save button in Present"
+                    text: "<b>New in 0.9.11</b><br>"
+                          + "• Speech: type words and hear them in a Piper voice, as a track in the Playback tab<br>"
+                          + "• Speech: voices, modes, speed, and pitch; set up Piper in Settings > Speech<br>"
+                          + "• Browsing containers: Continue Play replaces Loop (off = the video loops)<br>"
+                          + "• Wall Features tabs: Layers, Playback, Speech, Text"
                 }
 
                 // The Log window: everything the app would print to a

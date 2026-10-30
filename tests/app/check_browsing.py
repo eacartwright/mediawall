@@ -145,7 +145,10 @@ def step_undo_and_reset():
 def step_after_reset():
     item, b = content(), c.scene.get(box.id)
     fitted = abs(item.height - b.height) < 0.5 or abs(item.width - b.width) < 0.5
-    c.check("double-click resets the zoom", fitted and item.x <= 0.5 and item.y <= 0.5)
+    centered = (abs(item.x + item.width / 2 - b.width / 2) < 0.5
+                and abs(item.y + item.height / 2 - b.height / 2) < 0.5)
+    c.check("double-click resets the zoom (Fit: whole picture, centered)", fitted and centered
+            and item.width <= b.width + 0.5 and item.height <= b.height + 0.5)
     c.sm.fitContent(box.id, False)                                  # Fit
     c.click(360, 290, Qt.ForwardButton)
     b, item = c.scene.get(box.id), content()
@@ -240,6 +243,71 @@ def step_filter():
     c.check("...(forward: another video)", shown() in videos, str(shown()))
     c.sm.setMediaFilter(box.id, "audio")
     c.check("a container can't be set to audio", c.scene.get(box.id).media_filter == "video")
+    c.order0 = browse_order()
+    c.js(f"objectMenu.openFor(window.objectItem('{box.id}'))")
+    c.check("its menu has a Sort by submenu", c.js("""(function() {
+        for (var i = 0; i < objectMenu.count; i++)
+            if (objectMenu.itemAt(i).subMenu === objectMenu.sortMenu) return true
+        return false })()"""))
+    c.js("objectMenu.close()")
+    c.sm.setSort(box.id, "name", True)
+
+
+def browse_order(cid=box.id):
+    return c.js(f"window.objectItem('{cid}').browseFiles.map(function(e) {{ return e.name }})")
+
+
+def step_sort():
+    c.check("Sort by Name, Descending reverses the order", browse_order() == c.order0[::-1],
+            str(browse_order()))
+    c.check("...and keeps the file shown", shown() in c.order0, str(shown()))
+    # Continue Play: near the end of a video, it goes on to the next one.
+    c.sm.setContinuePlay(box.id, True)
+    c.before_end = shown()
+    item = content()
+    c.sm.setPlaying(item.id, True)
+
+
+def step_seek():
+    item = content()
+    c.js(f"scene.viewFor('{item.id}').seek(scene.viewFor('{item.id}').duration - 300)")
+
+
+def step_continue():
+    nxt = c.order0[::-1][(c.order0[::-1].index(c.before_end) + 1) % len(c.order0)]
+    c.check("Continue Play: at the end of a video, the next video plays",
+            shown() == nxt and player_state(box.id) == 1, f"{c.before_end} -> {shown()}")
+    # Locked, it still plays on (it's part of how the container was set up).
+    c.sm.setLocked(box.id, True)
+    c.before_end = shown()
+    step_seek()
+
+
+def step_continue_locked():
+    c.check("...and goes on in a locked container too",
+            shown() != c.before_end and c.scene.get(box.id).locked, f"{c.before_end} -> {shown()}")
+    # Off, the video loops, whatever the content's own Loop says.
+    c.sm.setLocked(box.id, False)
+    c.sm.setContinuePlay(box.id, False)
+    c.sm.setLoop(content().id, False)
+    c.before_end = shown()
+
+
+def step_loops():
+    c.check("Continue Play off: the video loops (its own Loop is ignored)",
+            shown() == c.before_end and player_state(box.id) == 1,
+            f"{c.before_end} -> {shown()}, state {player_state(box.id)}")
+    c.js(f"objectMenu.openFor(window.objectItem('{box.id}'))")
+    shown_items = c.js("""(function() {
+        var out = []
+        for (var i = 0; i < objectMenu.count; i++) {
+            var it = objectMenu.itemAt(i)
+            if (it && it.visible && it.text) out.push(it.text)
+        }
+        return out })()""")
+    c.js("objectMenu.close()")
+    c.check("a browsing container's menu has Continue Play and no Loop",
+            "Continue Play" in shown_items and "Loop" not in shown_items, str(shown_items))
     c.finish()
 
 
@@ -257,4 +325,6 @@ c.run(scene, [(1500, step_controls), (1150, step_hold), (1150, step_hold_key), (
               (1300, step_after_reset), (1800, step_autoplay), (1500, step_autoplay2),
               (1800, step_autoplay3), (1500, step_empty), (1500, step_present),
               (1300, step_present2), (1300, step_end), (1300, step_other_folder),
-              (1300, step_other_folder2), (1300, step_filter)])
+              (1300, step_other_folder2), (1300, step_filter), (1300, step_sort),
+              (1000, step_seek), (1000, step_continue), (1000, step_continue_locked),
+              (1000, step_seek), (1000, step_loops)])

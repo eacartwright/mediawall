@@ -84,9 +84,9 @@ ApplicationWindow {
         return null
     }
 
-    // Add a text object and open it for editing (AppActions.addText).
+    // Add a text object, ready to type on the canvas (AppActions.addText).
     function addText(x, y) {
-        scene.textEditRequested(sceneModel.addText(x, y))
+        scene.textTypeRequested(sceneModel.addText(x, y))
     }
 
     // Back one level: Present -> where you were; Full Screen -> window.
@@ -355,6 +355,7 @@ ApplicationWindow {
 
                 Button { action: appActions.addBrowser }
                 Button { action: appActions.addContainer }
+                Button { action: appActions.addText; objectName: "toolbarAddText" }
 
                 Item {
                     Layout.fillWidth: true
@@ -384,6 +385,11 @@ ApplicationWindow {
             // Read by every object: in Present, canvas objects are
             // view-only and show no selection; browsers keep working.
             readonly property bool presenting: window.presenting
+
+            // Master volume for this window (the Playback tab): every
+            // player's volume is multiplied by it. Not saved, not undone,
+            // and separate for each MediaWall window.
+            property real masterVolume: 1.0
 
             // Media players by media instance id, so panels and menus
             // can read a player's position (e.g. to set A-B loop points).
@@ -417,6 +423,10 @@ ApplicationWindow {
 
             // Edit a text object: the panel opens its Text tab.
             signal textEditRequested(string objectId)
+
+            // Type a text object's words on the canvas (TextObject.qml);
+            // the panel shows its Text tab too, for the style.
+            signal textTypeRequested(string objectId)
 
             // Where a new player should start (e.g. a video converted to
             // an audio track continues from where it was), by media id.

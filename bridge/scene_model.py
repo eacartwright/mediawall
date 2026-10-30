@@ -11,6 +11,7 @@ content* roles, and edited through the container's id.
 """
 
 import copy
+import math
 import time
 from pathlib import Path
 
@@ -29,6 +30,7 @@ from PySide6.QtWidgets import QFileDialog, QMessageBox
 
 from bridge.audio_model import AudioModel
 from core.history import History, snapshot
+from core.speech import normalized_speech
 from core.layout import add_layout_to_scene
 from core.media_browser import (
     AUDIO_EXTENSIONS, IMAGE_EXTENSIONS, VIDEO_EXTENSIONS, is_animatable,
@@ -38,13 +40,15 @@ from core.scene import FIT_CONTAIN, FIT_COVER, Scene
 
 # Browser fields are workspace state: saved with the project, but not
 # part of undo (undoing a move shouldn't also rewind your browsing).
-BROWSER_FIELDS = ("folder", "current_index", "include_subfolders", "media_filter")
+BROWSER_FIELDS = ("folder", "current_index", "include_subfolders", "media_filter",
+                  "sort_by", "sort_descending")
 
 # The same for browsing containers: their browse settings, and while
 # browsing, the content itself (which file, and how it's framed) and
 # the Fit/Fill mode it's framed with.
 CONTAINER_BROWSE_FIELDS = ("browse_mode", "browse_folder", "browse_subfolders",
-                           "media_filter")
+                           "media_filter", "sort_by", "sort_descending", "continue_play",
+                           "new_first")
 
 
 def _media_file_filter():
@@ -78,14 +82,21 @@ OBJECT_ROLE_NAMES = [
     "currentIndex",
     "includeSubfolders",
     "lockContent",
+    "locked",
     "clipShape",
     "fitMode",
     "browseMode",
     "browseFolder",
     "browseSubfolders",
     "mediaFilter",
+    "sortBy",
+    "sortDescending",
+    "continuePlay",
+    "newFirst",
+    "favorites",
     "objText",
     "textStyle",
+    "objSpeech",
 ]
 
 # Roles describing a media source. Used as "source*" for a media row,
@@ -113,7 +124,8 @@ ROLES = {name: int(Qt.UserRole) + 1 + i for i, name in enumerate(ROLE_NAMES)}
 GEOMETRY_ROLES = [ROLES[n] for n in
                   ("posX", "posY", "objWidth", "objHeight", "objRotation")]
 BROWSER_ROLES = [ROLES[n] for n in
-                 ("folder", "currentIndex", "includeSubfolders", "mediaFilter")]
+                 ("folder", "currentIndex", "includeSubfolders", "mediaFilter",
+                  "sortBy", "sortDescending")]
 Z_ROLES = [ROLES["objZ"]]
 PLAYBACK_ROLES = [ROLES[n] for n in
                   ("objPlaying", "objMuted", "objVolume", "objLoop",
@@ -121,8 +133,10 @@ PLAYBACK_ROLES = [ROLES[n] for n in
                    "objMirrored")]
 SOURCE_ROLES = [ROLES["source" + f] for f in SOURCE_FIELDS]
 CONTAINER_ROLES = [ROLES[n] for n in
-                   ("lockContent", "clipShape", "fitMode", "browseMode",
-                    "browseFolder", "browseSubfolders", "mediaFilter")]
+                   ("lockContent", "locked", "clipShape", "fitMode", "browseMode",
+                    "browseFolder", "browseSubfolders", "mediaFilter",
+                    "sortBy", "sortDescending", "continuePlay", "newFirst",
+                    "favorites")]
 CONTENT_ROLES = [ROLES[n] for n in CONTENT_ROLE_NAMES]
 TEXT_ROLES = [ROLES[n] for n in ("objText", "textStyle")]
 
@@ -208,6 +222,9 @@ class SceneModel(QAbstractListModel):
 
     # An audio track was added (the sidebar shows its Playback tab).
     audioTrackAdded = Signal(str)
+
+    # A project (opened, or New) brought its own Speech tab contents.
+    speechDraftChanged = Signal()
 
     # A container is about to browse a newly chosen folder: it should
     # move to that folder's first file unless it already shows one.
@@ -349,14 +366,21 @@ class SceneModel(QAbstractListModel):
             "currentIndex": obj.current_index,
             "includeSubfolders": obj.include_subfolders,
             "lockContent": obj.lock_content,
+            "locked": obj.locked,
             "clipShape": obj.clip_shape,
             "fitMode": obj.fit_mode,
             "browseMode": obj.browse_mode,
             "browseFolder": obj.browse_folder,
             "browseSubfolders": obj.browse_subfolders,
             "mediaFilter": obj.media_filter,
+            "sortBy": obj.sort_by,
+            "sortDescending": obj.sort_descending,
+            "continuePlay": obj.continue_play,
+            "newFirst": obj.new_first,
+            "favorites": list(obj.favorites),
             "objText": obj.text,
             "textStyle": obj.text_style,
+            "objSpeech": obj.speech,
         }.get(name)
 
     # -------------------------------------------------
@@ -372,6 +396,7 @@ class SceneModel(QAbstractListModel):
         self._history.clear()
         self._current = snapshot(self._scene)
         self.historyChanged.emit()
+        self.speechDraftChanged.emit()
 
         self.countChanged.emit()
         self.selectedIdChanged.emit()
@@ -627,11 +652,12 @@ class SceneModel(QAbstractListModel):
     def containerAt(self, x, y, exclude_id):
         """
         The empty container under a scene point, for dropping media.
-        A full container on top blocks the drop rather than letting it
-        reach one underneath: content is never replaced by dropping.
+        A full (or locked) container on top blocks the drop rather than
+        letting it reach one underneath: content is never replaced by
+        dropping.
         """
         obj = self._scene.container_at(x, y, exclude_id or None)
-        if obj is None or self._scene.content_of(obj.id) is not None:
+        if obj is None or obj.locked or self._scene.content_of(obj.id) is not None:
             return ""
         return obj.id
 
@@ -706,6 +732,26 @@ class SceneModel(QAbstractListModel):
             self._changed()
         self._merge_key = None
 
+    @Slot(str, float)
+    def fitTextHeight(self, object_id, height):
+        """
+        Wrapped text: after an edit, the box's height follows the lines
+        (part of the same undo step), keeping its top edge in place.
+        """
+        obj = self._scene.get(object_id)
+        if obj is None or obj.type != "text" or height <= 0:
+            return
+        r = math.radians(obj.rotation)
+        dh = height - obj.height
+        cx = obj.x + obj.width / 2 - math.sin(r) * dh / 2
+        cy = obj.y + obj.height / 2 + math.cos(r) * dh / 2
+        self._merge_key = self._text_edit_key
+        if self._scene.set_geometry(object_id, cx - obj.width / 2, cy - height / 2,
+                                    obj.width, height, obj.rotation):
+            self._emit_row(object_id, GEOMETRY_ROLES)
+            self._changed()
+        self._merge_key = None
+
     @Slot(str, str, float, float, result=str)
     def addMedia(self, path, media_type, x, y):
         source = self._register_source(path, media_type)
@@ -729,6 +775,43 @@ class SceneModel(QAbstractListModel):
         track_id = self._insert(lambda: self._scene.add_audio_track(source.id))
         self.audioTrackAdded.emit(track_id)
         return track_id
+
+    @Slot("QVariantMap", result=str)
+    def addSpeechTrack(self, speech):
+        """Add to Playback (the Speech tab): a speech track, with no file;
+        its clip is made when it's needed (readme section 14.6)."""
+        speech = normalized_speech(dict(speech))
+        if not speech:                                       # nothing to say
+            return ""
+        return self._insert(lambda: self._scene.add_speech_track(speech))
+
+    @Slot(str, "QVariantMap", result=bool)
+    def setTrackSpeech(self, track_id, speech):
+        """Update Track (the Speech tab): undoable."""
+        if not self._scene.set_track_speech(track_id, dict(speech)):
+            return False
+        self._emit_row(track_id, [ROLES["objSpeech"]] + PLAYBACK_ROLES)
+        self._changed()
+        return True
+
+    # What's in the Speech tab, saved with the project (workspace state:
+    # not undone). Announced only when a project replaces it, not for
+    # the tab's own edits.
+    def _get_speech_draft(self):
+        return dict(self._scene.speech_draft)
+
+    speechDraft = Property("QVariantMap", _get_speech_draft, notify=speechDraftChanged)
+
+    @Slot("QVariantMap")
+    def setSpeechDraft(self, draft):
+        if self._scene.set_speech_draft(dict(draft)):
+            self._changed(workspace_only=True)
+
+    @Slot(str, result="QVariantMap")
+    def trackSpeech(self, track_id):
+        """What made a speech track ({} for any other object)."""
+        obj = self._scene.get(track_id)
+        return dict(obj.speech) if obj is not None and obj.type == "audio" else {}
 
     @Slot(str, result=str)
     def convertToAudioTrack(self, media_id):
@@ -1043,6 +1126,21 @@ class SceneModel(QAbstractListModel):
             self._emit_row(container_id, CONTENT_ROLES)
             self._changed(workspace_only=True)
 
+    @Slot(str, str)
+    def continueInContainer(self, container_id, path):
+        """Continue Play goes on to the next video (even when locked)."""
+        source = self._register_source(path, "video")
+        if self._scene.show_file_in_container(container_id, source.id, continuing=True):
+            self._emit_row(container_id, CONTENT_ROLES)
+            self._changed(workspace_only=True)
+
+    @Slot(str, bool)
+    def setLocked(self, container_id, locked):
+        """Lock Container / Unlock Container (undoable)."""
+        if self._scene.set_locked(container_id, locked):
+            self._emit_row(container_id, CONTAINER_ROLES)
+            self._changed()
+
     @Slot(str, bool)
     def setLockContent(self, container_id, locked):
         if self._scene.set_lock_content(container_id, locked):
@@ -1099,6 +1197,35 @@ class SceneModel(QAbstractListModel):
             obj = self._scene.get(object_id)
             self._emit_row(object_id, BROWSER_ROLES if obj.type == "browser" else CONTAINER_ROLES)
             self._changed(workspace_only=True)
+
+    @Slot(str, str, bool)
+    def setSort(self, object_id, sort_by, descending):
+        """The order a browser or browsing container steps through files."""
+        if self._scene.set_sort(object_id, sort_by, descending):
+            obj = self._scene.get(object_id)
+            self._emit_row(object_id, BROWSER_ROLES if obj.type == "browser" else CONTAINER_ROLES)
+            self._changed(workspace_only=True)
+
+    @Slot(str, bool)
+    def setContinuePlay(self, container_id, on):
+        """A browsing container plays on to the next video at the end of one."""
+        if self._scene.set_continue_play(container_id, on):
+            self._emit_row(container_id, CONTAINER_ROLES)
+            self._changed(workspace_only=True)
+
+    @Slot(str, bool)
+    def setNewFirst(self, container_id, on):
+        """A browsing container shows files new to its folder first."""
+        if self._scene.set_new_first(container_id, on):
+            self._emit_row(container_id, CONTAINER_ROLES)
+            self._changed(workspace_only=True)
+
+    @Slot(str, str, bool)
+    def setFavorite(self, container_id, path, on):
+        """Mark a file as one of a browsing container's favorites (undoable)."""
+        if self._scene.set_favorite(container_id, path, on):
+            self._emit_row(container_id, CONTAINER_ROLES)
+            self._changed()
 
     @Slot(str, bool)
     def setPlaying(self, object_id, playing):

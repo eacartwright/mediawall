@@ -42,6 +42,11 @@ Menu {
     readonly property bool containerHasContent:
         isContainer && target.hasContent === true
 
+    // A locked container (Lock Container): the items that would change
+    // it, or what it shows, are greyed out.
+    readonly property bool targetLocked:
+        isContainer && target.locked === true
+
     readonly property bool isFreeMedia:
         target !== null && target.isFreeMedia === true
 
@@ -69,6 +74,7 @@ Menu {
     function openFor(item) {
         target = item
         placeSpeedMenu()
+        placeSortMenu()
         popup()   // opens at the mouse cursor
     }
 
@@ -96,6 +102,83 @@ Menu {
                 insertMenu(j + 1, speedMenu)
                 return
             }
+        }
+    }
+
+    // ---- Sort by submenu (browsers and browsing containers) ----
+    // Put in just after the filter items, like the Speed submenu.
+
+    function placeSortMenu() {
+        for (var i = 0; i < count; i++) {
+            if (itemAt(i).subMenu === sortMenu) {
+                takeMenu(i)
+                break
+            }
+        }
+        if (!filtersFiles)
+            return
+        for (var j = 0; j < count; j++) {
+            if (itemAt(j) === lockItem) {
+                insertMenu(j, sortMenu)
+                return
+            }
+        }
+    }
+
+    property Menu sortMenu: Menu {
+        id: sortSub
+        objectName: "sortMenu"       // found by tests/app
+        title: "Sort by"
+
+        readonly property var owner: menu
+        readonly property string sortBy: owner.filtersFiles ? owner.target.sortBy : ""
+        readonly property bool descending: owner.filtersFiles && owner.target.sortDescending === true
+
+        function setSort(key, descending) {
+            sceneModel.setSort(owner.targetId, key, descending)
+        }
+
+        // Checked state is re-bound after each click (a click toggles it).
+        component SortItem: MenuItem {
+            id: sortItem
+            property bool current
+            checkable: true
+            checked: current
+            onTriggered: checked = Qt.binding(function() { return sortItem.current })
+        }
+
+        SortItem {
+            text: "Name"
+            current: sortSub.sortBy === "name"
+            onTriggered: sortSub.setSort("name", sortSub.descending)
+        }
+        SortItem {
+            text: "Date Modified"
+            current: sortSub.sortBy === "date"
+            onTriggered: sortSub.setSort("date", sortSub.descending)
+        }
+        SortItem {
+            text: "Type"
+            current: sortSub.sortBy === "type"
+            onTriggered: sortSub.setSort("type", sortSub.descending)
+        }
+        SortItem {
+            text: "Random"
+            current: sortSub.sortBy === "random"
+            onTriggered: sortSub.setSort("random", sortSub.descending)
+        }
+        MenuSeparator {}
+        SortItem {
+            text: "Ascending"
+            enabled: sortSub.sortBy !== "random"
+            current: !sortSub.descending
+            onTriggered: sortSub.setSort(sortSub.sortBy, false)
+        }
+        SortItem {
+            text: "Descending"
+            enabled: sortSub.sortBy !== "random"
+            current: sortSub.descending
+            onTriggered: sortSub.setSort(sortSub.sortBy, true)
         }
     }
 
@@ -220,13 +303,33 @@ Menu {
         checkable: true
         checked: menu.target !== null && menu.target.mediaLoop === true
 
-        visible: menu.targetVideo
+        // A browsing container has Continue Play instead (off = loop).
+        visible: menu.targetVideo && !(menu.isContainer && menu.target.browseMode === true)
         height: visible ? implicitHeight : 0
 
         onTriggered: {
             sceneModel.setLoop(menu.target.playbackId, !menu.target.mediaLoop)
             loopItem.checked = Qt.binding(function() {
                 return menu.target !== null && menu.target.mediaLoop === true
+            })
+        }
+    }
+
+    // A browsing container: at the end of a video, play the next one;
+    // off, the video loops. (A locked container keeps it as set.)
+    MenuItem {
+        id: continuePlayItem
+        objectName: "continuePlayItem"      // found by tests/app
+        text: "Continue Play"
+        enabled: !menu.targetLocked
+        checkable: true
+        checked: menu.isContainer && menu.target.continuePlay === true
+        visible: menu.isContainer && menu.target.browseMode === true
+        height: visible ? implicitHeight : 0
+        onTriggered: {
+            sceneModel.setContinuePlay(menu.targetId, !menu.target.continuePlay)
+            continuePlayItem.checked = Qt.binding(function() {
+                return menu.isContainer && menu.target.continuePlay === true
             })
         }
     }
@@ -326,8 +429,27 @@ Menu {
     // ---- Container ----
 
     MenuItem {
+        id: lockContainerItem
+        objectName: "lockContainerItem"     // found by tests/app
+
+        text: "Lock Container"
+
+        checkable: true
+        checked: menu.targetLocked
+
+        visible: menu.isContainer
+        height: visible ? implicitHeight : 0
+
+        onTriggered: {
+            sceneModel.setLocked(menu.targetId, !menu.targetLocked)
+            lockContainerItem.checked = Qt.binding(function() { return menu.targetLocked })
+        }
+    }
+
+    MenuItem {
         text: "Adjust Content…"
 
+        enabled: !menu.targetLocked
         visible: menu.containerHasContent
         height: visible ? implicitHeight : 0
 
@@ -336,6 +458,7 @@ Menu {
 
     MenuItem {
         text: "Fit Content (show whole image)"
+        enabled: !menu.targetLocked
 
         visible: menu.containerHasContent
         height: visible ? implicitHeight : 0
@@ -345,6 +468,7 @@ Menu {
 
     MenuItem {
         text: "Fill Container"
+        enabled: !menu.targetLocked
 
         visible: menu.containerHasContent
         height: visible ? implicitHeight : 0
@@ -356,6 +480,7 @@ Menu {
 
     MenuItem {
         text: "Browse This Folder"
+        enabled: !menu.targetLocked
         visible: menu.isContainer && !menu.target.browseMode && menu.target.hasContent
         height: visible ? implicitHeight : 0
         onTriggered: sceneModel.startBrowsing(menu.targetId)
@@ -364,6 +489,7 @@ Menu {
     // Any container, filled or not: pick a folder to browse.
     MenuItem {
         text: "Browse Folder…"
+        enabled: !menu.targetLocked
         visible: menu.isContainer
         height: visible ? implicitHeight : 0
         onTriggered: sceneModel.chooseBrowseFolder(menu.targetId)
@@ -371,6 +497,7 @@ Menu {
 
     MenuItem {
         text: "Stop Browsing"
+        enabled: !menu.targetLocked
         visible: menu.isContainer && menu.target.browseMode === true
         height: visible ? implicitHeight : 0
         onTriggered: sceneModel.stopBrowsing(menu.targetId)
@@ -379,6 +506,7 @@ Menu {
     MenuItem {
         id: browseSubfoldersItem
         text: "Browse Subfolders Too"
+        enabled: !menu.targetLocked
         checkable: true
         checked: menu.isContainer && menu.target.browseSubfolders === true
         visible: menu.isContainer && menu.target.browseMode === true
@@ -391,15 +519,50 @@ Menu {
         }
     }
 
+    // A browsing container: mark the file shown as a favorite.
+    MenuItem {
+        id: favoriteItem
+        text: "Favorite"
+        checkable: true
+        checked: menu.isContainer && menu.target.isFavorite === true
+        visible: menu.isContainer && menu.target.browseMode === true && menu.target.hasContent
+        height: visible ? implicitHeight : 0
+        onTriggered: {
+            menu.target.toggleFavorite()
+            favoriteItem.checked = Qt.binding(function() {
+                return menu.isContainer && menu.target.isFavorite === true
+            })
+        }
+    }
+
+    // A browsing container: files new to the folder are shown first.
+    MenuItem {
+        id: newFirstItem
+        objectName: "newFirstItem"          // found by tests/app
+        text: "Show New Files First"
+        enabled: !menu.targetLocked
+        checkable: true
+        checked: menu.isContainer && menu.target.newFirst === true
+        visible: menu.isContainer && menu.target.browseMode === true
+        height: visible ? implicitHeight : 0
+        onTriggered: {
+            sceneModel.setNewFirst(menu.targetId, !menu.target.newFirst)
+            newFirstItem.checked = Qt.binding(function() {
+                return menu.isContainer && menu.target.newFirst === true
+            })
+        }
+    }
+
     // Which files a browser or browsing container steps through (one
     // is checked). Containers show no audio.
     Repeater {
         model: [
             { text: "Show All Media", value: "all" },
             { text: "Show Images Only", value: "image" },
+            { text: "Show Animated Only", value: "animated" },
             { text: "Show Videos Only", value: "video" },
             { text: "Show Audio Only", value: "audio" },
-            { text: "Show Animated Only (GIF, WebP)", value: "animated" },
+            { text: "Show Favorites Only", value: "favorites" },
         ]
 
         MenuItem {
@@ -407,9 +570,11 @@ Menu {
 
             text: modelData.value === "all" && menu.isContainer
                   ? "Show Images and Videos" : modelData.text
+            enabled: !menu.targetLocked
             checkable: true
             checked: menu.filtersFiles && menu.target.mediaFilter === modelData.value
             visible: menu.filtersFiles && (modelData.value !== "audio" || menu.isBrowser)
+                     && (modelData.value !== "favorites" || menu.isContainer)
             height: visible ? implicitHeight : 0
             onTriggered: {
                 sceneModel.setMediaFilter(menu.targetId, modelData.value)
@@ -424,6 +589,7 @@ Menu {
         id: lockItem
 
         text: "Scale Content with Container"
+        enabled: !menu.targetLocked
 
         checkable: true
         checked: menu.target !== null && menu.target.lockContent === true
@@ -443,6 +609,7 @@ Menu {
 
     MenuItem {
         text: "Release Content"
+        enabled: !menu.targetLocked
 
         visible: menu.containerHasContent
         height: visible ? implicitHeight : 0
@@ -452,6 +619,7 @@ Menu {
 
     MenuItem {
         text: "Remove Content"
+        enabled: !menu.targetLocked
 
         visible: menu.containerHasContent
         height: visible ? implicitHeight : 0
@@ -471,6 +639,7 @@ Menu {
         id: mirrorItem
 
         text: "Flip Horizontally"
+        enabled: !menu.targetLocked
 
         checkable: true
         checked: menu.target !== null && menu.target.mediaMirrored === true
@@ -490,6 +659,7 @@ Menu {
 
     MenuItem {
         text: "Reset Rotation"
+        enabled: !menu.targetLocked
 
         visible: menu.targetRotated
         height: visible ? implicitHeight : 0
@@ -502,6 +672,7 @@ Menu {
 
     MenuItem {
         text: "Reset Content Rotation"
+        enabled: !menu.targetLocked
 
         visible: menu.contentRotated
         height: visible ? implicitHeight : 0

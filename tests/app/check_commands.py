@@ -1,6 +1,6 @@
 """
 Commands and shortcuts (qml/AppActions.qml, readme section 25), and the
-Settings dialog (zoom step, saved between runs).
+Settings dialog (zoom step, container background, saved between runs).
 """
 
 from harness import Check, Qt
@@ -63,14 +63,14 @@ def step_settings2():
     c.js("appSettings.resetStepRepeat()")
     c.check("Default restores 400 / 150 ms",
             (c.js("appSettings.stepRepeatDelay"), c.js("appSettings.stepRepeatInterval")) == (400, 150))
-    c.item_js("settingsTabs", "item.currentIndex = 2")
+    c.item_js("settingsTabs", "item.currentIndex = 3")
     rows = c.item_js("shortcutsList", "item.rows") or []
     keys = {r[1]: r[2] for r in rows}
     c.check("Shortcuts tab: keys read from the commands",
             keys.get("Duplicate") == "Ctrl+D" and "Ctrl+Y" in keys.get("Redo", "")
             and keys.get("Present") == "F5", str(keys))
     c.grab("settings-shortcuts.png")
-    c.item_js("settingsTabs", "item.currentIndex = 3")
+    c.item_js("settingsTabs", "item.currentIndex = 4")
     from core.version import VERSION
     c.check("About tab: the version", c.item_js("aboutVersion", "item.text") == "Version " + VERSION)
     c.grab("settings-about.png")
@@ -82,6 +82,16 @@ def step_settings2():
     c.check("a new settings object (a restart) reads it back", AppSettings().zoomStep == 25.0)
     c.js("appSettings.resetZoomStep()")
     c.check("Default restores 10%", c.js("appSettings.zoomStep") == 10.0)
+    c.check("container background defaults to #252525",
+            c.item_js("containerFrame", "item.color.toString()") == "#252525")
+    c.js("appSettings.containerColor = '#336699'")
+    c.check("...and follows the setting at once, kept after a restart",
+            c.item_js("containerFrame", "item.color.toString()") == "#336699"
+            and AppSettings().containerColor == "#336699")
+    c.js("appSettings.containerColor = 'not a colour'")
+    c.check("...a bad value is ignored", c.js("appSettings.containerColor") == "#336699")
+    c.js("appSettings.resetContainerColor()")
+    c.check("...Default restores it", c.js("appSettings.containerColor") == "#252525")
     c.finish()
 
 

@@ -20,6 +20,8 @@ from bridge.log_capture import LogCapture
 from bridge.media_memory import MediaMemory
 from bridge.project_controller import ProjectController
 from bridge.scene_model import SceneModel
+from bridge.speech import SpeechEngine
+from bridge.text_shaper import TextShaper
 from bridge.ui_font import fix_linux_ui_font
 from core.media_browser import MediaBrowser
 from core.version import VERSION
@@ -72,9 +74,21 @@ class BrowserBackend(QObject):
     def folderExists(self, folder):
         return bool(folder) and Path(folder).is_dir()
 
-    @Slot(str, bool, str, result=list)
-    def scanFolder(self, folder, recursive, media_filter):
-        return self.media_browser.scan_folder(folder, recursive, media_filter)
+    # sort_by, descending, seed: the object's order (core/media_browser.py
+    # sort_entries); seed is its id, fixing a random order.
+    @Slot(str, bool, str, str, bool, str, result=list)
+    def scanFolder(self, folder, recursive, media_filter, sort_by, descending, seed):
+        return self.media_browser.scan_folder(folder, recursive, media_filter,
+                                              sort_by, descending, seed)
+
+    # A browsing container's scan: the same, plus its favorites (for the
+    # "favorites" filter).
+    @Slot(str, bool, str, str, bool, str, list, result=list)
+    def scanContainerFolder(self, folder, recursive, media_filter, sort_by, descending,
+                            seed, favorites):
+        return self.media_browser.scan_folder(folder, recursive, media_filter,
+                                              sort_by, descending, seed,
+                                              [str(p) for p in favorites])
 
 
 def main():
@@ -119,6 +133,9 @@ def main():
     browser_backend = BrowserBackend()
     scene_model = SceneModel()
     project_controller = ProjectController(scene_model, app_settings)
+    text_shaper = TextShaper()
+    speech_engine = SpeechEngine(app_settings)
+    app.aboutToQuit.connect(speech_engine.shutdown)
 
     engine = QQmlApplicationEngine()
     context = engine.rootContext()
@@ -128,6 +145,8 @@ def main():
     context.setContextProperty("appLog", log_capture.model)
     context.setContextProperty("appSettings", app_settings)
     context.setContextProperty("mediaMemory", media_memory)
+    context.setContextProperty("textShaper", text_shaper)
+    context.setContextProperty("speechEngine", speech_engine)
     context.setContextProperty("keyRelease", key_release)
     context.setContextProperty("appVersion", VERSION)
     context.setContextProperty("appIconUrl", QUrl.fromLocalFile(str(ICON_PATH)))

@@ -12,9 +12,10 @@ everywhere at once, and is saved immediately.
 """
 
 import os
+import re
 import sys
 
-from PySide6.QtCore import Property, QObject, QSettings, Signal, Slot
+from PySide6.QtCore import Property, QObject, QSettings, QUrl, Signal, Slot
 from PySide6.QtGui import QKeySequence
 
 from core.media_cost import (
@@ -55,6 +56,13 @@ STEP_INTERVAL_DEFAULT = 150
 STEP_INTERVAL_RANGE = (30, 1000)
 
 
+# The colour behind a container's content (where the picture doesn't
+# reach), as "#rrggbb".
+CONTAINER_COLOR_KEY = "containers/backgroundColor"
+CONTAINER_COLOR_DEFAULT = "#252525"
+_HEX_COLOR = re.compile(r"#[0-9a-fA-F]{6}")
+
+
 # Recently opened or saved projects (Open Recent), newest first.
 RECENT_KEY = "recent/projects"
 
@@ -93,14 +101,22 @@ def apply_hw_decoding():
     return mode, False
 
 
+# Speech (readme section 14.6): the Piper program, and the folder of
+# voices the user downloaded.
+PIPER_PATH_KEY = "speech/piperPath"
+VOICES_FOLDER_KEY = "speech/voicesFolder"
+
+
 class AppSettings(QObject):
 
     zoomStepChanged = Signal()
     speedRangeChanged = Signal()
     stepRepeatChanged = Signal()
+    containerColorChanged = Signal()
     recentProjectsChanged = Signal()
     hwDecodingChanged = Signal()
     maxImageSizeChanged = Signal()
+    speechChanged = Signal()
 
     def __init__(self, hw_decoding=(HW_AUTO, False), parent=None):
         super().__init__(parent)
@@ -241,6 +257,60 @@ class AppSettings(QObject):
     def resetStepRepeat(self):
         self._set_step_delay(STEP_DELAY_DEFAULT)
         self._set_step_interval(STEP_INTERVAL_DEFAULT)
+
+    # ---- Container background colour ----
+
+    def _get_container_color(self):
+        value = str(self._settings.value(CONTAINER_COLOR_KEY, CONTAINER_COLOR_DEFAULT))
+        return value.lower() if _HEX_COLOR.fullmatch(value) else CONTAINER_COLOR_DEFAULT
+
+    def _set_container_color(self, value):
+        # QML colours arrive as "#rrggbb" (or "#aarrggbb"; alpha dropped).
+        value = str(value).lower()
+        if len(value) == 9 and value.startswith("#"):
+            value = "#" + value[3:]
+        if not _HEX_COLOR.fullmatch(value) or value == self._get_container_color():
+            return
+        self._settings.setValue(CONTAINER_COLOR_KEY, value)
+        self._settings.sync()
+        self.containerColorChanged.emit()
+
+    containerColor = Property(str, _get_container_color, _set_container_color,
+                              notify=containerColorChanged)
+
+    def _get_container_color_default(self):
+        return CONTAINER_COLOR_DEFAULT
+
+    containerColorDefault = Property(str, _get_container_color_default, constant=True)
+
+    @Slot()
+    def resetContainerColor(self):
+        self._set_container_color(CONTAINER_COLOR_DEFAULT)
+
+    # ---- Speech (paths; "" = not set) ----
+
+    def _get_text(self, key):
+        return str(self._settings.value(key, "") or "")
+
+    def _set_text(self, key, value):
+        value = str(value or "").strip()
+        if value == self._get_text(key):
+            return
+        self._settings.setValue(key, value)
+        self._settings.sync()
+        self.speechChanged.emit()
+
+    piperPath = Property(str, lambda self: self._get_text(PIPER_PATH_KEY),
+                         lambda self, v: self._set_text(PIPER_PATH_KEY, v),
+                         notify=speechChanged)
+    voicesFolder = Property(str, lambda self: self._get_text(VOICES_FOLDER_KEY),
+                            lambda self, v: self._set_text(VOICES_FOLDER_KEY, v),
+                            notify=speechChanged)
+
+    @Slot("QVariant", result=str)
+    def localPath(self, url):
+        """A file dialog's chosen URL as a path."""
+        return QUrl(url).toLocalFile() if not isinstance(url, QUrl) else url.toLocalFile()
 
     # ---- Shortcut display (the Settings dialog's Shortcuts tab) ----
 

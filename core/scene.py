@@ -38,6 +38,8 @@ from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Optional
 
+from core.speech import normalized_speech, speech_title
+
 
 OBJECT_TYPES = {"media", "browser", "container", "audio", "text"}
 
@@ -70,11 +72,18 @@ FIT_MODES = {FIT_CONTAIN, FIT_COVER}
 
 # Which files a browser or browsing container steps through: every
 # kind it shows, one type, or animated GIF/WebP only
-# (core/media_browser.py, matches_filter). Containers show no audio.
+# (core/media_browser.py, matches_filter). Containers show no audio, and
+# can show only their favorites.
 MEDIA_FILTERS = {
     "browser": ("all", "image", "video", "audio", "animated"),
-    "container": ("all", "image", "video", "animated"),
+    "container": ("all", "image", "video", "animated", "favorites"),
 }
+
+# The order a browser or browsing container steps through a folder
+# (core/media_browser.py, sort_entries). "name" is natural name order,
+# folder by folder; "date" is the modification time (creation time
+# isn't recorded on Linux); "random" is a shuffle fixed per object.
+SORT_KEYS = ("name", "date", "type", "random")
 
 # Object types that always stack above the others (workspace tools).
 OVERLAY_TYPES = {"browser"}
@@ -133,10 +142,25 @@ TEXT_STYLE_DEFAULTS = {
     "depth": 0,                 # 3D extrusion, 0 .. TEXT_DEPTH_MAX
     "depth_color": "#404040",
     "stretch": False,           # fill the box exactly, not keeping proportions
+    # Wrap: the words wrap onto lines as wide as the box, at a fixed
+    # letter size (scene px), and the box's height follows them.
+    "wrap": False,
+    "size": 60.0,               # letter size when wrapping, TEXT_SIZE_MIN .. MAX
+    "align": "center",          # TEXT_ALIGNS, for wrapped lines
+    "arc": 0.0,                 # bend, degrees the line spans; > 0 arches up
+    "tilt": 0.0,                # perspective lean, degrees; > 0 top leans back
+    "glow": 0.0,                # glow size, 0 .. TEXT_GLOW_MAX
+    "glow_color": "#40c0ff",
 }
 
 TEXT_OUTLINE_MAX = 20.0
 TEXT_DEPTH_MAX = 40
+TEXT_SIZE_MIN = 4.0
+TEXT_SIZE_MAX = 2000.0
+TEXT_ALIGNS = ("left", "center", "right")
+TEXT_ARC_MAX = 360.0
+TEXT_TILT_MAX = 70.0
+TEXT_GLOW_MAX = 40.0
 
 _COLOR = re.compile(r"#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})")
 
@@ -155,8 +179,10 @@ def normalized_text_style(raw) -> dict:
             ok = isinstance(value, bool)
         elif isinstance(default, (int, float)):
             ok = isinstance(value, (int, float)) and not isinstance(value, bool)
-        elif key in ("fill", "outline", "depth_color"):
+        elif key in ("fill", "outline", "depth_color", "glow_color"):
             ok = isinstance(value, str) and _COLOR.fullmatch(value) is not None
+        elif key == "align":
+            ok = value in TEXT_ALIGNS
         elif key == "fill2":
             ok = isinstance(value, str) and (value == "" or _COLOR.fullmatch(value) is not None)
         else:
@@ -166,6 +192,10 @@ def normalized_text_style(raw) -> dict:
 
     style["outline_width"] = round(min(TEXT_OUTLINE_MAX, max(0.0, float(style["outline_width"]))), 2)
     style["depth"] = int(min(TEXT_DEPTH_MAX, max(0, round(style["depth"]))))
+    style["size"] = round(min(TEXT_SIZE_MAX, max(TEXT_SIZE_MIN, float(style["size"]))), 2)
+    style["arc"] = round(min(TEXT_ARC_MAX, max(-TEXT_ARC_MAX, float(style["arc"]))), 1)
+    style["tilt"] = round(min(TEXT_TILT_MAX, max(-TEXT_TILT_MAX, float(style["tilt"]))), 1)
+    style["glow"] = round(min(TEXT_GLOW_MAX, max(0.0, float(style["glow"]))), 1)
     return style
 
 
@@ -270,8 +300,12 @@ class SceneObject:
 
     # container
     lock_content: bool = True     # resizing the container scales content
+    # Locked (Lock Container): the container can't be moved, resized,
+    # or rotated, and its content can't be panned, zoomed, replaced, or
+    # stepped to another file, until unlocked. Playback still works.
+    locked: bool = False
     clip_shape: str = "rect"
-    fit_mode: str = FIT_COVER     # how new content is framed (Fit/Fill)
+    fit_mode: str = FIT_CONTAIN   # how new content is framed (Fit/Fill)
 
     # A browsing container: the wheel steps through the media in a
     # folder, showing each file as its content. Workspace state, like a
@@ -281,13 +315,34 @@ class SceneObject:
     browse_subfolders: bool = True
 
     # browser and browsing container: "all" or one media type
-    # (MEDIA_FILTERS). Workspace state.
+    # (MEDIA_FILTERS), and the order files are stepped through
+    # (SORT_KEYS). Workspace state.
     media_filter: str = "all"
+    sort_by: str = "name"
+    sort_descending: bool = False
+
+    # browsing container: when a video ends, play the folder's next
+    # video (Continue Play). Workspace state.
+    continue_play: bool = False
+
+    # browsing container: files added to the folder since it was last
+    # looked at are shown first, newest first (Show New Files First).
+    # Workspace state.
+    new_first: bool = False
+
+    # browsing container: the files marked as favorites (absolute paths,
+    # as scanned), for the Favorites Only filter. Saved and undoable.
+    favorites: list = field(default_factory=list)
 
     # text: what it says (one line), and how it looks
     # (TEXT_STYLE_DEFAULTS; always complete, see normalized_text_style)
     text: str = ""
     text_style: dict = field(default_factory=dict)
+
+    # audio track made by Speech (readme 14.6): the words, voice, and
+    # settings that made its file (core/speech.py SPEECH_DEFAULTS), so
+    # it can be edited and made again; {} for any other track.
+    speech: dict = field(default_factory=dict)
 
     @property
     def center(self):
@@ -300,6 +355,10 @@ class Scene:
         self.sources: dict[str, MediaSource] = {}
         self.objects: list[SceneObject] = []
         self.selected_id: Optional[str] = None
+        # What's in the Speech tab (a speech dict, or {}): saved with the
+        # project, but workspace state, so undo never changes it (undo
+        # snapshots copy only sources and objects).
+        self.speech_draft: dict = {}
 
     # -------------------------------------------------
     # Sources
@@ -448,6 +507,14 @@ class Scene:
             return None
         return obj
 
+    def _editable_container(self, container_id) -> Optional[SceneObject]:
+        """The container, unless it is missing or locked."""
+        container = self._container(container_id)
+        return None if container is None or container.locked else container
+
+    def _frozen(self, obj) -> bool:
+        return obj.type == "container" and obj.locked
+
     def container_at(self, x, y, exclude_id=None) -> Optional[SceneObject]:
         """The top-most container whose (rotated) box contains a scene point."""
         best = None
@@ -541,6 +608,40 @@ class Scene:
         return self.add_object(
             "audio", 0, 0, source_id=source_id, muted=False, loop=True, z=0,
         )
+
+    def add_speech_track(self, speech) -> Optional[SceneObject]:
+        """
+        Add a speech track (readme 14.6): an audio track with no file,
+        whose speech is made into a clip when it's needed.
+        """
+        speech = normalized_speech(speech)
+        if not speech:
+            return None
+        return self.add_object(
+            "audio", 0, 0, source_id=None, muted=False, loop=True, z=0, speech=speech,
+        )
+
+    def set_speech_draft(self, raw) -> bool:
+        """What's in the Speech tab, to save with the project."""
+        draft = normalized_speech(raw)
+        if draft == self.speech_draft:
+            return False
+        self.speech_draft = draft
+        return True
+
+    def set_track_speech(self, track_id, speech) -> bool:
+        """
+        A speech track changed (Update Track). It plays the new version
+        from the start.
+        """
+        track = self.get(track_id)
+        speech = normalized_speech(speech)
+        if track is None or track.type != "audio" or not track.speech or not speech:
+            return False
+        track.speech = speech             # a new dict: duplicates never share one
+        track.playing = True
+        track.loop_a = track.loop_b = -1.0
+        return True
 
     def audio_tracks(self) -> list:
         return [o for o in self.objects if o.type == "audio"]
@@ -644,7 +745,7 @@ class Scene:
 
     def set_geometry(self, object_id, x, y, width, height, rotation) -> bool:
         obj = self.get(object_id)
-        if obj is None:
+        if obj is None or self._frozen(obj):
             return False
 
         new = (float(x), float(y), float(width), float(height), float(rotation))
@@ -721,7 +822,7 @@ class Scene:
         so the view inside the frame stays exactly the same.
         """
         obj = self.get(object_id)
-        if obj is None or obj.parent_id is not None or factor <= 0:
+        if obj is None or obj.parent_id is not None or factor <= 0 or self._frozen(obj):
             return False
 
         shorter = min(obj.width, obj.height)
@@ -744,6 +845,11 @@ class Scene:
         obj.height *= factor
         obj.x = px + (cx - px) * factor - obj.width / 2
         obj.y = py + (cy - py) * factor - obj.height / 2
+
+        # Wrapped text: the letters scale too, so the lines stay the same.
+        if obj.type == "text" and obj.text_style.get("wrap"):
+            size = obj.text_style.get("size", TEXT_STYLE_DEFAULTS["size"]) * factor
+            obj.text_style = normalized_text_style({**obj.text_style, "size": size})
 
         content = self.content_of(obj.id) if obj.type == "container" else None
         if content is not None:
@@ -786,6 +892,47 @@ class Scene:
             return False
 
         obj.include_subfolders = bool(include)
+        return True
+
+    def set_sort(self, object_id, sort_by=None, descending=None) -> bool:
+        """A browser or container's file order (SORT_KEYS), and its direction."""
+        obj = self.get(object_id)
+        if obj is None or obj.type not in MEDIA_FILTERS:
+            return False
+        sort_by = obj.sort_by if sort_by is None else sort_by
+        descending = obj.sort_descending if descending is None else bool(descending)
+        if sort_by not in SORT_KEYS:
+            return False
+        if (obj.sort_by, obj.sort_descending) == (sort_by, descending):
+            return False
+        obj.sort_by, obj.sort_descending = sort_by, descending
+        return True
+
+    def set_continue_play(self, container_id, on) -> bool:
+        obj = self.get(container_id)
+        if obj is None or obj.type != "container" or obj.continue_play == bool(on):
+            return False
+        obj.continue_play = bool(on)
+        return True
+
+    def set_new_first(self, container_id, on) -> bool:
+        obj = self.get(container_id)
+        if obj is None or obj.type != "container" or obj.new_first == bool(on):
+            return False
+        obj.new_first = bool(on)
+        return True
+
+    def set_favorite(self, container_id, path, on) -> bool:
+        """Mark (or unmark) a file as one of a container's favorites."""
+        obj = self.get(container_id)
+        if obj is None or obj.type != "container" or not path:
+            return False
+        if bool(on) == (path in obj.favorites):
+            return False
+        if on:
+            obj.favorites = obj.favorites + [path]
+        else:
+            obj.favorites = [p for p in obj.favorites if p != path]
         return True
 
     def set_media_filter(self, object_id, media_filter) -> bool:
@@ -854,7 +1001,7 @@ class Scene:
     # Containers
     # -------------------------------------------------
 
-    def _frame_content(self, container, content, aspect, mode=FIT_COVER):
+    def _frame_content(self, container, content, aspect, mode=FIT_CONTAIN):
         """Center content in the container at a fitted size, unrotated."""
         if aspect <= 0:
             aspect = FALLBACK_ASPECT
@@ -933,7 +1080,7 @@ class Scene:
         Returns (new_instance, released) where released is the previous
         content (now a free object) or None.
         """
-        container = self._container(container_id)
+        container = self._editable_container(container_id)
         if container is None:
             return None, None
 
@@ -959,7 +1106,7 @@ class Scene:
         the container's previous content (now free) or None.
         """
         media = self.get(media_id)
-        container = self._container(container_id)
+        container = self._editable_container(container_id)
 
         if (media is None or container is None or media.type != "media"
                 or media.parent_id is not None):
@@ -987,7 +1134,7 @@ class Scene:
         Turn a container's content back into a free media object,
         placed where it currently appears on the canvas (unclipped).
         """
-        container = self._container(container_id)
+        container = self._editable_container(container_id)
         content = self.content_of(container_id) if container else None
         if content is None:
             return None
@@ -1008,7 +1155,7 @@ class Scene:
 
     def remove_content(self, container_id) -> bool:
         content = self.content_of(container_id)
-        if content is None:
+        if content is None or self._editable_container(container_id) is None:
             return False
         self.objects = [o for o in self.objects if o.id != content.id]
         return True
@@ -1016,7 +1163,7 @@ class Scene:
     def set_content_geometry(self, container_id, x, y, width, height,
                              rotation) -> bool:
         content = self.content_of(container_id)
-        if content is None:
+        if content is None or self._editable_container(container_id) is None:
             return False
 
         new = (float(x), float(y), max(1.0, float(width)),
@@ -1035,7 +1182,7 @@ class Scene:
         Re-frame the content (Fit or Fill). The container remembers the
         mode, and frames new content (e.g. while browsing) the same way.
         """
-        container = self._container(container_id)
+        container = self._editable_container(container_id)
         if container is None or mode not in FIT_MODES:
             return False
 
@@ -1063,7 +1210,7 @@ class Scene:
         `folder`, or else the folder of the file it shows now; with
         neither, it stays off (returns False).
         """
-        container = self._container(container_id)
+        container = self._editable_container(container_id)
         if container is None:
             return False
 
@@ -1093,7 +1240,7 @@ class Scene:
         container.browse_subfolders = bool(include)
         return True
 
-    def show_file_in_container(self, container_id, source_id) -> bool:
+    def show_file_in_container(self, container_id, source_id, continuing=False) -> bool:
         """
         Show another file in a container (browsing): the content keeps
         its id and playback settings (volume, mute, loop, speed), takes
@@ -1101,8 +1248,13 @@ class Scene:
         container's Fit/Fill mode. A-B loop points belonged to the old
         file, so they're cleared. An empty container
         gets new content.
+
+        A locked container refuses, except for Continue Play
+        (continuing=True): it is part of how the container was set up.
         """
-        container = self._container(container_id)
+        container = self.get(container_id) if continuing else self._editable_container(container_id)
+        if container is not None and container.type != "container":
+            container = None
         source = self.sources.get(source_id)
         if container is None or source is None:
             return False
@@ -1157,7 +1309,7 @@ class Scene:
         Step 2: make the media the container's content, filling it
         exactly, so nothing visibly changes.
         """
-        container = self._container(container_id)
+        container = self._editable_container(container_id)
         media = self.get(media_id)
         if container is None or media is None or media.parent_id is not None:
             return False
@@ -1178,6 +1330,14 @@ class Scene:
         if container is not None:
             self.adopt_as_content(container.id, media_id)
         return container
+
+    def set_locked(self, container_id, locked) -> bool:
+        """Lock Container / Unlock Container."""
+        container = self._container(container_id)
+        if container is None or container.locked == bool(locked):
+            return False
+        container.locked = bool(locked)
+        return True
 
     def set_lock_content(self, container_id, locked) -> bool:
         container = self._container(container_id)
@@ -1201,6 +1361,9 @@ class Scene:
         obj = self.get(object_id)
         if obj is None:
             return ""
+
+        if obj.type == "audio" and obj.speech:
+            return speech_title(obj.speech)
 
         if obj.type in PLAYABLE_TYPES:
             return self.source_name(obj.source_id)

@@ -20,7 +20,7 @@ AUDIO_SOURCE_TYPES = {"video", "audio"}
 ROLE_NAMES = [
     "itemId", "ownerId", "name", "kind", "isTrack", "inContainer", "missing",
     "playing", "muted", "volume", "loop", "speed", "preservePitch",
-    "loopA", "loopB",
+    "loopA", "loopB", "browsing", "continuePlay", "ownerLocked", "isSpeech", "speech",
 ]
 ROLES = {name: int(Qt.UserRole) + 1 + i for i, name in enumerate(ROLE_NAMES)}
 
@@ -76,11 +76,15 @@ class AudioModel(QAbstractListModel):
             return None
 
         source = scene.sources.get(media.source_id)
+        # A browsing container's content shows Continue Play, not Loop.
+        owner = scene.get(media.parent_id) if media.parent_id else None
+        browsing = owner is not None and owner.browse_mode
         return {
             "itemId": media.id,
             "ownerId": media.parent_id or media.id,
-            "name": scene.source_name(media.source_id),
-            "kind": source.type if source else "video",
+            "name": scene.display_name(media.id) if media.speech
+                    else scene.source_name(media.source_id),
+            "kind": "speech" if media.speech else source.type if source else "video",
             "isTrack": media.type == "audio",
             "inContainer": media.parent_id is not None,
             "missing": bool(source and source.missing),
@@ -92,4 +96,9 @@ class AudioModel(QAbstractListModel):
             "preservePitch": media.preserve_pitch,
             "loopA": media.loop_a,
             "loopB": media.loop_b,
+            "browsing": browsing,
+            "continuePlay": browsing and owner.continue_play,
+            "ownerLocked": owner is not None and owner.locked,
+            "isSpeech": bool(media.speech),
+            "speech": media.speech,         # a speech track's source (no file)
         }[name]

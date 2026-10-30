@@ -4,6 +4,7 @@ Tests for folder scanning. No Qt required.
 Run from the project folder:  python -m unittest
 """
 
+import os
 import tempfile
 import unittest
 from pathlib import Path
@@ -52,10 +53,52 @@ class MediaBrowserTests(unittest.TestCase):
             "Japan/Kyoto/temple.png",   # subfolder after its parent's files
         ])
 
+    def test_favorites_filter_keeps_only_favorites(self):
+        paths = [e["path"] for e in self.browser.scan_folder(str(self.root), True)]
+        favorites = [paths[0], paths[3]]
+        found = self.browser.scan_folder(str(self.root), True, "favorites",
+                                         favorites=favorites)
+        self.assertEqual([e["path"] for e in found], favorites)
+        self.assertEqual(self.browser.scan_folder(str(self.root), True, "favorites"), [])
+
+    def test_entries_record_size(self):
+        (self.root / "top.jpg").write_bytes(b"12345")
+        sizes = {e["relpath"]: e["size"] for e in self.browser.scan_folder(str(self.root), True)}
+        self.assertEqual((sizes["top.jpg"], sizes["Beach/clip.mp4"]), (5, 0))
+
     def test_missing_folder_returns_empty(self):
         self.assertEqual(
             self.browser.scan_folder(str(self.root / "nope"), True), []
         )
+
+    def sorted_relpaths(self, sort_by, descending=False, seed=""):
+        return [e["relpath"] for e in
+                self.browser.scan_folder(str(self.root), True, "all", sort_by, descending, seed)]
+
+    def test_sort_by_name_descending_reverses(self):
+        self.assertEqual(self.sorted_relpaths("name", True), self.relpaths(True)[::-1])
+
+    def test_sort_by_date_modified(self):
+        # Oldest first: give each file a distinct time, against name order.
+        for i, rel in enumerate(["Japan/Kyoto/temple.png", "top.jpg", "Beach/clip.mp4",
+                                 "Japan/IMG_10.jpg", "Japan/IMG_2.jpg"]):
+            os.utime(self.root / rel, (1_000_000 + i, 1_000_000 + i))
+        self.assertEqual(self.sorted_relpaths("date"), [
+            "Japan/Kyoto/temple.png", "top.jpg", "Beach/clip.mp4",
+            "Japan/IMG_10.jpg", "Japan/IMG_2.jpg"])
+        self.assertEqual(self.sorted_relpaths("date", True)[0], "Japan/IMG_2.jpg")
+
+    def test_sort_by_type(self):
+        # Images (by extension, then name), then videos.
+        self.assertEqual(self.sorted_relpaths("type"), [
+            "top.jpg", "Japan/IMG_2.jpg", "Japan/IMG_10.jpg",
+            "Japan/Kyoto/temple.png", "Beach/clip.mp4"])
+
+    def test_random_order_is_fixed_by_seed(self):
+        first = self.sorted_relpaths("random", seed="container-a")
+        self.assertEqual(sorted(first), sorted(self.relpaths(True)))
+        self.assertEqual(self.sorted_relpaths("random", seed="container-a"), first)
+        self.assertEqual(self.sorted_relpaths("random", True, "container-a"), first)  # no direction
 
 
 def gif_bytes(frames):

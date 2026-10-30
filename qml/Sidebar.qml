@@ -6,7 +6,8 @@ import QtQuick.Layouts
 // tab on its right edge. (On the left so its tabs stay clear of the
 // Full Screen buttons in the top-right corner.) Tabs: Layers, Playback
 // (every video and audio track's sound and playback settings; readme
-// section 14), and Text (TextPanel.qml; readme section 5.4).
+// section 14), Speech (SpeechPanel.qml; readme section 14.6), and Text
+// (TextPanel.qml; readme section 5.4).
 // Overlays the canvas; hidden in Present mode (Main.qml).
 
 Item {
@@ -29,15 +30,22 @@ Item {
         }
     }
 
-    // Editing a text object (added, double-clicked, or Edit Text…): show
-    // the Text tab, ready to type. The object is selected by then.
+    // Editing a text object in the panel (Edit Text…): show the Text
+    // tab, ready to type. The object is selected by then.
     Connections {
         target: sidebar.sceneItem
         function onTextEditRequested(objectId) {
             sceneModel.select(objectId)
             sidebar.open = true
-            tabs.currentIndex = 2
+            tabs.currentIndex = 3
             Qt.callLater(textPanel.focusText)
+        }
+        // Typing on the canvas (added or double-clicked): the Text tab
+        // shows, but the canvas keeps the keyboard.
+        function onTextTypeRequested(objectId) {
+            sceneModel.select(objectId)
+            sidebar.open = true
+            tabs.currentIndex = 3
         }
     }
 
@@ -92,7 +100,7 @@ Item {
         }
 
         ToolTip.visible: handleArea.containsMouse
-        ToolTip.text: sidebar.open ? "Hide the panel" : "Layers, Playback, Text"
+        ToolTip.text: sidebar.open ? "Hide the panel" : "Layers, Playback, Speech, Text"
         ToolTip.delay: 500
     }
 
@@ -133,6 +141,7 @@ Item {
 
                 TabButton { text: "Layers"; objectName: "layersTab" }
                 TabButton { text: "Playback"; objectName: "playbackTab" }
+                TabButton { text: "Speech"; objectName: "speechTab" }
                 TabButton { text: "Text"; objectName: "textTab" }
             }
 
@@ -380,308 +389,434 @@ Item {
 
                 // ---- Playback ----
 
-                ListView {
-                    id: audioList
+                ColumnLayout {
+                    spacing: 0
 
-                    clip: true
-                    spacing: 1
-                    model: sceneModel.audioItems
+                    // Master volume: this window only (not saved).
+                    RowLayout {
+                        Layout.fillWidth: true
+                        Layout.margins: 6
+                        spacing: 6
 
-                    ScrollBar.vertical: ScrollBar {}
-
-                    delegate: Rectangle {
-                        id: card
-
-                        required property int index
-                        required property string itemId
-                        required property string ownerId
-                        required property string name
-                        required property string kind
-                        required property bool isTrack
-                        required property bool inContainer
-                        required property bool missing
-                        required property bool playing
-                        required property bool muted
-                        required property real volume
-                        required property bool loop
-                        required property real speed
-                        required property bool preservePitch
-                        required property real loopA
-                        required property real loopB
-
-                        // The player on the canvas, for position (A/B).
-                        readonly property var view: {
-                            var scene = sidebar.sceneItem
-                            if (!scene)
-                                return null
-                            scene.mediaViewsVersion        // re-evaluate on changes
-                            return scene.viewFor(itemId)
+                        Text {
+                            text: "Master"
+                            color: "#cccccc"
+                            font.pixelSize: 12
+                            font.bold: true
                         }
 
-                        readonly property bool isSelected: ownerId === sceneModel.selectedId
-
-                        width: ListView.view.width
-                        height: cardColumn.implicitHeight + 12
-
-                        color: isSelected ? "#2f4a66" : "#2c2c2c"
-
-                        // Clicking the card (not a control) selects the
-                        // video, or the container holding it.
-                        MouseArea {
-                            anchors.fill: parent
-                            onClicked: sceneModel.select(card.ownerId)
+                        Slider {
+                            objectName: "masterVolumeSlider"     // found by tests/app
+                            Layout.fillWidth: true
+                            from: 0
+                            to: 1
+                            stepSize: 0.05
+                            wheelEnabled: true
+                            value: sidebar.sceneItem ? sidebar.sceneItem.masterVolume : 1
+                            onMoved: sidebar.sceneItem.masterVolume = value
+                            ToolTip.visible: hovered
+                            ToolTip.text: "Volume of everything in this window (not saved)"
+                            ToolTip.delay: 600
                         }
 
-                        ColumnLayout {
-                            id: cardColumn
+                        Text {
+                            Layout.preferredWidth: 32
+                            text: Math.round((sidebar.sceneItem ? sidebar.sceneItem.masterVolume : 1) * 100) + "%"
+                            color: "#cccccc"
+                            font.pixelSize: 11
+                            horizontalAlignment: Text.AlignRight
+                            MouseArea {
+                                anchors.fill: parent
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: sidebar.sceneItem.masterVolume = 1
+                            }
+                        }
+                    }
 
-                            anchors.left: parent.left
-                            anchors.right: parent.right
-                            anchors.top: parent.top
-                            anchors.margins: 6
-                            spacing: 2
+                    Rectangle {
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: 1
+                        color: "#3a3a3a"
+                    }
 
-                            // ---- Name and position ----
-                            RowLayout {
-                                Layout.fillWidth: true
-                                spacing: 6
+                    ListView {
+                        id: audioList
 
-                                Rectangle {
-                                    Layout.preferredWidth: 38
-                                    Layout.preferredHeight: 16
-                                    radius: 3
-                                    color: card.kind === "audio" ? "#9a7a3a" : "#7a4a9a"
+                        Layout.fillWidth: true
+                        Layout.fillHeight: true
+                        clip: true
+                        spacing: 1
+                        model: sceneModel.audioItems
+
+                        ScrollBar.vertical: ScrollBar {}
+
+                        delegate: Rectangle {
+                            id: card
+
+                            required property int index
+                            required property string itemId
+                            required property string ownerId
+                            required property string name
+                            required property string kind
+                            required property bool isTrack
+                            required property bool inContainer
+                            required property bool missing
+                            required property bool playing
+                            required property bool muted
+                            required property real volume
+                            required property bool loop
+                            required property real speed
+                            required property bool preservePitch
+                            required property real loopA
+                            required property real loopB
+                            required property bool browsing        // in a browsing container
+                            required property bool continuePlay
+                            required property bool ownerLocked
+                            required property bool isSpeech         // made in the Speech tab
+                            required property var speech
+
+                            // A speech track's clip: "" (ready, or not asked
+                            // for yet), "Making…", or why it can't be made.
+                            readonly property string speechStatus: {
+                                speechEngine.clipsVersion
+                                return isSpeech ? speechEngine.clipStatus(speech) : ""
+                            }
+
+                            // The player on the canvas, for position (A/B).
+                            readonly property var view: {
+                                var scene = sidebar.sceneItem
+                                if (!scene)
+                                    return null
+                                scene.mediaViewsVersion        // re-evaluate on changes
+                                return scene.viewFor(itemId)
+                            }
+
+                            readonly property bool isSelected: ownerId === sceneModel.selectedId
+
+                            width: ListView.view.width
+                            height: cardColumn.implicitHeight + 12
+
+                            color: isSelected ? "#2f4a66" : "#2c2c2c"
+
+                            // Clicking the card (not a control) selects the
+                            // video, or the container holding it.
+                            MouseArea {
+                                anchors.fill: parent
+                                onClicked: sceneModel.select(card.ownerId)
+                            }
+
+                            ColumnLayout {
+                                id: cardColumn
+
+                                anchors.left: parent.left
+                                anchors.right: parent.right
+                                anchors.top: parent.top
+                                anchors.margins: 6
+                                spacing: 2
+
+                                // ---- Name and position ----
+                                RowLayout {
+                                    Layout.fillWidth: true
+                                    spacing: 6
+
+                                    Rectangle {
+                                        Layout.preferredWidth: 38
+                                        Layout.preferredHeight: 16
+                                        radius: 3
+                                        color: card.kind === "audio" ? "#9a7a3a"
+                                               : card.kind === "speech" ? "#3a7a8a" : "#7a4a9a"
+                                        Text {
+                                            anchors.centerIn: parent
+                                            text: card.kind
+                                            color: "#ffffff"
+                                            font.pixelSize: 10
+                                        }
+                                    }
+
                                     Text {
-                                        anchors.centerIn: parent
-                                        text: card.kind
-                                        color: "#ffffff"
-                                        font.pixelSize: 10
+                                        Layout.fillWidth: true
+                                        text: card.name + (card.inContainer ? "  (in container)" : "")
+                                              + (card.isTrack && card.kind === "video" ? "  (audio only)" : "")
+                                              + (card.missing ? "  — missing" : "")
+                                        color: card.missing ? "#e08080" : "#eeeeee"
+                                        font.pixelSize: 12
+                                        elide: Text.ElideMiddle
+                                    }
+
+                                    Text {
+                                        visible: card.view !== null && card.view.duration > 0
+                                        text: card.view
+                                              ? sidebar.formatMs(card.view.position) + " / "
+                                                + sidebar.formatMs(card.view.duration)
+                                              : ""
+                                        color: "#aaaaaa"
+                                        font.pixelSize: 11
+                                    }
+
+                                    Button {
+                                        Layout.preferredHeight: 22
+                                        visible: card.missing
+                                        text: "Locate…"
+                                        onClicked: sceneModel.locateMissing(card.itemId)
+                                    }
+
+                                    // A speech track: its words and settings
+                                    // back in the Speech tab, to change.
+                                    Button {
+                                        objectName: "editSpeechButton"
+                                        Layout.preferredHeight: 22
+                                        visible: card.isSpeech
+                                        text: "Edit…"
+                                        onClicked: {
+                                            tabs.currentIndex = 2
+                                            speechPanel.edit(card.itemId)
+                                        }
+                                        ToolTip.visible: hovered
+                                        ToolTip.text: "Change the words or voice in the Speech tab"
+                                        ToolTip.delay: 500
+                                    }
+
+                                    // Tracks have no canvas item, so they're
+                                    // removed here (undoable).
+                                    Button {
+                                        Layout.preferredHeight: 22
+                                        Layout.preferredWidth: 26
+                                        visible: card.isTrack
+                                        text: "✕"
+                                        onClicked: sceneModel.removeObject(card.itemId)
+                                        ToolTip.visible: hovered
+                                        ToolTip.text: "Remove this audio track"
+                                        ToolTip.delay: 500
                                     }
                                 }
 
                                 Text {
+                                    objectName: "speechTrackStatus"
                                     Layout.fillWidth: true
-                                    text: card.name + (card.inContainer ? "  (in container)" : "")
-                                          + (card.isTrack && card.kind === "video" ? "  (audio only)" : "")
-                                          + (card.missing ? "  — missing" : "")
-                                    color: card.missing ? "#e08080" : "#eeeeee"
-                                    font.pixelSize: 12
-                                    elide: Text.ElideMiddle
-                                }
-
-                                Text {
-                                    visible: card.view !== null && card.view.duration > 0
-                                    text: card.view
-                                          ? sidebar.formatMs(card.view.position) + " / "
-                                            + sidebar.formatMs(card.view.duration)
-                                          : ""
-                                    color: "#aaaaaa"
+                                    visible: card.speechStatus !== ""
+                                    text: card.speechStatus
+                                    color: card.speechStatus === "Making…" ? "#aaaaaa" : "#e08080"
                                     font.pixelSize: 11
+                                    wrapMode: Text.WordWrap
                                 }
 
-                                Button {
-                                    Layout.preferredHeight: 22
-                                    visible: card.missing
-                                    text: "Locate…"
-                                    onClicked: sceneModel.locateMissing(card.itemId)
-                                }
-
-                                // Tracks have no canvas item, so they're
-                                // removed here (undoable).
-                                Button {
-                                    Layout.preferredHeight: 22
-                                    Layout.preferredWidth: 26
-                                    visible: card.isTrack
-                                    text: "✕"
-                                    onClicked: sceneModel.removeObject(card.itemId)
-                                    ToolTip.visible: hovered
-                                    ToolTip.text: "Remove this audio track"
-                                    ToolTip.delay: 500
-                                }
-                            }
-
-                            // ---- Play, mute, volume ----
-                            RowLayout {
-                                Layout.fillWidth: true
-                                spacing: 4
-
-                                Button {
-                                    Layout.preferredHeight: 24
-                                    Layout.preferredWidth: 52
-                                    text: card.playing ? "Pause" : "Play"
-                                    onClicked: sceneModel.setPlaying(card.itemId, !card.playing)
-                                }
-
-                                Button {
-                                    Layout.preferredHeight: 24
-                                    Layout.preferredWidth: 60
-                                    text: card.muted ? "Unmute" : "Mute"
-                                    onClicked: sceneModel.setMuted(card.itemId, !card.muted)
-                                }
-
-                                // The mouse wheel over the slider changes the volume.
-                                Slider {
+                                // ---- Play, mute, volume ----
+                                RowLayout {
                                     Layout.fillWidth: true
-                                    from: 0
-                                    to: 1
-                                    value: card.volume
-                                    wheelEnabled: true
-                                    stepSize: 0.05
-                                    opacity: card.muted ? 0.5 : 1
-                                    onMoved: sceneModel.setVolume(card.itemId, value)
+                                    spacing: 4
+
+                                    Button {
+                                        Layout.preferredHeight: 24
+                                        Layout.preferredWidth: 52
+                                        text: card.playing ? "Pause" : "Play"
+                                        onClicked: sceneModel.setPlaying(card.itemId, !card.playing)
+                                    }
+
+                                    Button {
+                                        Layout.preferredHeight: 24
+                                        Layout.preferredWidth: 60
+                                        text: card.muted ? "Unmute" : "Mute"
+                                        onClicked: sceneModel.setMuted(card.itemId, !card.muted)
+                                    }
+
+                                    // The mouse wheel over the slider changes the volume.
+                                    Slider {
+                                        Layout.fillWidth: true
+                                        from: 0
+                                        to: 1
+                                        value: card.volume
+                                        wheelEnabled: true
+                                        stepSize: 0.05
+                                        opacity: card.muted ? 0.5 : 1
+                                        onMoved: sceneModel.setVolume(card.itemId, value)
+                                    }
+
+                                    Text {
+                                        Layout.preferredWidth: 32
+                                        text: Math.round(card.volume * 100) + "%"
+                                        color: "#cccccc"
+                                        font.pixelSize: 11
+                                        horizontalAlignment: Text.AlignRight
+                                    }
                                 }
 
-                                Text {
-                                    Layout.preferredWidth: 32
-                                    text: Math.round(card.volume * 100) + "%"
-                                    color: "#cccccc"
-                                    font.pixelSize: 11
-                                    horizontalAlignment: Text.AlignRight
-                                }
-                            }
-
-                            // ---- Speed and pitch ----
-                            RowLayout {
-                                Layout.fillWidth: true
-                                spacing: 4
-
-                                Text {
-                                    text: "Speed"
-                                    color: "#cccccc"
-                                    font.pixelSize: 11
-                                }
-
-                                // Log scale over the range set in Settings
-                                // (default 0.5x .. 3x).
-                                Slider {
-                                    objectName: "speedSlider"
+                                // ---- Speed and pitch ----
+                                RowLayout {
                                     Layout.fillWidth: true
-                                    from: Math.log2(appSettings.speedMin)
-                                    to: Math.log2(appSettings.speedMax)
-                                    value: Math.log2(card.speed)
-                                    onMoved: {
-                                        var v = Math.abs(value) < 0.05 ? 0 : value  // snap to 1x
-                                        sceneModel.setSpeed(card.itemId, Math.pow(2, v))
+                                    spacing: 4
+
+                                    Text {
+                                        text: "Speed"
+                                        color: "#cccccc"
+                                        font.pixelSize: 11
+                                    }
+
+                                    // Log scale over the range set in Settings
+                                    // (default 0.5x .. 3x).
+                                    Slider {
+                                        objectName: "speedSlider"
+                                        Layout.fillWidth: true
+                                        from: Math.log2(appSettings.speedMin)
+                                        to: Math.log2(appSettings.speedMax)
+                                        value: Math.log2(card.speed)
+                                        onMoved: {
+                                            var v = Math.abs(value) < 0.05 ? 0 : value  // snap to 1x
+                                            sceneModel.setSpeed(card.itemId, Math.pow(2, v))
+                                        }
+                                    }
+
+                                    Text {
+                                        Layout.preferredWidth: 38
+                                        text: card.speed.toFixed(2) + "×"
+                                        color: card.speed === 1 ? "#cccccc" : "#e0c060"
+                                        font.pixelSize: 11
+                                        horizontalAlignment: Text.AlignRight
+
+                                        // Double-click resets to normal speed.
+                                        MouseArea {
+                                            anchors.fill: parent
+                                            onDoubleClicked: sceneModel.setSpeed(card.itemId, 1.0)
+                                        }
+                                    }
+
+                                    CheckBox {
+                                        checked: card.preservePitch
+                                        onToggled: {
+                                            sceneModel.setPreservePitch(card.itemId, checked)
+                                            checked = Qt.binding(function() { return card.preservePitch })
+                                        }
+                                    }
+
+                                    Text {
+                                        text: "Keep pitch"
+                                        color: "#cccccc"
+                                        font.pixelSize: 11
+                                        TapHandler {
+                                            onTapped: sceneModel.setPreservePitch(card.itemId, !card.preservePitch)
+                                        }
                                     }
                                 }
 
-                                Text {
-                                    Layout.preferredWidth: 38
-                                    text: card.speed.toFixed(2) + "×"
-                                    color: card.speed === 1 ? "#cccccc" : "#e0c060"
-                                    font.pixelSize: 11
-                                    horizontalAlignment: Text.AlignRight
-
-                                    // Double-click resets to normal speed.
-                                    MouseArea {
-                                        anchors.fill: parent
-                                        onDoubleClicked: sceneModel.setSpeed(card.itemId, 1.0)
-                                    }
-                                }
-
-                                CheckBox {
-                                    checked: card.preservePitch
-                                    onToggled: {
-                                        sceneModel.setPreservePitch(card.itemId, checked)
-                                        checked = Qt.binding(function() { return card.preservePitch })
-                                    }
-                                }
-
-                                Text {
-                                    text: "Keep pitch"
-                                    color: "#cccccc"
-                                    font.pixelSize: 11
-                                    TapHandler {
-                                        onTapped: sceneModel.setPreservePitch(card.itemId, !card.preservePitch)
-                                    }
-                                }
-                            }
-
-                            // ---- Loop and A-B ----
-                            RowLayout {
-                                Layout.fillWidth: true
-                                spacing: 4
-
-                                CheckBox {
-                                    checked: card.loop
-                                    onToggled: {
-                                        sceneModel.setLoop(card.itemId, checked)
-                                        checked = Qt.binding(function() { return card.loop })
-                                    }
-                                }
-
-                                Text {
-                                    text: "Loop"
-                                    color: "#cccccc"
-                                    font.pixelSize: 11
-                                    TapHandler {
-                                        onTapped: sceneModel.setLoop(card.itemId, !card.loop)
-                                    }
-                                }
-
-                                Item { Layout.preferredWidth: 6 }
-
-                                Button {
-                                    Layout.preferredHeight: 24
-                                    Layout.preferredWidth: 30
-                                    text: "A"
-                                    enabled: card.view !== null
-                                    onClicked: sceneModel.setLoopA(card.itemId, card.view.position)
-                                    ToolTip.visible: hovered
-                                    ToolTip.text: "Set loop start here"
-                                    ToolTip.delay: 500
-                                }
-
-                                Button {
-                                    Layout.preferredHeight: 24
-                                    Layout.preferredWidth: 30
-                                    text: "B"
-                                    enabled: card.view !== null
-                                    onClicked: sceneModel.setLoopB(card.itemId, card.view.position)
-                                    ToolTip.visible: hovered
-                                    ToolTip.text: "Set loop end here"
-                                    ToolTip.delay: 500
-                                }
-
-                                Text {
+                                // ---- Loop (or Continue Play) and A-B ----
+                                // A browsing container's content has
+                                // Continue Play instead: off, it loops.
+                                RowLayout {
                                     Layout.fillWidth: true
-                                    text: {
-                                        if (card.loopA < 0 && card.loopB < 0)
-                                            return ""
-                                        return (card.loopA >= 0 ? sidebar.formatMsPrecise(card.loopA) : "–")
-                                               + " → "
-                                               + (card.loopB >= 0 ? sidebar.formatMsPrecise(card.loopB) : "–")
-                                    }
-                                    color: "#e0a84c"
-                                    font.pixelSize: 11
-                                    elide: Text.ElideRight
-                                }
+                                    spacing: 4
 
-                                Button {
-                                    Layout.preferredHeight: 24
-                                    Layout.preferredWidth: 30
-                                    text: "✕"
-                                    visible: card.loopA >= 0 || card.loopB >= 0
-                                    onClicked: sceneModel.clearLoop(card.itemId)
-                                    ToolTip.visible: hovered
-                                    ToolTip.text: "Clear the A–B loop"
-                                    ToolTip.delay: 500
+                                    CheckBox {
+                                        visible: !card.browsing
+                                        checked: card.loop
+                                        onToggled: {
+                                            sceneModel.setLoop(card.itemId, checked)
+                                            checked = Qt.binding(function() { return card.loop })
+                                        }
+                                    }
+
+                                    Text {
+                                        visible: !card.browsing
+                                        text: "Loop"
+                                        color: "#cccccc"
+                                        font.pixelSize: 11
+                                        TapHandler {
+                                            onTapped: sceneModel.setLoop(card.itemId, !card.loop)
+                                        }
+                                    }
+
+                                    CheckBox {
+                                        visible: card.browsing
+                                        enabled: !card.ownerLocked
+                                        checked: card.continuePlay
+                                        onToggled: {
+                                            sceneModel.setContinuePlay(card.ownerId, checked)
+                                            checked = Qt.binding(function() { return card.continuePlay })
+                                        }
+                                    }
+
+                                    Text {
+                                        visible: card.browsing
+                                        text: "Continue Play"
+                                        color: card.ownerLocked ? "#777777" : "#cccccc"
+                                        font.pixelSize: 11
+                                        TapHandler {
+                                            enabled: !card.ownerLocked
+                                            onTapped: sceneModel.setContinuePlay(card.ownerId, !card.continuePlay)
+                                        }
+                                    }
+
+                                    Item { Layout.preferredWidth: 6 }
+
+                                    Button {
+                                        Layout.preferredHeight: 24
+                                        Layout.preferredWidth: 30
+                                        text: "A"
+                                        enabled: card.view !== null
+                                        onClicked: sceneModel.setLoopA(card.itemId, card.view.position)
+                                        ToolTip.visible: hovered
+                                        ToolTip.text: "Set loop start here"
+                                        ToolTip.delay: 500
+                                    }
+
+                                    Button {
+                                        Layout.preferredHeight: 24
+                                        Layout.preferredWidth: 30
+                                        text: "B"
+                                        enabled: card.view !== null
+                                        onClicked: sceneModel.setLoopB(card.itemId, card.view.position)
+                                        ToolTip.visible: hovered
+                                        ToolTip.text: "Set loop end here"
+                                        ToolTip.delay: 500
+                                    }
+
+                                    Text {
+                                        Layout.fillWidth: true
+                                        text: {
+                                            if (card.loopA < 0 && card.loopB < 0)
+                                                return ""
+                                            return (card.loopA >= 0 ? sidebar.formatMsPrecise(card.loopA) : "–")
+                                                   + " → "
+                                                   + (card.loopB >= 0 ? sidebar.formatMsPrecise(card.loopB) : "–")
+                                        }
+                                        color: "#e0a84c"
+                                        font.pixelSize: 11
+                                        elide: Text.ElideRight
+                                    }
+
+                                    Button {
+                                        Layout.preferredHeight: 24
+                                        Layout.preferredWidth: 30
+                                        text: "✕"
+                                        visible: card.loopA >= 0 || card.loopB >= 0
+                                        onClicked: sceneModel.clearLoop(card.itemId)
+                                        ToolTip.visible: hovered
+                                        ToolTip.text: "Clear the A–B loop"
+                                        ToolTip.delay: 500
+                                    }
                                 }
                             }
                         }
-                    }
 
-                    Text {
-                        anchors.centerIn: parent
-                        width: parent.width - 32
-                        visible: audioList.count === 0
-                        text: "No videos or audio tracks yet.\n\nDouble-click an audio file in a "
-                              + "Browser (or use Add to Audio) to add a track."
-                        color: "#888888"
-                        font.pixelSize: 12
-                        wrapMode: Text.WordWrap
-                        horizontalAlignment: Text.AlignHCenter
+                        Text {
+                            anchors.centerIn: parent
+                            width: parent.width - 32
+                            visible: audioList.count === 0
+                            text: "No videos or audio tracks yet.\n\nDouble-click an audio file in a "
+                                  + "Browser (or use Add to Audio) to add a track."
+                            color: "#888888"
+                            font.pixelSize: 12
+                            wrapMode: Text.WordWrap
+                            horizontalAlignment: Text.AlignHCenter
+                        }
                     }
+                }
+
+                // ---- Speech ----
+
+                SpeechPanel {
+                    id: speechPanel
+                    objectName: "speechPanel"           // found by tests/app
+                    sceneItem: sidebar.sceneItem
+                    actions: sidebar.actions
                 }
 
                 // ---- Text ----
