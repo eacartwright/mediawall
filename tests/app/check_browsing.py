@@ -321,7 +321,7 @@ OTHER = OUT / "other folder"
 OTHER.mkdir(parents=True, exist_ok=True)
 shutil.copy(media(GIF), OTHER / GIF)
 
-c.run(scene, [(1500, step_controls), (1150, step_hold), (1150, step_hold_key), (600, step_hold_key2), (1200, step_hold_tilt), (1300, step_pan_and_move), (1300, step_undo_and_reset),
+c.run(scene, [(1500, step_controls), (1500, step_hold), (1150, step_hold_key), (600, step_hold_key2), (1200, step_hold_tilt), (1300, step_pan_and_move), (1300, step_undo_and_reset),
               (1300, step_after_reset), (1800, step_autoplay), (1500, step_autoplay2),
               (1800, step_autoplay3), (1500, step_empty), (1500, step_present),
               (1300, step_present2), (1300, step_end), (1300, step_other_folder),
