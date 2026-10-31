@@ -677,11 +677,10 @@ Dialog {
                     wrapMode: Text.WordWrap
                     textFormat: Text.StyledText
                     color: "#999999"
-                    text: "<b>New in 0.9.12</b><br>"
-                          + "• Snapping: move and resize to the wall's edges and to other objects (hold Ctrl to skip)<br>"
-                          + "• Text animations: Wiggle, Pulse, Glow pulse, Gradient shift, Color cycle<br>"
-                          + "• Settings > Performance: hardware decoding, image size limit, and the Media Memory window<br>"
-                          + "• The app is now called Mediawall"
+                    text: "<b>New in 0.9.13</b><br>"
+                          + "• Animated GIFs and WebPs use far less memory<br>"
+                          + "• Memory is given back after New and Open<br>"
+                          + "• Log window: Pause and Export"
                 }
 
                 // The Log window: everything the app would print to a
