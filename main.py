@@ -18,6 +18,7 @@ from bridge.app_settings import AppSettings, apply_hw_decoding
 from bridge.key_release import KeyReleaseWatcher
 from bridge.log_capture import LogCapture
 from bridge.media_memory import MediaMemory
+from bridge.memory_release import MemoryRelease
 from bridge.project_controller import ProjectController
 from bridge.scene_model import SceneModel
 from bridge.speech import SpeechEngine
@@ -166,6 +167,9 @@ def main():
 
     if not engine.rootObjects():
         sys.exit(1)
+
+    # Give memory back after New / Open (bridge/memory_release.py).
+    memory_release = MemoryRelease(engine, scene_model)
 
     # Optional: open a project given on the command line,
     # e.g.  python main.py ~/walls/japan.mediawall

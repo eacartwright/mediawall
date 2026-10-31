@@ -15,6 +15,9 @@ ApplicationWindow {
 
     color: "#1e1e1e"
 
+    // Pause is for reading while the window is open.
+    onClosing: appLog.paused = false
+
     ListView {
         id: lines
 
@@ -68,9 +71,51 @@ ApplicationWindow {
             spacing: 6
 
             Label {
+                id: statusLabel
+                objectName: "logStatus"
+
                 Layout.fillWidth: true
-                text: lines.count + " lines · also saved to logs/mediawall.log"
-                color: "#999999"
+                elide: Text.ElideMiddle
+                text: exportedTo !== "" ? "Exported to " + exportedTo
+                      : appLog.paused ? "Paused · " + appLog.heldCount + " new lines held back"
+                      : lines.count + " lines · also saved to logs/mediawall.log"
+                color: appLog.paused && exportedTo === "" ? "#e0c060" : "#999999"
+
+                // The last export's path, shown for a few seconds.
+                property string exportedTo: ""
+
+                Timer {
+                    id: exportedTimer
+                    interval: 4000
+                    onTriggered: statusLabel.exportedTo = ""
+                }
+
+                function showExported(path) {
+                    exportedTo = path
+                    exportedTimer.restart()
+                }
+            }
+
+            // Holds new lines back so the view stays still (they are
+            // still captured, and written to the log file).
+            Button {
+                objectName: "logPauseButton"
+                text: appLog.paused ? "Resume" : "Pause"
+                onClicked: {
+                    if (appLog.paused)
+                        lines.follow = true     // show the held lines
+                    appLog.paused = !appLog.paused
+                }
+            }
+
+            Button {
+                objectName: "logExportButton"
+                text: "Export…"
+                onClicked: {
+                    var path = appLog.exportLog()
+                    if (path !== "")
+                        statusLabel.showExported(path)
+                }
             }
 
             Button {

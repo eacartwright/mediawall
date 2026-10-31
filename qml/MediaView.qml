@@ -204,6 +204,12 @@ Item {
             smooth: true
             mipmap: true            // calmer GIF dither patterns when scaled down
 
+            // Decode each frame as it's shown. With the cache on (Qt's
+            // default), every frame stays in memory as its own image and
+            // texture, per instance: a 111-frame 600x326 GIF grew to
+            // ~100 MB each, and climbed until every frame had played.
+            cache: false
+
             playing: view.playing
             speed: view.speed
 

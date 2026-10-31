@@ -227,6 +227,10 @@ class SceneModel(QAbstractListModel):
     # A project (opened, or New) brought its own Speech tab contents.
     speechDraftChanged = Signal()
 
+    # The whole scene was replaced (New, Open): bridge/memory_release.py
+    # gives the old wall's memory back.
+    sceneReplaced = Signal()
+
     # A container is about to browse a newly chosen folder: it should
     # move to that folder's first file unless it already shows one.
     browseFolderChosen = Signal(str)
@@ -398,6 +402,7 @@ class SceneModel(QAbstractListModel):
         self._current = snapshot(self._scene)
         self.historyChanged.emit()
         self.speechDraftChanged.emit()
+        self.sceneReplaced.emit()
 
         self.countChanged.emit()
         self.selectedIdChanged.emit()
