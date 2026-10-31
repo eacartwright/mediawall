@@ -21,10 +21,12 @@ import io
 import os
 import sys
 import threading
+import time
 import traceback
 from pathlib import Path
 
 from PySide6.QtCore import (
+    Property,
     QObject,
     QStringListModel,
     QtMsgType,
@@ -32,6 +34,7 @@ from PySide6.QtCore import (
     Slot,
     qInstallMessageHandler,
 )
+from PySide6.QtWidgets import QFileDialog, QMessageBox
 
 
 MAX_LINES = 5000
@@ -46,15 +49,33 @@ _QT_LEVELS = {
 
 
 class LogModel(QStringListModel):
-    """The captured lines, newest last, for the Log window."""
+    """
+    The captured lines, newest last, for the Log window.
+
+    While paused, new lines are held back instead of shown, so the view
+    stays still. Capture itself never stops (the log file and lineAdded's
+    other listeners get every line), and resuming shows the held lines.
+    """
 
     lineAdded = Signal(str)
+    pausedChanged = Signal()
+    heldCountChanged = Signal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
+        self._paused = False
+        self._held = []
+        self._export_dir = str(Path.home())
         self.lineAdded.connect(self._append)
 
     def _append(self, line):
+        if self._paused:
+            self._held.append(line)
+            if len(self._held) > MAX_LINES:
+                del self._held[0]
+            self.heldCountChanged.emit()
+            return
+
         row = self.rowCount()
         self.insertRows(row, 1)
         self.setData(self.index(row), line)
@@ -63,13 +84,68 @@ class LogModel(QStringListModel):
         if extra > 0:
             self.removeRows(0, extra)
 
+    # ---- Pause ----
+
+    def _get_paused(self):
+        return self._paused
+
+    def _set_paused(self, paused):
+        if paused == self._paused:
+            return
+        self._paused = paused
+        if not paused and self._held:
+            self.setStringList(self._lines()[-MAX_LINES:])
+            self._held = []
+            self.heldCountChanged.emit()
+        self.pausedChanged.emit()
+
+    paused = Property(bool, _get_paused, _set_paused, notify=pausedChanged)
+
+    def _get_held_count(self):
+        return len(self._held)
+
+    # Lines captured while paused, not shown yet.
+    heldCount = Property(int, _get_held_count, notify=heldCountChanged)
+
+    # ---- Copy, export, clear ----
+
+    def _lines(self):
+        """Every line since the last Clear, held ones included."""
+        return self.stringList() + self._held
+
     @Slot(result=str)
     def allText(self):
-        return "\n".join(self.stringList())
+        return "\n".join(self._lines())
+
+    @Slot(str, result=bool)
+    def saveTo(self, path):
+        """Write the lines (as allText) to a text file."""
+        try:
+            with open(path, "w", encoding="utf-8") as f:
+                f.write(self.allText() + "\n")
+        except OSError as exc:
+            QMessageBox.warning(None, "Couldn't Export Log", str(exc))
+            return False
+        return True
+
+    @Slot(result=str)
+    def exportLog(self):
+        """Ask where to save, then save. Returns the path, or ""."""
+        name = time.strftime("mediawall-log-%Y%m%d-%H%M%S.txt")
+        path, _ = QFileDialog.getSaveFileName(
+            None, "Export Log", str(Path(self._export_dir) / name),
+            "Text Files (*.txt *.log);;All Files (*)")
+        if not path or not self.saveTo(path):
+            return ""
+        self._export_dir = str(Path(path).parent)
+        return path
 
     @Slot()
     def clear(self):
         self.setStringList([])
+        if self._held:
+            self._held = []
+            self.heldCountChanged.emit()
 
 
 class LogCapture(QObject):
