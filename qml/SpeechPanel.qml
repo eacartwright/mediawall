@@ -28,6 +28,8 @@ ScrollView {
     property string missingVoice: ""
 
     contentWidth: availableWidth
+    // The scroll bar is drawn over the content: keep it clear when shown.
+    rightPadding: ScrollBar.vertical.visible ? ScrollBar.vertical.width : 0
 
     // The words and settings as they are now (a speech dict).
     function current() {

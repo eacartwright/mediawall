@@ -456,6 +456,34 @@ Menu {
         onTriggered: menu.target.adjusting = true
     }
 
+    // ---- Mirror (the picture: a free image/video, or a container's).
+    // Near the top of the menu, so it's close to the pointer. ----
+
+    MenuItem {
+        id: mirrorItem
+
+        text: "Flip Horizontally"
+        enabled: !menu.targetLocked
+
+        checkable: true
+        checked: menu.target !== null && menu.target.mediaMirrored === true
+
+        visible: menu.isFreeMedia || menu.containerHasContent
+        height: visible ? implicitHeight : 0
+
+        onTriggered: {
+            sceneModel.setMirrored(menu.target.playbackId, !menu.target.mediaMirrored)
+            mirrorItem.checked = Qt.binding(function() {
+                return menu.target !== null && menu.target.mediaMirrored === true
+            })
+        }
+    }
+
+    MenuSeparator {
+        visible: menu.isFreeMedia
+        height: visible ? implicitHeight : 0
+    }
+
     MenuItem {
         text: "Fit Content (show whole image)"
         enabled: !menu.targetLocked
@@ -559,7 +587,7 @@ Menu {
         model: [
             { text: "Show All Media", value: "all" },
             { text: "Show Images Only", value: "image" },
-            { text: "Show Animated Only", value: "animated" },
+            { text: "Show Animated and Videos", value: "animated" },
             { text: "Show Videos Only", value: "video" },
             { text: "Show Audio Only", value: "audio" },
             { text: "Show Favorites Only", value: "favorites" },
@@ -632,28 +660,6 @@ Menu {
         height: visible ? implicitHeight : 0
     }
 
-
-    // ---- Mirror (the picture: a free image/video, or a container's) ----
-
-    MenuItem {
-        id: mirrorItem
-
-        text: "Flip Horizontally"
-        enabled: !menu.targetLocked
-
-        checkable: true
-        checked: menu.target !== null && menu.target.mediaMirrored === true
-
-        visible: menu.isFreeMedia || menu.containerHasContent
-        height: visible ? implicitHeight : 0
-
-        onTriggered: {
-            sceneModel.setMirrored(menu.target.playbackId, !menu.target.mediaMirrored)
-            mirrorItem.checked = Qt.binding(function() {
-                return menu.target !== null && menu.target.mediaMirrored === true
-            })
-        }
-    }
 
     // ---- Rotation (also: double-click the orange knob) ----
 

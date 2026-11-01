@@ -18,6 +18,8 @@ ScrollView {
     property var actions
 
     contentWidth: availableWidth
+    // The scroll bar is drawn over the content: keep it clear when shown.
+    rightPadding: ScrollBar.vertical.visible ? ScrollBar.vertical.width : 0
 
     // The selected text object's canvas item, or null. (layers changes
     // with every change, so this never holds on to a replaced item.)
@@ -137,6 +139,32 @@ ScrollView {
                 placeholderText: "Type the text"
                 text: panel.target ? panel.target.objText : ""
                 onTextEdited: sceneModel.setText(panel.targetId, text)
+
+                // The wheel moves the cursor along a line too long for the
+                // field (3 letters a notch), so any spot is easy to reach.
+                // When the words fit, the wheel scrolls the panel.
+                MouseArea {
+                    objectName: "textFieldWheel"        // found by tests/app
+                    anchors.fill: parent
+                    acceptedButtons: Qt.NoButton        // clicks go to the field
+                    cursorShape: Qt.IBeamCursor
+                    property real rest: 0               // part of a step (touchpads)
+                    onWheel: (wheel) => {
+                        var field = textField
+                        if (field.contentWidth <= field.width - field.leftPadding - field.rightPadding) {
+                            wheel.accepted = false
+                            return
+                        }
+                        var delta = wheel.angleDelta.y !== 0 ? -wheel.angleDelta.y : wheel.angleDelta.x
+                        rest += delta / 40
+                        var steps = rest < 0 ? Math.ceil(rest) : Math.floor(rest)
+                        rest -= steps
+                        if (steps === 0)
+                            return
+                        field.forceActiveFocus()
+                        field.cursorPosition = Math.max(0, Math.min(field.length, field.cursorPosition + steps))
+                    }
+                }
             }
 
             // ---- Presets ----
@@ -400,7 +428,10 @@ ScrollView {
                         text: modelData.text
                         checkable: true
                         checked: panel.style.align === modelData.value
-                        implicitWidth: 52
+                        // Narrower if needed, so the row fits the panel.
+                        Layout.fillWidth: true
+                        Layout.maximumWidth: 52
+                        Layout.minimumWidth: 30
                         onClicked: {
                             panel.set({ align: modelData.value })
                             checked = Qt.binding(function() { return panel.style.align === modelData.value })

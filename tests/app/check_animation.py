@@ -4,7 +4,7 @@ in a container, and in Present), the Speed submenu's setting reaching
 the animation, and the Animated Only filter.
 """
 
-from harness import GIF, MEDIA, PHOTO, Check, Qt, media
+from harness import GIF, MEDIA, PHOTO, VIDEO, Check, Qt, media
 from core.media_browser import MediaBrowser
 from core.scene import Scene
 
@@ -77,8 +77,8 @@ def step_present2():
     c.check("Present: double-click restarts it and stays in Present",
             c.win.property("presenting") and c.js(anim(free.id) + ".currentFrame") < 40)
     names = [e["name"] for e in MediaBrowser().scan_folder(str(MEDIA), True, "animated")]
-    c.check("Animated Only lists the GIF and no stills",
-            GIF in names and PHOTO not in names, str(names))
+    c.check("Animated and Videos lists the GIF and the video, and no stills",
+            GIF in names and VIDEO in names and PHOTO not in names, str(names))
     c.finish()
 
 

@@ -131,6 +131,7 @@ class AnimatedTests(unittest.TestCase):
             ("simple.webp", b"RIFF\x10\x00\x00\x00WEBPVP8 " + bytes(8)),
             ("broken.gif", b"GIF89a\x01"),
             ("photo.jpg", b""),
+            ("clip.mp4", b""),
         ]:
             (self.root / name).write_bytes(data)
 
@@ -146,8 +147,9 @@ class AnimatedTests(unittest.TestCase):
                 self.assertEqual(is_animated(self.root / name), expected)
 
     def test_animated_filter(self):
+        # Everything that moves: animated images and videos.
         names = [e["name"] for e in MediaBrowser().scan_folder(str(self.root), False, "animated")]
-        self.assertEqual(names, ["moving.gif", "moving.webp"])
+        self.assertEqual(sorted(names), ["clip.mp4", "moving.gif", "moving.webp"])
 
     def test_type_filter(self):
         names = [e["name"] for e in MediaBrowser().scan_folder(str(self.root), False, "image")]

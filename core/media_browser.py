@@ -111,15 +111,16 @@ def is_animated(path):
 def matches_filter(entry, media_filter, favorites=()):
     """
     True if a scanned entry passes a browser or container's filter:
-    "all", a type ("image", "video", "audio"), "animated" (animated
-    GIF/WebP only), or "favorites" (its path is in `favorites`).
+    "all", a type ("image", "video", "audio"), "animated" (everything
+    that moves: video and animated GIF/WebP), or "favorites" (its path
+    is in `favorites`).
     """
     if media_filter in ("all", "", None):
         return True
     if media_filter == "favorites":
         return entry["path"] in favorites
     if media_filter == "animated":
-        return entry["animatable"] and is_animated(entry["path"])
+        return entry["type"] == "video" or (entry["animatable"] and is_animated(entry["path"]))
     return entry["type"] == media_filter
 
 

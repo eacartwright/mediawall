@@ -947,49 +947,42 @@ Item {
 
 
     // -------------------------------------------------
-    // Browsing badge (selected): marks a browsing container
-    // -------------------------------------------------
-
-    Rectangle {
-        anchors.left: parent.left
-        anchors.top: parent.top
-        anchors.margins: 12                 // just clear of the 9 px corner square
-
-        width: Math.min(badgeText.implicitWidth + 12, parent.width - 24)
-        height: badgeText.implicitHeight + 6
-        radius: 3
-
-        visible: root.browseMode && root.selected && !root.adjusting
-        color: "#cc202020"
-        z: 25
-
-        Text {
-            id: badgeText
-            anchors.centerIn: parent
-            width: parent.width - 12
-            elide: Text.ElideMiddle
-            text: root.browseFiles.length === 0
-                  ? (root.mediaFilter === "favorites" ? "Browsing · no favorites yet"
-                                                      : "Browsing · no media found")
-                  : "⇅"
-            color: "#dddddd"
-            font.pixelSize: 11
-        }
-    }
-
-
-    // -------------------------------------------------
-    // Top-right: the favorite star (a browsing container's file;
-    // selected or under the pointer) and the Locked badge (selected;
+    // Top-left (the top-right is where Full Screen and Present put
+    // their buttons): the favorite star (a browsing container's file;
+    // selected or under the pointer), a note when a browsing container
+    // finds nothing (selected), and the Locked badge (selected;
     // right-click > Lock Container unlocks)
     // -------------------------------------------------
 
     Row {
-        anchors.right: parent.right
+        anchors.left: parent.left
         anchors.top: parent.top
-        anchors.margins: 12
+        anchors.margins: 12                 // just clear of the 9 px corner square
         spacing: 6
         z: 25
+
+        Rectangle {
+            objectName: "browsingNote"          // found by tests/app
+
+            width: Math.min(noteText.implicitWidth + 12, root.width - 24)
+            height: 22
+            radius: 3
+
+            visible: root.browseMode && root.selected && !root.adjusting
+                     && root.browseFiles.length === 0
+            color: "#cc202020"
+
+            Text {
+                id: noteText
+                anchors.centerIn: parent
+                width: parent.width - 12
+                elide: Text.ElideMiddle
+                text: root.mediaFilter === "favorites" ? "Browsing · no favorites yet"
+                                                       : "Browsing · no media found"
+                color: "#dddddd"
+                font.pixelSize: 11
+            }
+        }
 
         Rectangle {
             objectName: "favoriteStar"          // found by tests/app

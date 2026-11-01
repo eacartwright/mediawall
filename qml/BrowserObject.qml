@@ -175,7 +175,7 @@ Rectangle {
     // With a filter (right-click menu), it says which type, e.g. "2 / 3 videos".
     readonly property string positionText: {
         var kind = { "image": "images", "video": "videos", "audio": "audio files",
-                     "animated": "animated" }[mediaFilter]
+                     "animated": "animated + video" }[mediaFilter]
         if (mediaFiles.length === 0)
             return kind ? "No " + kind : "No media"
         return (displayIndex + 1) + " / " + mediaFiles.length + (kind ? " " + kind : "")

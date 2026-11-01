@@ -44,6 +44,8 @@ def step_start():
 
 def step_star():
     x, y, _, _ = c.center_of("favoriteStar")
+    # Top-left (the top-right is where Full Screen and Present put their buttons).
+    c.check("the star is in the container's top-left corner", x < 100 + 60, f"x {x:.0f}")
     c.click(x, y)
     c.check("the star marks the file shown as a favorite",
             [os.path.basename(p) for p in c.scene.get(box.id).favorites] == ["1.jpg"]
