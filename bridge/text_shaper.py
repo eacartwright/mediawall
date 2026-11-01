@@ -83,6 +83,22 @@ def split_emoji(text):
     return runs
 
 
+def _graphemes(text):
+    """(start, piece) for each grapheme (letter with its accents) in `text`."""
+    finder = QTextBoundaryFinder(QTextBoundaryFinder.Grapheme, text)
+    utf16 = text.encode("utf-16-le")
+    out = []
+    start = 0
+    while True:
+        end = finder.toNextBoundary()
+        if end < 0:
+            break
+        piece = utf16[start * 2:end * 2].decode("utf-16-le")
+        out.append((len(utf16[:start * 2].decode("utf-16-le")), piece))
+        start = end
+    return out
+
+
 def text_advance(metrics, text):
     """The width of `text`, with each emoji EMOJI_ADVANCE wide."""
     return sum(EMOJI_ADVANCE * BASE_PIXEL_SIZE if is_emoji else metrics.horizontalAdvance(piece)
@@ -228,13 +244,40 @@ def _fine_segments(start, segments):
     return out
 
 
+def _svg_path(path, warps, warp, result=None):
+    """A QPainterPath as SVG path data, warped (arc, tilt) if there are warps."""
+    parts = []
+    for sub in _subpaths(path):
+        start, segments = sub[0], sub[1:]
+        if warps:
+            segments = _fine_segments(start, segments)
+        start = warp(start)
+        parts.append(f"M{start[0]:.2f} {start[1]:.2f}")
+        if result is not None:
+            result.moveTo(*start)
+        for seg in segments:
+            points = [warp(p) for p in seg[1:]]
+            if seg[0] == "L":
+                parts.append(f"L{points[0][0]:.2f} {points[0][1]:.2f}")
+                if result is not None:
+                    result.lineTo(*points[0])
+            else:
+                parts.append("C" + " ".join(f"{p[0]:.2f} {p[1]:.2f}" for p in points))
+                if result is not None:
+                    result.cubicTo(*points[0], *points[1], *points[2])
+        parts.append("Z")
+    return "".join(parts)
+
+
 @lru_cache(maxsize=256)
-def shape_text(text, family, bold, italic, wrap_width, align, arc, tilt):
+def shape_text(text, family, bold, italic, wrap_width, align, arc, tilt, letters=False):
     """
     The outline of `text` as SVG path data and its bounds:
     {"path", "x", "y", "width", "height", "lines"}. With wrap_width > 0
     the lines are wrapped to it and aligned within it ("left", "center",
-    "right"); otherwise there is one line.
+    "right"); otherwise there is one line. With `letters`, also each
+    letter on its own (the Ripple animation): "letters", a list of
+    {"path", "x", "y"} (its outline, and its centre, warped like the rest).
     """
     font = QFont(family)
     font.setPixelSize(BASE_PIXEL_SIZE)
@@ -252,6 +295,7 @@ def shape_text(text, family, bold, italic, wrap_width, align, arc, tilt):
 
     path = QPainterPath()
     emoji = []                   # [text, center x, center y, size] before warping
+    letter_paths = []            # each letter's outline, before warping
     bounds = QRectF()
     baseline = metrics.ascent()
     for line in lines:
@@ -260,6 +304,15 @@ def shape_text(text, family, bold, italic, wrap_width, align, arc, tilt):
         for piece, is_emoji in split_emoji(line):
             if not is_emoji:
                 path.addText(QPointF(px, baseline), font, piece)
+                if letters:
+                    # Placed by the advance of the text before each one,
+                    # so kerning matches the whole line.
+                    for start, letter in _graphemes(piece):
+                        if letter.strip():
+                            one = QPainterPath()
+                            x = px + metrics.horizontalAdvance(piece[:start])
+                            one.addText(QPointF(x, baseline), font, letter)
+                            letter_paths.append(one)
                 px += metrics.horizontalAdvance(piece)
                 continue
             # A square a little under the font size, centred in its
@@ -273,7 +326,6 @@ def shape_text(text, family, bold, italic, wrap_width, align, arc, tilt):
         baseline += metrics.lineSpacing()
 
     bounds = path.boundingRect().united(bounds) if not path.isEmpty() else bounds
-    subpaths = _subpaths(path)
 
     warps = []
     if abs(arc) >= 0.5 and bounds.width() > 0:
@@ -286,24 +338,8 @@ def shape_text(text, family, bold, italic, wrap_width, align, arc, tilt):
             p = w(*p)
         return p
 
-    parts = []
     result = QPainterPath()
-    for sub in subpaths:
-        start, segments = sub[0], sub[1:]
-        if warps:
-            segments = _fine_segments(start, segments)
-        start = warp(start)
-        parts.append(f"M{start[0]:.2f} {start[1]:.2f}")
-        result.moveTo(*start)
-        for seg in segments:
-            points = [warp(p) for p in seg[1:]]
-            if seg[0] == "L":
-                parts.append(f"L{points[0][0]:.2f} {points[0][1]:.2f}")
-                result.lineTo(*points[0])
-            else:
-                parts.append("C" + " ".join(f"{p[0]:.2f} {p[1]:.2f}" for p in points))
-                result.cubicTo(*points[0], *points[1], *points[2])
-        parts.append("Z")
+    svg = _svg_path(path, warps, warp, result)
 
     # Each emoji moves with the arc and tilt: its centre is warped, it
     # turns with the line there, and shrinks or grows with the tilt.
@@ -323,8 +359,8 @@ def shape_text(text, family, bold, italic, wrap_width, align, arc, tilt):
 
     if not warps:
         box = bounds
-    return {
-        "path": "".join(parts),
+    shaped = {
+        "path": svg,
         "x": box.x(),
         "y": box.y(),
         "width": box.width(),
@@ -332,13 +368,21 @@ def shape_text(text, family, bold, italic, wrap_width, align, arc, tilt):
         "lines": len(lines),
         "emoji": placed,
     }
+    if letters:
+        shaped["letters"] = [
+            {"path": _svg_path(one, warps, warp),
+             "x": warp((one.boundingRect().center().x(), one.boundingRect().center().y()))[0],
+             "y": warp((one.boundingRect().center().x(), one.boundingRect().center().y()))[1]}
+            for one in letter_paths
+        ]
+    return shaped
 
 
 class TextShaper(QObject):
     """Exposed to QML as `textShaper` (main.py)."""
 
-    @Slot(str, str, bool, bool, float, str, float, float, result="QVariantMap")
-    def shape(self, text, family, bold, italic, wrap_width, align, arc, tilt):
+    @Slot(str, str, bool, bool, float, str, float, float, bool, result="QVariantMap")
+    def shape(self, text, family, bold, italic, wrap_width, align, arc, tilt, letters):
         # Rounded, so a resize drag reuses cached layouts.
         return shape_text(text, family, bold, italic, round(max(0.0, wrap_width), 1),
-                          align, round(arc, 1), round(tilt, 1))
+                          align, round(arc, 1), round(tilt, 1), letters)

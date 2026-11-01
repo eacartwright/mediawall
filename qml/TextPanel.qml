@@ -30,6 +30,7 @@ ScrollView {
     }
     readonly property string targetId: target ? target.objectId : ""
     readonly property var style: target ? target.textStyle : ({})
+    readonly property var animations: style.animations || []
 
     function set(changes) {
         if (targetId !== "")
@@ -539,44 +540,99 @@ ScrollView {
                 }
             }
 
-            // ---- Animation: looping, on the canvas (TextArt) ----
-            RowLayout {
+            // ---- Animation: looping, on the canvas (TextArt). Any of
+            // them together; the speed and intensity apply to all. ----
+            Caption { text: "Animate" }
+
+            GridLayout {
                 Layout.fillWidth: true
-                spacing: 6
+                columns: 2
+                rowSpacing: 0
+                columnSpacing: 4
 
-                Caption { text: "Animate"; Layout.preferredWidth: 48 }
-
-                ComboBox {
-                    objectName: "animationBox"           // found by tests/app
-                    Layout.fillWidth: true
-                    textRole: "text"
-                    valueRole: "value"
-                    model: [{ value: "", text: "None" },
-                            { value: "wiggle", text: "Wiggle" },
+                Repeater {
+                    model: [{ value: "wiggle", text: "Wiggle" },
                             { value: "pulse", text: "Pulse" },
+                            { value: "ripple", text: "Ripple" },
+                            { value: "fade", text: "Fade" },
                             { value: "glow_pulse", text: "Glow pulse" },
                             { value: "gradient_shift", text: "Gradient shift" },
                             { value: "color_cycle", text: "Color cycle" }]
-                    currentIndex: indexOfValue(panel.style.animation || "")
-                    onActivated: (index) => panel.set({ animation: valueAt(index) })
+
+                    CheckBox {
+                        required property var modelData
+                        objectName: "animate:" + modelData.value     // found by tests/app
+                        Layout.fillWidth: true
+                        text: modelData.text
+                        checked: panel.animations.indexOf(modelData.value) >= 0
+                        onToggled: {
+                            var list = panel.animations.filter(function(a) { return a !== modelData.value })
+                            if (checked)
+                                list.push(modelData.value)       // core puts them in order
+                            panel.set({ animations: list })
+                            checked = Qt.binding(function() {
+                                return panel.animations.indexOf(modelData.value) >= 0
+                            })
+                        }
+                    }
                 }
+            }
+
+            RowLayout {
+                Layout.fillWidth: true
+                spacing: 6
+                enabled: panel.animations.length > 0
+
+                Caption { text: "Speed"; Layout.preferredWidth: 48 }
 
                 ComboBox {
                     objectName: "animationSpeedBox"      // found by tests/app
-                    Layout.preferredWidth: 90
-                    enabled: (panel.style.animation || "") !== ""
+                    Layout.fillWidth: true
                     textRole: "text"
                     valueRole: "value"
                     model: [{ value: "slow", text: "Slow" }, { value: "normal", text: "Normal" },
-                            { value: "fast", text: "Fast" }]
+                            { value: "fast", text: "Fast" }, { value: "very_fast", text: "Very fast" }]
                     currentIndex: indexOfValue(panel.style.animation_speed || "normal")
                     onActivated: (index) => panel.set({ animation_speed: valueAt(index) })
                 }
             }
 
+            // How far it turns, grows, or fades (1x = as designed).
+            RowLayout {
+                Layout.fillWidth: true
+                spacing: 6
+                enabled: panel.animations.length > 0
+
+                Caption { text: "Intensity"; Layout.preferredWidth: 48 }
+
+                Slider {
+                    objectName: "intensitySlider"        // found by tests/app
+                    Layout.fillWidth: true
+                    from: 0.25
+                    to: 3
+                    stepSize: 0.05
+                    value: panel.style.animation_intensity || 1
+                    onMoved: panel.set({ animation_intensity: value })
+                }
+
+                Text {
+                    Layout.preferredWidth: 34
+                    horizontalAlignment: Text.AlignRight
+                    text: (panel.style.animation_intensity || 1).toFixed(2) + "×"
+                    color: "#cccccc"
+                    font.pixelSize: 11
+                    // Click: back to 1x.
+                    MouseArea {
+                        anchors.fill: parent
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: panel.set({ animation_intensity: 1 })
+                    }
+                }
+            }
+
             Caption {
                 Layout.fillWidth: true
-                visible: panel.style.animation === "glow_pulse" && !(panel.style.glow > 0)
+                visible: panel.animations.indexOf("glow_pulse") >= 0 && !(panel.style.glow > 0)
                 wrapMode: Text.WordWrap
                 text: "Glow pulse fades the glow in and out: set a Glow above to see it."
             }

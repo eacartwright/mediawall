@@ -1,9 +1,11 @@
 """
-Text animations (readme section 5.4): each one chosen in the Text tab
+Text animations (readme section 5.4): each one ticked in the Text tab
 moves or changes the canvas text over time (Wiggle turns it, Pulse
-scales it, Glow pulse fades the glow, Gradient shift slides the fill,
-Color cycle turns its hue); the preset tiles stay still; Speed sets the
-cycle; undo brings the old setting back; None stops it.
+scales it, Ripple grows the letters in turn, Fade fades it, Glow pulse
+fades the glow, Gradient shift slides the fill, Color cycle turns its
+hue); several run together; the preset tiles stay still; Intensity
+makes them bigger; Speed sets the cycle (Very fast too); undo brings the
+old setting back; unticking them all stops it.
 """
 
 from PySide6.QtCore import QTimer
@@ -33,6 +35,12 @@ FIND = """(function find(item, name) {
 WATCH = {
     "wiggle": f"{FIND}({ART}, 'textMotion').rotation",
     "pulse": f"{FIND}({ART}, 'textMotion').scale",
+    # The letters drawn one by one: how much each has grown, together.
+    "ripple": f"""(function() {{ var k = {FIND}({ART}, 'rippleLetters').parent.children, g = []
+        for (var i = 0; i < k.length; i++)
+            if (k[i].growth !== undefined) g.push(Math.round(k[i].growth * 1000))
+        return g.join(",") }})()""",
+    "fade": f"{FIND}({ART}, 'textMotion').opacity",
     "glow_pulse": f"{FIND}({ART}, 'glowLoader').opacity",
     # The face's gradient: the shape (beside its Repeater) that has one.
     "gradient_shift": f"""(function() {{ var k = {FIND}({ART}, 'textFace').parent.children
@@ -40,26 +48,31 @@ WATCH = {
             if (k[i].fillGrad) return k[i].fillGrad.y1 }})()""",
     "color_cycle": f"{ART}.faceFill.toString()",
 }
-ORDER = ["", "wiggle", "pulse", "glow_pulse", "gradient_shift", "color_cycle"]
+ORDER = list(WATCH)
 
 
 def style():
     return c.scene.get(text.id).text_style
 
 
-def choose(box, index):
-    c.item_js(box, f"item.activated({index})")
+def tick(name):
+    """Click an animation's checkbox in the Text tab."""
+    c.item_js(f"animate:{name}", "(item.toggle(), item.toggled())")
 
 
-def sample(expression):
-    c.samples = []
+def sample(expressions):
+    c.samples = {e: [] for e in expressions}
     for t in range(0, 600, 60):
-        QTimer.singleShot(t, lambda: c.samples.append(c.js(expression)))
+        QTimer.singleShot(t, lambda: [c.samples[e].append(c.js(e)) for e in expressions])
     # What's on screen, twice: the drawing itself has to change, not
     # only the values it's drawn from.
     c.shots = []
     for t in (150, 450):
         QTimer.singleShot(t, lambda: c.shots.append(text_on_screen()))
+
+
+def varied(values):
+    return len({round(v, 3) if isinstance(v, float) else v for v in values})
 
 
 def text_on_screen():
@@ -79,16 +92,20 @@ def step_still():
 
 
 def start(name):
-    choose("animationBox", ORDER.index(name))
+    """Only `name` ticked (the one before unticked)."""
+    if getattr(c, "current", None):
+        tick(c.current)
+    tick(name)
     c.current = name
-    sample(WATCH[name])
+    sample([WATCH[name]])
 
 
 def checker(name, following):
     def step():
-        varied = len({round(v, 3) if isinstance(v, float) else v for v in c.samples})
-        c.check(f"{name}: chosen in the Text tab, it changes the canvas text over time",
-                style()["animation"] == name and varied >= 3, f"{style()['animation']}: {c.samples}")
+        values = c.samples[WATCH[name]]
+        c.check(f"{name}: ticked in the Text tab, it changes the canvas text over time",
+                style()["animations"] == [name] and varied(values) >= 3,
+                f"{style()['animations']}: {values}")
         c.check("...and it's redrawn", len(c.shots) == 2 and c.shots[0] != c.shots[1])
         c.shots[-1].save(str(OUT / f"text-{name}.png"))
         following()
@@ -101,25 +118,47 @@ def after_wiggle():
     start("pulse")
 
 
-def step_speed():
-    choose("animationSpeedBox", 2)
-    c.check("Speed: Fast makes a cycle 1.5 s",
-            style()["animation_speed"] == "fast" and c.js(f"{ART}.cycleMs") == 1500)
+def step_after_all():
+    # Wiggle and Fade together (Color cycle still ticked).
+    tick("wiggle")
+    tick("fade")
+    sample([WATCH["wiggle"], WATCH["fade"]])
+
+
+def step_stacked():
+    c.check("several at once: Wiggle and Fade run together (with Color cycle)",
+            style()["animations"] == ["wiggle", "fade", "color_cycle"]
+            and varied(c.samples[WATCH["wiggle"]]) >= 3 and varied(c.samples[WATCH["fade"]]) >= 3,
+            str(style()["animations"]))
+    c.item_js("intensitySlider", "(item.value = 2, item.moved())")
+    sample([WATCH["wiggle"]])
+
+
+def step_intensity():
+    turn = max(abs(v) for v in c.samples[WATCH["wiggle"]])
+    c.check("Intensity 2x: Wiggle turns further (beyond its usual 4°)",
+            style()["animation_intensity"] == 2 and turn > 4.5, f"{turn:.1f}°")
+    c.item_js("animationSpeedBox", "item.activated(3)")
+    c.check("Speed: Very fast makes a cycle 0.75 s",
+            style()["animation_speed"] == "very_fast" and c.js(f"{ART}.cycleMs") == 750)
     c.sm.undo()
     c.check("undo brings back Normal, in the Text tab too",
             style()["animation_speed"] == "normal"
             and c.item_js("animationSpeedBox", "item.currentText") == "Normal")
-    choose("animationBox", 0)
-    c.check("None: the text stops, back to still",
-            style()["animation"] == "" and c.js(f"{ART}.running") is False
-            and c.js(f"{ART}.phase") == 0 and c.js(WATCH["wiggle"]) == 0)
+    for name in ("wiggle", "fade", "color_cycle"):
+        tick(name)
+    c.check("all unticked: the text stops, back to still",
+            style()["animations"] == [] and c.js(f"{ART}.running") is False
+            and c.js(f"{ART}.phase") == 0 and c.js(WATCH["wiggle"]) == 0
+            and c.js(WATCH["fade"]) == 1)
     c.finish()
 
 
-c.run(scene, [(1500, step_open), (400, step_still),
-              (800, checker("wiggle", after_wiggle)),
-              (800, checker("pulse", lambda: start("glow_pulse"))),
-              (800, checker("glow_pulse", lambda: start("gradient_shift"))),
-              (800, checker("gradient_shift", lambda: start("color_cycle"))),
-              (800, checker("color_cycle", lambda: None)),
-              (200, step_speed)])
+steps = [(1500, step_open), (400, step_still)]
+for i, name in enumerate(ORDER):
+    following = (after_wiggle if name == "wiggle"
+                 else (lambda n=ORDER[i + 1]: start(n)) if i + 1 < len(ORDER)
+                 else step_after_all)
+    steps.append((800, checker(name, following)))
+steps += [(800, step_stacked), (800, step_intensity)]
+c.run(scene, steps)

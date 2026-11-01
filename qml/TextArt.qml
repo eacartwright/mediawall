@@ -46,14 +46,26 @@ Item {
     // ---- Animation (readme section 5.4) ----
     // Only where `animated` is set (text objects on the canvas), so the
     // Text tab's preset tiles stay still. One phase, 0 -> 1 per cycle,
-    // drives every animation.
+    // drives every animation; several can run together.
 
     property bool animated: false
-    readonly property string animation: value("animation", "")
+    readonly property var animations: value("animations", [])
     readonly property string animationSpeed: value("animation_speed", "normal")
     readonly property int cycleMs: animationSpeed === "slow" ? 6000
-                                 : animationSpeed === "fast" ? 1500 : 3000
-    readonly property bool running: animated && animation !== "" && visible
+                                 : animationSpeed === "fast" ? 1500
+                                 : animationSpeed === "very_fast" ? 750 : 3000
+    // How strongly the moving ones move (1 = as designed).
+    readonly property real intensity: value("animation_intensity", 1)
+    readonly property bool running: animated && animations.length > 0 && visible
+
+    function animating(name) { return running && animations.indexOf(name) >= 0 }
+    readonly property bool wiggling: animating("wiggle")
+    readonly property bool pulsing: animating("pulse")
+    readonly property bool rippling: animating("ripple")
+    readonly property bool fading: animating("fade")
+    readonly property bool glowPulsing: animating("glow_pulse")
+    readonly property bool gradientShifting: animating("gradient_shift")
+    readonly property bool colorCycling: animating("color_cycle")
 
     property real phase: 0
     readonly property real turn: 2 * Math.PI * phase
@@ -72,17 +84,22 @@ Item {
 
     // The fill as drawn: its hue turning (Color cycle), or the gradient's
     // second color (Gradient shift, a darker shade if there's none).
-    readonly property color faceFill: animation === "color_cycle" && running
-                                      ? cycled(fill) : fill
-    readonly property color faceFill2: animation === "color_cycle" && running && fill2 !== ""
+    readonly property color faceFill: colorCycling ? cycled(fill) : fill
+    readonly property color faceFill2: colorCycling && fill2 !== ""
                                        ? cycled(fill2)
                                        : fill2 !== "" ? fill2
-                                       : animation === "gradient_shift" && running
+                                       : gradientShifting
                                          ? Qt.darker(fill, 1.8) : faceFill
     // Gradient shift: how far the gradient has slid; mirrored, it repeats
     // every two glyph heights.
-    readonly property real gradientShift: animation === "gradient_shift" && running
-                                          ? phase * 2 * glyphs.height : 0
+    readonly property real gradientShift: gradientShifting ? phase * 2 * glyphs.height : 0
+
+    // Ripple: a wave runs along the letters once a cycle, from first to
+    // last; each grows (up to 30% at intensity 1) as it passes.
+    function rippleGrowth(i, count) {
+        var d = Math.abs(i - (phase * (count + 2) - 1))
+        return d < 1.5 ? 0.3 * intensity * (0.5 + 0.5 * Math.cos(Math.PI * d / 1.5)) : 0
+    }
 
     // A color with its hue turned by the phase. A grey has no hue, so it
     // gets some color first.
@@ -107,8 +124,10 @@ Item {
     readonly property real wrapWidth: Math.max(basePixelSize, width / wrapScale - 2 * pad - depth)
 
     // The letters' outline (SVG path data) and bounds.
+    // (Each letter on its own too, for Ripple.)
     readonly property var shaped: textShaper.shape(text, fontFamily, bold, italic,
-                                                   wrap ? wrapWidth : 0, align, arc, tilt)
+                                                   wrap ? wrapWidth : 0, align, arc, tilt,
+                                                   rippling)
     readonly property rect glyphs: Qt.rect(shaped.x, shaped.y, shaped.width, shaped.height)
 
     // The natural size with outline and depth. Wrapping, the width is
@@ -125,14 +144,16 @@ Item {
     // Wrapping: the height the lines take on the canvas.
     readonly property real wrappedHeight: naturalHeight * wrapScale
 
-    // Wiggle and Pulse: the whole drawing turns or grows around its middle.
+    // Wiggle and Pulse: the whole drawing turns or grows around its
+    // middle. Fade: it fades out and back in (at intensity 1, all the way).
     Item {
         id: motion
         objectName: "textMotion"                 // found by tests/app
 
         anchors.fill: parent
-        rotation: art.animation === "wiggle" && art.running ? 4 * Math.sin(art.turn) : 0
-        scale: art.animation === "pulse" && art.running ? 1 + 0.06 * art.wave : 1
+        rotation: art.wiggling ? 4 * art.intensity * Math.sin(art.turn) : 0
+        scale: art.pulsing ? 1 + 0.06 * art.intensity * art.wave : 1
+        opacity: art.fading ? 1 - Math.min(1, art.intensity) * art.wave : 1
 
         Item {
             id: body
@@ -160,7 +181,7 @@ Item {
                 objectName: "glowLoader"         // found by tests/app
                 active: art.glow > 0 && !rebuilding
                 // Glow pulse: the glow fades in and out.
-                opacity: art.animation === "glow_pulse" && art.running ? 1 - 0.8 * art.wave : 1
+                opacity: art.glowPulsing ? 1 - Math.min(1, 0.8 * art.intensity) * art.wave : 1
 
                 // The effect keeps its first size when the outline changes
                 // (arc, tilt, new words), so it is built again instead.
@@ -251,7 +272,9 @@ Item {
             // redraws those changes (checked with Qt 6.11).
             Repeater {
                 objectName: "textFace"               // found by tests/app
-                model: [art.fill + "|" + art.fill2 + "|" + art.glyphs.y + "|" + art.glyphs.height]
+                // (Ripple draws the face letter by letter instead, below.)
+                model: art.rippling ? []
+                       : [art.fill + "|" + art.fill2 + "|" + art.glyphs.y + "|" + art.glyphs.height]
 
                 Shape {
                     id: front
@@ -271,6 +294,51 @@ Item {
 
                     // Top to bottom across the glyphs (mirrored beyond them,
                     // for Gradient shift).
+                    property LinearGradient fillGrad: LinearGradient {
+                        x1: 0
+                        y1: art.glyphs.y - art.gradientShift
+                        x2: 0
+                        y2: art.glyphs.y + art.glyphs.height - art.gradientShift
+                        spread: ShapeGradient.ReflectSpread
+                        GradientStop { position: 0; color: art.faceFill }
+                        GradientStop { position: 1; color: art.faceFill2 }
+                    }
+                }
+            }
+
+            // Ripple: the face letter by letter, each growing around its
+            // centre as the wave passes. (The depth and glow stay whole:
+            // drawn per letter they'd be hundreds of shapes.)
+            Repeater {
+                id: rippleLetters
+                objectName: "rippleLetters"          // found by tests/app
+                model: art.rippling ? (art.shaped.letters || []) : []
+
+                Shape {
+                    id: letter
+
+                    required property var modelData
+                    required property int index
+                    readonly property real growth: art.rippleGrowth(index, rippleLetters.count)
+
+                    x: body.originX
+                    y: body.originY
+                    preferredRendererType: Shape.CurveRenderer
+                    transform: Scale {
+                        origin.x: letter.modelData.x
+                        origin.y: letter.modelData.y
+                        xScale: 1 + letter.growth
+                        yScale: 1 + letter.growth
+                    }
+
+                    ShapePath {
+                        fillGradient: letter.fillGrad
+                        strokeColor: art.outlineWidth > 0 ? art.outline : "transparent"
+                        strokeWidth: art.outlineWidth
+                        joinStyle: ShapePath.RoundJoin
+                        PathSvg { path: letter.modelData.path }
+                    }
+
                     property LinearGradient fillGrad: LinearGradient {
                         x1: 0
                         y1: art.glyphs.y - art.gradientShift

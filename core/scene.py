@@ -159,8 +159,14 @@ TEXT_STYLE_DEFAULTS = {
     "tilt": 0.0,                # perspective lean, degrees; > 0 top leans back
     "glow": 0.0,                # glow size, 0 .. TEXT_GLOW_MAX
     "glow_color": "#40c0ff",
-    "animation": "",            # TEXT_ANIMATIONS; "" = still
+    # Looping animations, any of TEXT_ANIMATIONS, together (in that
+    # order); [] = still. Projects before 2026-11-01 saved one, as
+    # "animation" (a name or ""): it is read as a list of one.
+    "animations": [],
     "animation_speed": "normal",    # TEXT_ANIMATION_SPEEDS
+    # How strongly they move (wiggle, pulse, ripple, glow pulse, fade),
+    # 1 = as designed; TEXT_INTENSITY_MIN .. MAX.
+    "animation_intensity": 1.0,
 }
 
 TEXT_OUTLINE_MAX = 20.0
@@ -172,8 +178,11 @@ TEXT_ARC_MAX = 360.0
 TEXT_TILT_MAX = 70.0
 TEXT_GLOW_MAX = 40.0
 # Looping animations (on the canvas only; preset tiles stay still).
-TEXT_ANIMATIONS = ("", "wiggle", "pulse", "glow_pulse", "gradient_shift", "color_cycle")
-TEXT_ANIMATION_SPEEDS = ("slow", "normal", "fast")
+TEXT_ANIMATIONS = ("wiggle", "pulse", "ripple", "fade", "glow_pulse", "gradient_shift",
+                   "color_cycle")
+TEXT_ANIMATION_SPEEDS = ("slow", "normal", "fast", "very_fast")
+TEXT_INTENSITY_MIN = 0.25
+TEXT_INTENSITY_MAX = 3.0
 
 _COLOR = re.compile(r"#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})")
 
@@ -188,6 +197,12 @@ def normalized_text_style(raw) -> dict:
 
     for key, default in TEXT_STYLE_DEFAULTS.items():
         value = raw.get(key, default)
+        if key == "animations":
+            if "animations" not in raw and raw.get("animation") in TEXT_ANIMATIONS:
+                value = [raw["animation"]]           # saved before stacking
+            names = value if isinstance(value, list) else []
+            style[key] = [a for a in TEXT_ANIMATIONS if a in names]
+            continue
         if isinstance(default, bool):
             ok = isinstance(value, bool)
         elif isinstance(default, (int, float)):
@@ -196,8 +211,6 @@ def normalized_text_style(raw) -> dict:
             ok = isinstance(value, str) and _COLOR.fullmatch(value) is not None
         elif key == "align":
             ok = value in TEXT_ALIGNS
-        elif key == "animation":
-            ok = value in TEXT_ANIMATIONS
         elif key == "animation_speed":
             ok = value in TEXT_ANIMATION_SPEEDS
         elif key == "fill2":
@@ -213,6 +226,8 @@ def normalized_text_style(raw) -> dict:
     style["arc"] = round(min(TEXT_ARC_MAX, max(-TEXT_ARC_MAX, float(style["arc"]))), 1)
     style["tilt"] = round(min(TEXT_TILT_MAX, max(-TEXT_TILT_MAX, float(style["tilt"]))), 1)
     style["glow"] = round(min(TEXT_GLOW_MAX, max(0.0, float(style["glow"]))), 1)
+    style["animation_intensity"] = round(min(TEXT_INTENSITY_MAX, max(
+        TEXT_INTENSITY_MIN, float(style["animation_intensity"]))), 2)
     return style
 
 

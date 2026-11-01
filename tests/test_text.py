@@ -41,12 +41,24 @@ class TextStyleTests(unittest.TestCase):
         self.assertEqual(normalized_text_style({"align": "right"})["align"], "right")
 
     def test_animation_values_are_checked(self):
-        style = normalized_text_style({"animation": "spin", "animation_speed": "ludicrous"})
-        self.assertEqual(style["animation"], "")
+        style = normalized_text_style({"animations": ["spin"], "animation_speed": "ludicrous",
+                                       "animation_intensity": 9})
+        self.assertEqual(style["animations"], [])
         self.assertEqual(style["animation_speed"], "normal")
-        style = normalized_text_style({"animation": "glow_pulse", "animation_speed": "fast"})
-        self.assertEqual((style["animation"], style["animation_speed"]), ("glow_pulse", "fast"))
-        self.assertEqual(normalized_text_style({"animation": 3})["animation"], "")
+        self.assertEqual(style["animation_intensity"], 3.0)
+        style = normalized_text_style({"animations": ["glow_pulse"], "animation_speed": "very_fast"})
+        self.assertEqual((style["animations"], style["animation_speed"]),
+                         (["glow_pulse"], "very_fast"))
+        self.assertEqual(normalized_text_style({"animations": 3})["animations"], [])
+
+    def test_animations_stack_in_a_fixed_order(self):
+        style = normalized_text_style({"animations": ["fade", "wiggle", "fade", "ripple"]})
+        self.assertEqual(style["animations"], ["wiggle", "ripple", "fade"])
+
+    def test_one_animation_saved_before_stacking_still_loads(self):
+        self.assertEqual(normalized_text_style({"animation": "pulse"})["animations"], ["pulse"])
+        self.assertEqual(normalized_text_style({"animation": ""})["animations"], [])
+        self.assertNotIn("animation", normalized_text_style({"animation": "pulse"}))
 
     def test_gradient_end_may_be_empty(self):
         self.assertEqual(normalized_text_style({"fill2": ""})["fill2"], "")
