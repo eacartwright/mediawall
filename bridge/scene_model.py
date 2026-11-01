@@ -1068,6 +1068,22 @@ class SceneModel(QAbstractListModel):
             self._emit_row(container_id, CONTENT_ROLES + CONTAINER_ROLES)
             self._changed(workspace_only=self._browsing(container_id))
 
+    @Slot(str, int)
+    def rotateQuarter(self, object_id, turns):
+        """
+        Up/Down: turn a free image or video, or a container's picture
+        (the container stays), by quarter turns (> 0 clockwise).
+        """
+        obj = self._scene.get(object_id)
+        if obj is None or not self._scene.rotate_quarter(object_id, turns):
+            return
+        if obj.type == "container":
+            self._emit_row(object_id, CONTENT_ROLES)
+            self._changed(workspace_only=self._browsing(object_id))
+        else:
+            self._emit_row(object_id, GEOMETRY_ROLES)
+            self._changed()
+
     @Slot(str)
     def resetContentFraming(self, container_id):
         """Back to the container's Fit/Fill framing (e.g. double-click)."""

@@ -1015,16 +1015,72 @@ class Scene:
     # Containers
     # -------------------------------------------------
 
-    def _frame_content(self, container, content, aspect, mode=FIT_CONTAIN):
-        """Center content in the container at a fitted size, unrotated."""
+    @staticmethod
+    def _framed_box(container, aspect, mode, rotation=0.0):
+        """
+        (x, y, width, height) of content centered in the container at a
+        fitted size, turned by `rotation` (a multiple of 90°: a quarter
+        turn fits the picture's sideways shape).
+        """
         if aspect <= 0:
             aspect = FALLBACK_ASPECT
 
-        w, h = fitted_size(container.width, container.height, aspect, mode)
-        content.width, content.height = w, h
-        content.x = (container.width - w) / 2
-        content.y = (container.height - h) / 2
-        content.rotation = 0.0
+        sideways = round(rotation / 90) % 2 == 1
+        w, h = fitted_size(container.width, container.height,
+                           1 / aspect if sideways else aspect, mode)
+        if sideways:
+            w, h = h, w                       # the unrotated box
+        return (container.width - w) / 2, (container.height - h) / 2, w, h
+
+    def _frame_content(self, container, content, aspect, mode=FIT_CONTAIN, rotation=0.0):
+        """Center content in the container at a fitted size, unrotated (or turned)."""
+        content.x, content.y, content.width, content.height = \
+            self._framed_box(container, aspect, mode, rotation)
+        content.rotation = float(rotation)
+
+    def rotate_quarter(self, object_id, turns) -> bool:
+        """
+        Up/Down (as in qView): turn the picture by quarter turns (> 0
+        clockwise). A free image or video turns around its center. In a
+        container the picture turns and the container stays as it is:
+        a picture framed by Fit or Fill is framed again (so Fit still
+        shows all of it); one panned or zoomed by hand turns around the
+        container's center and keeps its size.
+        """
+        obj = self.get(object_id)
+        if obj is None or obj.parent_id is not None or turns == 0:
+            return False
+
+        if obj.type == "media":
+            return self.set_geometry(obj.id, obj.x, obj.y, obj.width, obj.height,
+                                     (obj.rotation + 90 * turns) % 360)
+
+        container = self._editable_container(object_id)
+        content = self.content_of(object_id) if container else None
+        if content is None:
+            return False
+
+        source = self.sources.get(content.source_id)
+        aspect = source.aspect if source else 0.0
+        new_rotation = (content.rotation + 90 * turns) % 360
+
+        # Still as Fit or Fill framed it (at a right angle)?
+        framed = self._framed_box(container, aspect, container.fit_mode, content.rotation)
+        if content.rotation % 90 == 0 and all(
+                abs(a - b) < 0.5 for a, b in
+                zip(framed, (content.x, content.y, content.width, content.height))):
+            self._frame_content(container, content, aspect, container.fit_mode, new_rotation)
+            return True
+
+        # Turn the picture's center around the container's center.
+        half_w, half_h = container.width / 2, container.height / 2
+        cx = content.x + content.width / 2 - half_w
+        cy = content.y + content.height / 2 - half_h
+        cx, cy = _rotate(cx, cy, 90 * turns)
+        content.x = half_w + cx - content.width / 2
+        content.y = half_h + cy - content.height / 2
+        content.rotation = new_rotation
+        return True
 
     def _scale_content(self, container, new_width, new_height):
         """

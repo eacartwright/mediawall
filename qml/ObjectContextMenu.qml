@@ -479,6 +479,19 @@ Menu {
         }
     }
 
+    // Quarter turns (Up / Down): in a container, the picture turns.
+    MenuItem {
+        action: menu.actions.rotateRight
+        visible: menu.isFreeMedia || menu.containerHasContent
+        height: visible ? implicitHeight : 0
+    }
+
+    MenuItem {
+        action: menu.actions.rotateLeft
+        visible: menu.isFreeMedia || menu.containerHasContent
+        height: visible ? implicitHeight : 0
+    }
+
     MenuSeparator {
         visible: menu.isFreeMedia
         height: visible ? implicitHeight : 0

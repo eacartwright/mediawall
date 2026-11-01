@@ -126,6 +126,34 @@ Item {
         onTriggered: sceneModel.sendToBack(sceneModel.selectedId)
     }
 
+    // ---- Turn the picture (Up / Down, as in qView): a free image or
+    // video, or a container's picture (the container stays as it is) ----
+
+    readonly property bool canTurn: {
+        var item = window.objectItem(sceneModel.selectedId)
+        return actions.editing && item !== null
+               && (item.isFreeMedia === true
+                   || (item.isContainer === true && item.hasContent && !item.locked))
+    }
+
+    // Not while typing in a field (the words, a number box).
+    readonly property bool typing:
+        window.activeFocusItem !== null && window.activeFocusItem.cursorPosition !== undefined
+
+    readonly property Action rotateRight: Action {
+        text: "Rotate Picture Right"
+        shortcut: "Up"
+        enabled: actions.canTurn && !actions.typing
+        onTriggered: sceneModel.rotateQuarter(sceneModel.selectedId, 1)
+    }
+
+    readonly property Action rotateLeft: Action {
+        text: "Rotate Picture Left"
+        shortcut: "Down"
+        enabled: actions.canTurn && !actions.typing
+        onTriggered: sceneModel.rotateQuarter(sceneModel.selectedId, -1)
+    }
+
     // ---- Files (a selected browser or browsing container) ----
 
     // The selected object, if it steps through a folder's files.

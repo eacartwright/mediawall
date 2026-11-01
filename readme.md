@@ -2472,6 +2472,10 @@ Mouse wheel       zoom around the pointer: a browser preview, or the
                   empty one) or a selected free image
 Left / Right      previous/next file (a selected browser or browsing
                   container; hold to keep stepping, at the Settings pace)
+Up / Down         turn the picture a quarter turn right / left, as in
+                  qView (a selected free image or video; in a container
+                  the picture turns and the container stays; not while
+                  typing in a field; also in the right-click menu)
 Back / Forward    previous/next file (thumb buttons; over a browser
   mouse buttons   preview or a browsing container, also in Present)
 Left-drag         pan (a zoomed browser preview; a container's picture,
@@ -2486,12 +2490,7 @@ Double-click      restart an animated image (free, in a container, or in
                   leave Full Screen (on the empty canvas)
 ```
 
-Planned:
-
-```text
-Arrow keys   move selected object
-Shift+Arrow  move faster
-```
+Arrow keys don't move the selected object (dropped 2026-10-16; section 51).
 
 Exact bindings can still change.
 
@@ -2509,6 +2508,7 @@ The prototype currently provides:
 - Locate Missing File (right-click), which also relinks other missing files from the same old folder if they're found in the new one
 - undo/redo for every scene change, for the session (section 47)
 - Duplicate (section 48)
+- Up / Down turn the selected picture a quarter turn (a free image or video, or a container's picture; section 49)
 - a Python scene model that owns all object state; QML renders it
 - one `MediaSource` per file, referenced by media objects through `source_id`
 - random object IDs, so importing a layout can never cause ID collisions
@@ -2574,12 +2574,12 @@ From testing 0.9.13 (2026-11-01):
 
 - **Done 2026-11-01** (first batch; `check_text_panel` added, `check_favorites` and `check_animation` updated, all pass on Windows): the favorite star moved to the top-left corner (the Full Screen / Present buttons covered it), with the Locked badge and the empty-folder note, and the `⇅` badge is gone; **Animated Only** became **Animated and Videos**; Flip Horizontally moved up, above Fit Content; the Text tab (and Speech tab) leave room for the scroll bar, and Wrap to box's alignment buttons shrink to fit, so nothing runs to the panel's edge; the wheel over the Text tab's words field moves the cursor along a long line (3 letters a notch; when the words fit, it scrolls the panel).
 - **Done 2026-11-01** (second batch; `check_text_lock` added, unit tests for the lock): the **Text tab lists every text object**, one line each (click to select), and its Add Text button shows only while there's no text; **Lock text**: a Lock checkbox on each line (text can't go in a container, so it needs its own lock). Locked text ignores the mouse, so clicks reach what's behind it (e.g. a container's A-B button); it's unlocked from the tab, where its words and style can still be changed.
+- **Done 2026-11-01** (third batch; `check_rotate_keys` added, unit tests in `test_containers.py`): **Up/Down turn the picture** a quarter turn right/left, as in qView, also as Rotate Picture Right/Left in the right-click menu. A free image or video turns around its center; in a container the picture turns and the container stays as it is (section 49).
 - **Containers and browsers**
   - **Add File next to Browse Folder** in the browser, for one file (e.g. a single audio track). This answers the 2026-09-30 question on adding single files.
 - **Text** (section 5.4)
   - **Bug: undo didn't revert an accidental fill colour change.** Waiting on the steps (the user is trying to reproduce it): how was it changed (the colour dialog, a preset, the gradient box, the wheel over a control)? An accepted colour dialog is one undo step in the code (`TextPanel.qml`, `setTextStyle`).
   - **Animations**: a Very fast speed; an Intensity slider (how far it pulses, grows, wiggles); new animations: Ripple (letters enlarge one after another) and Fade (alpha in and out); several animations stacked on one text (the saved `animation` becomes a list).
-- **Keys**: Up/Down rotate the selected image or video by 90°, as in qView. In a container, the picture inside turns and the container stays as it is. (Left/Right still step through files; arrow-key nudging stays dropped.)
 - **Audio** (section 14)
   - **A pause between loops** of an audio track (seconds, per track).
   - **Play through a folder**: an audio track that goes on to the next file in its folder (by name) at the end, for a run of songs. Previous/next buttons on the track skip back and forward. As with Continue Play in browsing containers, it's a switch: on, it plays through; off, the current file loops.
@@ -2665,7 +2665,7 @@ Done since the review: browsing containers (section 6.4), layouts (section 17), 
 
 ### Dropped
 
-- Arrow keys to nudge the selected object (decided 2026-10-16: not wanted). Left/Right still step through files in a browser or browsing container.
+- Arrow keys to nudge the selected object (decided 2026-10-16: not wanted). Left/Right still step through files in a browser or browsing container, and Up/Down turn the picture (2026-11-01).
 - Contain/Cover/Free/Stretch display modes for free media (section 5.1).
 - Audio solo, and choosing between several audio streams in one file.
 - Scaling the wall to other screen sizes (Phase 10).
@@ -2922,6 +2922,7 @@ The following design decisions are currently established:
 - **Video memory** (2026-10-29): hardware video decoding is a setting (Automatic / Off / one backend), applied through Qt's `QT_FFMPEG_DECODING_HW_DEVICE_TYPES` at startup, so it takes a restart; Qt can't switch per player. Still images can be limited to 4096 / 2048 / 1024 px on the long side (live). A separate **Media Memory** window, rather than log lines, shows estimated video memory per loaded media, the measured total from `nvidia-smi`, and decoder fallbacks counted from the log; it refreshes in place every two seconds. Both are in a new Settings tab, **Performance** (General, Performance, Shortcuts, About).
 - **Log Pause holds lines back rather than stopping capture** (2026-10-30): the file and other listeners must never miss a line, and freezing only the view would still shift it as old lines are trimmed. Export saves the window's lines (since the last Clear), not the whole log file, so a Clear before reproducing a problem gives a short, focused export; the full run is still in `logs/mediawall.log`.
 - **Animated images don't cache frames** (2026-10-30): `AnimatedImage` uses `cache: false`, decoding each frame as it's shown, as browsers do. Qt's default kept every frame of every instance in memory and as textures, which filled gigabytes on a wall with a few GIFs. The cost is a little more CPU per frame. After the whole wall is replaced (New, Open), the app gives memory back: QML garbage collection, `QQuickWindow.releaseResources`, and on Linux `malloc_trim(0)`, because glibc otherwise keeps freed memory in the process. Confirmed 2026-11-01: this fixed the busy wall's memory problem.
+- **Up/Down turn the picture, not the container** (2026-11-01), as in qView (Up clockwise). In a container, a picture still as Fit or Fill framed it is framed again at the new angle (`Scene._framed_box` takes a right-angle rotation), so a Fit picture turned sideways still shows whole; one panned or zoomed by hand turns around the container's center and keeps its size. Like other framing in a browsing container, the turn there isn't undone (workspace state), and the next file starts upright. Off in Present (view-only), and while a field has the cursor (the keys belong to the field then).
 - **Text has its own Lock, and it's about the mouse** (2026-11-01): text can't go in a container, so Lock Container can't pin it. A locked text is click-through (`enabled: false`, as in Present), so it can sit over a video's controls; `core` stores `locked` for text but doesn't freeze its geometry (`Scene._frozen` is containers only), because the Text tab's edits refit the box and the canvas can't move it anyway. Locking and unlocking are in the Text tab's list, the one place a click-through object can still be reached. The tab's own Add Text button shows only while there's no text (the toolbar's stays).
 - **Container badges are in the top-left corner** (2026-11-01): the favorite star, the Locked badge, and the empty-folder note, since Full Screen and Present put their ✕ / ▶ / Save buttons in the window's top-right, where they covered a container there. The `⇅` browsing badge was dropped. **Animated Only became Animated and Videos** (everything that moves); the saved `media_filter` value stays "animated", so older projects keep working. The wheel over the Text tab's words field moves the cursor (3 letters a notch) rather than scrolling the text without it, so the spot reached is where typing goes.
 

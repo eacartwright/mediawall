@@ -569,6 +569,60 @@ class LockedContainerTests(unittest.TestCase):
         self.assertFalse(loaded.get(self.free.id).locked)
 
 
+class RotateQuarterTests(unittest.TestCase):
+    """Up/Down: the picture turns a quarter turn; a container stays put."""
+
+    def setUp(self):
+        self.scene = Scene()
+        self.wide = self.scene.add_source("/trip/wide.jpg", "image", 400, 200)
+        self.free = self.scene.add_media(self.wide.id, 600, 0)
+        self.box = self.scene.add_object("container", 0, 0, width=400, height=200)
+        self.content, _ = self.scene.add_media_to_container(self.wide.id, self.box.id)
+
+    def frame(self):
+        c = self.content
+        return tuple(round(v, 3) for v in (c.x, c.y, c.width, c.height, c.rotation))
+
+    def test_free_media_turns_around_its_center(self):
+        box = (self.free.x, self.free.y, self.free.width, self.free.height)
+        self.assertTrue(self.scene.rotate_quarter(self.free.id, 1))
+        self.assertEqual(self.free.rotation, 90)
+        self.assertTrue(self.scene.rotate_quarter(self.free.id, -2))
+        self.assertEqual(self.free.rotation, 270)
+        self.assertEqual((self.free.x, self.free.y, self.free.width, self.free.height), box)
+
+    def test_fitted_picture_is_fitted_again(self):
+        self.assertEqual(self.frame(), (0, 0, 400, 200, 0))
+        self.assertTrue(self.scene.rotate_quarter(self.box.id, 1))
+        # Sideways it shows 100 x 200, centered: the unrotated box is 200 x 100.
+        self.assertEqual(self.frame(), (100, 50, 200, 100, 90))
+        self.assertEqual((self.box.x, self.box.y, self.box.width, self.box.height,
+                          self.box.rotation), (0, 0, 400, 200, 0))
+        self.assertTrue(self.scene.rotate_quarter(self.box.id, -1))
+        self.assertEqual(self.frame(), (0, 0, 400, 200, 0))
+
+    def test_filled_picture_is_filled_again(self):
+        self.scene.fit_content(self.box.id, FIT_COVER)
+        self.assertTrue(self.scene.rotate_quarter(self.box.id, 1))
+        # Sideways it covers 400 x 800: the unrotated box is 800 x 400.
+        self.assertEqual(self.frame(), (-200, -100, 800, 400, 90))
+
+    def test_panned_picture_turns_around_the_container_center(self):
+        self.scene.set_content_geometry(self.box.id, 50, 20, 400, 200, 0)
+        self.assertTrue(self.scene.rotate_quarter(self.box.id, 1))
+        # Its center (250, 120) turns round (200, 100) to (180, 150).
+        self.assertEqual(self.frame(), (-20, 50, 400, 200, 90))
+
+    def test_locked_or_empty_containers_and_text_dont_turn(self):
+        empty = self.scene.add_object("container", 0, 300)
+        text = self.scene.add_text(0, 600, "Hi")
+        self.assertFalse(self.scene.rotate_quarter(empty.id, 1))
+        self.assertFalse(self.scene.rotate_quarter(text.id, 1))
+        self.scene.set_locked(self.box.id, True)
+        self.assertFalse(self.scene.rotate_quarter(self.box.id, 1))
+        self.assertEqual(self.frame(), (0, 0, 400, 200, 0))
+
+
 class FavoritesTests(unittest.TestCase):
 
     def setUp(self):

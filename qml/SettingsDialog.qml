@@ -556,6 +556,8 @@ Dialog {
                     cmd("Arrange", a.bringForward)
                     cmd("Arrange", a.sendBackward)
                     cmd("Arrange", a.sendToBack)
+                    r.push(["Pictures", "Turn the picture right / left (in a container, "
+                            + "the container stays)", dialog.keys("Up") + " / " + dialog.keys("Down")])
                     r.push(["Browsing files", "Previous / next file (hold to repeat)",
                             dialog.keys("Left") + " / " + dialog.keys("Right")])
                     r.push(["Browsing files", "Previous / next file (hold to repeat)",
