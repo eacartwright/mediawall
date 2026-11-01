@@ -21,6 +21,7 @@ ROLE_NAMES = [
     "itemId", "ownerId", "name", "kind", "isTrack", "inContainer", "missing",
     "playing", "muted", "volume", "loop", "speed", "preservePitch",
     "loopA", "loopB", "browsing", "continuePlay", "ownerLocked", "isSpeech", "speech",
+    "loopGap", "canStep",
 ]
 ROLES = {name: int(Qt.UserRole) + 1 + i for i, name in enumerate(ROLE_NAMES)}
 
@@ -97,8 +98,13 @@ class AudioModel(QAbstractListModel):
             "loopA": media.loop_a,
             "loopB": media.loop_b,
             "browsing": browsing,
-            "continuePlay": browsing and owner.continue_play,
+            # A browsing container's, or a track's own (its folder).
+            "continuePlay": owner.continue_play if browsing
+                            else media.type == "audio" and media.continue_play,
             "ownerLocked": owner is not None and owner.locked,
             "isSpeech": bool(media.speech),
             "speech": media.speech,         # a speech track's source (no file)
+            "loopGap": media.loop_gap,
+            # A track with a file can step through its folder.
+            "canStep": media.type == "audio" and not media.speech and source is not None,
         }[name]

@@ -23,6 +23,8 @@ Item {
     required property bool objPreservePitch
     required property real objLoopA
     required property real objLoopB
+    required property real objLoopGap       // seconds of pause at the end
+    required property bool continuePlay     // go on through the folder
     required property string sourceUrl
     required property string sourcePath
     required property string sourceName
@@ -49,13 +51,48 @@ Item {
         if (isSpeech && objPlaying && speechEngine.clipUrl(objSpeech) === "")
             speechEngine.request(objSpeech)
     }
-    onObjPlayingChanged: needClip()
+    onObjPlayingChanged: {
+        needClip()
+        if (!objPlaying)
+            gapTimer.stop()
+    }
     onObjSpeechChanged: needClip()
     Component.onCompleted: needClip()
     // Piper or the voices were just set up: try again.
     Connections {
         target: speechEngine
         function onVoicesChanged() { root.needClip() }
+    }
+
+    // ---- The end of a file (readme section 14.5) ----
+    // Continue Play goes on to the next file in the folder (by name);
+    // otherwise Loop starts it over. With a pause set, either waits that
+    // long first. Without one, a plain Loop is left to the player, so
+    // it stays seamless. An A-B loop overrides both (it never ends).
+    readonly property bool playsThrough: continuePlay && !isSpeech && !view.abLooping
+    readonly property bool handlesEnd: playsThrough || (objLoop && objLoopGap > 0 && !view.abLooping)
+
+    function fileEnded() {
+        if (!handlesEnd || !objPlaying)
+            return
+        gapTimer.interval = Math.max(1, objLoopGap * 1000)
+        gapTimer.start()
+    }
+
+    function goOn() {
+        if (!objPlaying)
+            return
+        // The next file plays from its start once it's loaded; with no
+        // other file in the folder, this one starts over.
+        if (playsThrough && sceneModel.stepTrack(objectId, 1))
+            return
+        view.replay()
+    }
+
+    Timer {
+        id: gapTimer
+        objectName: "trackGapTimer"
+        onTriggered: root.goOn()
     }
 
     MediaView {
@@ -69,13 +106,15 @@ Item {
         playing: root.objPlaying
         muted: root.objMuted
         volume: root.objVolume * (root.sceneItem ? root.sceneItem.masterVolume : 1)
-        loop: root.objLoop
+        loop: root.objLoop && !root.handlesEnd
         speed: root.objSpeed
         preservePitch: root.objPreservePitch
         loopA: root.objLoopA
         loopB: root.objLoopB
         name: root.sourceName
         path: root.sourcePath
+
+        onEndedChanged: if (ended) root.fileEnded()
 
         // Continue from a position handed over (e.g. by Convert to
         // Audio Track).

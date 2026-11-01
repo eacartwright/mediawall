@@ -34,6 +34,7 @@ from core.speech import normalized_speech
 from core.layout import add_layout_to_scene
 from core.media_browser import (
     AUDIO_EXTENSIONS, IMAGE_EXTENSIONS, VIDEO_EXTENSIONS, is_animatable,
+    media_type_for, neighbour_file,
 )
 from core.scene import FIT_CONTAIN, FIT_COVER, Scene
 from core.snap import bounding_box, snap_move, snap_resize
@@ -79,6 +80,7 @@ OBJECT_ROLE_NAMES = [
     "objLoopA",
     "objLoopB",
     "objMirrored",
+    "objLoopGap",
     "folder",
     "currentIndex",
     "includeSubfolders",
@@ -131,7 +133,7 @@ Z_ROLES = [ROLES["objZ"]]
 PLAYBACK_ROLES = [ROLES[n] for n in
                   ("objPlaying", "objMuted", "objVolume", "objLoop",
                    "objSpeed", "objPreservePitch", "objLoopA", "objLoopB",
-                   "objMirrored")]
+                   "objMirrored", "objLoopGap", "continuePlay")]
 SOURCE_ROLES = [ROLES["source" + f] for f in SOURCE_FIELDS]
 CONTAINER_ROLES = [ROLES[n] for n in
                    ("lockContent", "locked", "clipShape", "fitMode", "browseMode",
@@ -367,6 +369,7 @@ class SceneModel(QAbstractListModel):
             "objLoopA": obj.loop_a,
             "objLoopB": obj.loop_b,
             "objMirrored": obj.mirrored,
+            "objLoopGap": obj.loop_gap,
             "folder": obj.folder,
             "currentIndex": obj.current_index,
             "includeSubfolders": obj.include_subfolders,
@@ -481,6 +484,17 @@ class SceneModel(QAbstractListModel):
                 if live is not None:
                     for name in BROWSER_FIELDS:
                         setattr(obj, name, getattr(live, name))
+
+        # Audio tracks: keep the file each one is on (stepping through a
+        # folder isn't undone, as with browsing).
+        for obj in target.objects:
+            live = cur.get(obj.id)
+            if obj.type == "audio" and live is not None and live.source_id != obj.source_id:
+                obj.source_id = live.source_id
+                obj.loop_a, obj.loop_b = live.loop_a, live.loop_b
+                source = cur.sources.get(live.source_id)
+                if source is not None:
+                    target.sources.setdefault(source.id, copy.deepcopy(source))
 
         # Browsing containers: keep their browse settings, and while one
         # is browsing, what it shows (undo never changes the file).
@@ -1262,11 +1276,16 @@ class SceneModel(QAbstractListModel):
             self._changed(workspace_only=True)
 
     @Slot(str, bool)
-    def setContinuePlay(self, container_id, on):
-        """A browsing container plays on to the next video at the end of one."""
-        if self._scene.set_continue_play(container_id, on):
-            self._emit_row(container_id, CONTAINER_ROLES)
-            self._changed(workspace_only=True)
+    def setContinuePlay(self, object_id, on):
+        """
+        A browsing container plays on to the next video at the end of
+        one (workspace state); an audio track to the next file in its
+        folder (undoable, like its Loop).
+        """
+        if self._scene.set_continue_play(object_id, on):
+            obj = self._scene.get(object_id)
+            self._emit_row(object_id, CONTAINER_ROLES + PLAYBACK_ROLES)
+            self._changed(workspace_only=obj.type == "container")
 
     @Slot(str, bool)
     def setNewFirst(self, container_id, on):
@@ -1296,6 +1315,34 @@ class SceneModel(QAbstractListModel):
     @Slot(str, bool)
     def setLoop(self, object_id, loop):
         self._set_media_option(object_id, "loop", loop)
+
+    @Slot(str, float)
+    def setLoopGap(self, track_id, seconds):
+        """An audio track's pause before it starts over or goes on."""
+        self._merge_key = "loopgap:" + track_id     # a slider drag: one step
+        self._set_media_option(track_id, "loop_gap", seconds)
+
+    @Slot(str, int, result=bool)
+    def stepTrack(self, track_id, delta):
+        """
+        An audio track's previous/next file in its folder (its buttons,
+        or Continue Play at the end of a file). Like browsing, which
+        file a track plays is workspace state: not undone. Returns False
+        if there's no other file to go to.
+        """
+        track = self._scene.get(track_id)
+        source = self._scene.sources.get(track.source_id) if track and track.source_id else None
+        if track is None or track.type != "audio" or source is None:
+            return False
+        path = neighbour_file(source.path, delta)
+        if path is None:
+            return False
+        new = self._register_source(path, media_type_for(path))
+        if not self._scene.set_track_file(track_id, new.id):
+            return False
+        self._emit_row(track_id, SOURCE_ROLES + PLAYBACK_ROLES)
+        self._changed(workspace_only=True)
+        return True
 
     @Slot(str, bool)
     def setMirrored(self, object_id, mirrored):

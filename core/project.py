@@ -28,7 +28,7 @@ from core.speech import normalized_speech
 from core.scene import (
     CLIP_SHAPES, FIT_CONTAIN, FIT_MODES, MEDIA_FILTERS, OBJECT_TYPES, PLAYABLE_TYPES,
     SORT_KEYS, MediaSource, Scene, SceneObject,
-    clamp_speed, new_id, normalized_loop, normalized_text_style, one_line,
+    clamp_loop_gap, clamp_speed, new_id, normalized_loop, normalized_text_style, one_line,
 )
 
 
@@ -49,7 +49,8 @@ TYPE_FIELDS = {
                   "media_filter", "sort_by", "sort_descending", "continue_play",
                   "new_first", "favorites"],
     "audio": ["source_id", "playing", "muted", "volume", "loop",
-              "speed", "preserve_pitch", "loop_a", "loop_b", "speech"],
+              "speed", "preserve_pitch", "loop_a", "loop_b", "speech",
+              "loop_gap", "continue_play"],
     "text": ["text", "text_style", "locked"],
 }
 
@@ -283,6 +284,7 @@ def scene_from_dict(data, project_path=None):
             if obj.loop_a is None:
                 warnings.append("Ignored an A-B loop with points too close together.")
                 obj.loop_a = obj.loop_b = -1.0
+            obj.loop_gap = clamp_loop_gap(obj.loop_gap)
 
         if object_type == "container" and obj.fit_mode not in FIT_MODES:
             warnings.append(f"Unknown fit mode {obj.fit_mode!r}; using Fit.")

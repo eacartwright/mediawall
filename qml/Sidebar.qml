@@ -474,6 +474,11 @@ Item {
                             required property bool ownerLocked
                             required property bool isSpeech         // made in the Speech tab
                             required property var speech
+                            required property real loopGap        // a track's pause at the end
+                            required property bool canStep        // a track with a file
+
+                            // A track going on through its folder.
+                            readonly property bool playsThrough: isTrack && continuePlay
 
                             // A speech track's clip: "" (ready, or not asked
                             // for yet), "Making…", or why it can't be made.
@@ -704,8 +709,11 @@ Item {
                                     Layout.fillWidth: true
                                     spacing: 4
 
+                                    // A track playing through its folder
+                                    // doesn't loop (Continue Play, below).
                                     CheckBox {
                                         visible: !card.browsing
+                                        enabled: !card.playsThrough
                                         checked: card.loop
                                         onToggled: {
                                             sceneModel.setLoop(card.itemId, checked)
@@ -716,9 +724,10 @@ Item {
                                     Text {
                                         visible: !card.browsing
                                         text: "Loop"
-                                        color: "#cccccc"
+                                        color: card.playsThrough ? "#777777" : "#cccccc"
                                         font.pixelSize: 11
                                         TapHandler {
+                                            enabled: !card.playsThrough
                                             onTapped: sceneModel.setLoop(card.itemId, !card.loop)
                                         }
                                     }
@@ -791,6 +800,101 @@ Item {
                                         ToolTip.visible: hovered
                                         ToolTip.text: "Clear the A–B loop"
                                         ToolTip.delay: 500
+                                    }
+                                }
+
+                                // ---- A track's folder: previous / next
+                                // file, and Continue Play (at the end of a
+                                // file, the next one, by name) ----
+                                RowLayout {
+                                    Layout.fillWidth: true
+                                    spacing: 4
+                                    visible: card.canStep
+
+                                    Button {
+                                        objectName: "trackPrev"
+                                        Layout.preferredHeight: 24
+                                        Layout.preferredWidth: 30
+                                        text: "◀"
+                                        onClicked: sceneModel.stepTrack(card.itemId, -1)
+                                        ToolTip.visible: hovered
+                                        ToolTip.text: "Previous file in this folder"
+                                        ToolTip.delay: 500
+                                    }
+
+                                    Button {
+                                        objectName: "trackNext"
+                                        Layout.preferredHeight: 24
+                                        Layout.preferredWidth: 30
+                                        text: "▶"
+                                        onClicked: sceneModel.stepTrack(card.itemId, 1)
+                                        ToolTip.visible: hovered
+                                        ToolTip.text: "Next file in this folder"
+                                        ToolTip.delay: 500
+                                    }
+
+                                    Item { Layout.preferredWidth: 4 }
+
+                                    CheckBox {
+                                        objectName: "trackContinuePlay"
+                                        checked: card.continuePlay
+                                        onToggled: {
+                                            sceneModel.setContinuePlay(card.itemId, checked)
+                                            checked = Qt.binding(function() { return card.continuePlay })
+                                        }
+                                    }
+
+                                    Text {
+                                        Layout.fillWidth: true
+                                        text: "Continue Play"
+                                        color: "#cccccc"
+                                        font.pixelSize: 11
+                                        TapHandler {
+                                            onTapped: sceneModel.setContinuePlay(card.itemId, !card.continuePlay)
+                                        }
+                                        ToolTip.visible: continueHover.hovered
+                                        ToolTip.text: "At the end of a file, play the next one in its "
+                                                      + "folder; off, Loop repeats this one"
+                                        ToolTip.delay: 500
+                                        HoverHandler { id: continueHover }
+                                    }
+                                }
+
+                                // ---- A track's pause before it starts over,
+                                // or goes on to the next file ----
+                                RowLayout {
+                                    Layout.fillWidth: true
+                                    spacing: 4
+                                    visible: card.isTrack
+
+                                    Text {
+                                        text: "Pause"
+                                        color: "#cccccc"
+                                        font.pixelSize: 11
+                                    }
+
+                                    Slider {
+                                        objectName: "trackGapSlider"
+                                        Layout.fillWidth: true
+                                        from: 0
+                                        to: 30
+                                        stepSize: 0.5
+                                        value: card.loopGap
+                                        onMoved: sceneModel.setLoopGap(card.itemId, value)
+                                    }
+
+                                    Text {
+                                        Layout.preferredWidth: 38
+                                        text: card.loopGap > 0 ? card.loopGap.toFixed(1) + " s" : "none"
+                                        color: card.loopGap > 0 ? "#e0c060" : "#cccccc"
+                                        font.pixelSize: 11
+                                        horizontalAlignment: Text.AlignRight
+
+                                        // Double-click: no pause.
+                                        MouseArea {
+                                            anchors.fill: parent
+                                            onDoubleClicked: sceneModel.setLoopGap(card.itemId, 0)
+                                        }
                                     }
                                 }
                             }

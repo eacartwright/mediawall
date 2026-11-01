@@ -211,6 +211,47 @@ class AudioTrackTests(unittest.TestCase):
                          ("audio", self.src.id, 0.4, False))
         self.assertIn(self.src.id, loaded.sources)
 
+    def test_pause_between_loops(self):
+        track = self.scene.add_audio_track(self.src.id)
+        self.assertEqual(track.loop_gap, 0)
+        self.assertTrue(self.scene.set_media_option(track.id, "loop_gap", 2.54))
+        self.assertEqual(track.loop_gap, 2.5)
+        self.scene.set_media_option(track.id, "loop_gap", 500)
+        self.assertEqual(track.loop_gap, 30)                     # LOOP_GAP_MAX
+        # Only tracks have it.
+        vid = self.scene.add_source("/v/clip.mp4", "video", 1920, 1080)
+        media = self.scene.add_media(vid.id, 0, 0)
+        self.assertFalse(self.scene.set_media_option(media.id, "loop_gap", 2))
+
+    def test_continue_play_and_next_file(self):
+        track = self.scene.add_audio_track(self.src.id)
+        self.assertTrue(self.scene.set_continue_play(track.id, True))
+        self.scene.set_loop(track.id, 1000, 4000)
+        self.scene.set_playing(track.id, False)
+        self.scene.set_media_option(track.id, "volume", 0.3)
+        nxt = self.scene.add_source("/music/song2.m4a", "audio")
+        self.assertTrue(self.scene.set_track_file(track.id, nxt.id))
+        # The new file plays, keeps the settings, drops the A-B points.
+        self.assertEqual((track.source_id, track.playing, track.volume, track.loop_a),
+                         (nxt.id, True, 0.3, -1))
+        self.assertFalse(self.scene.set_track_file(track.id, nxt.id))   # no change
+        self.assertFalse(self.scene.set_track_file(track.id, "nope"))
+
+    def test_gap_and_continue_play_saved(self):
+        from core.project import scene_from_dict, scene_to_dict
+
+        track = self.scene.add_audio_track(self.src.id)
+        self.scene.set_media_option(track.id, "loop_gap", 3)
+        self.scene.set_continue_play(track.id, True)
+        data = scene_to_dict(self.scene)
+        loaded, _ = scene_from_dict(data)
+        t = loaded.get(track.id)
+        self.assertEqual((t.loop_gap, t.continue_play), (3, True))
+        # A damaged value is clamped.
+        next(o for o in data["objects"] if o["id"] == track.id)["loop_gap"] = -4
+        loaded, _ = scene_from_dict(data)
+        self.assertEqual(loaded.get(track.id).loop_gap, 0)
+
 
 if __name__ == "__main__":
     unittest.main()

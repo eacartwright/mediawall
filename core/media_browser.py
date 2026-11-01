@@ -41,6 +41,28 @@ def file_patterns(media_type=None):
     return [f"*{e}" for e in sorted(extensions)] + [f"*{e.upper()}" for e in sorted(extensions)]
 
 
+def neighbour_file(path, delta):
+    """
+    The file `delta` steps from `path` in its folder (not subfolders),
+    among files of the same type, by name, going round at either end:
+    an audio track's Continue Play and previous/next. The path itself if
+    it's the only one; None if the folder has none (or is gone). A file
+    no longer there counts from the start.
+    """
+    media_type = media_type_for(path)
+    folder = Path(path).parent
+    if media_type is None or not folder.is_dir():
+        return None
+    files = [e["path"] for e in MediaBrowser().scan_folder(str(folder), False, media_type)]
+    if not files:
+        return None
+    here = os.path.normcase(os.path.normpath(str(path)))
+    names = [os.path.normcase(os.path.normpath(p)) for p in files]
+    if here in names:
+        return files[(names.index(here) + delta) % len(files)]
+    return files[0 if delta > 0 else -1]
+
+
 def is_animatable(path):
     """True if the file's format can contain animation (GIF, WebP)."""
     return Path(path).suffix.lower() in ANIMATABLE_EXTENSIONS

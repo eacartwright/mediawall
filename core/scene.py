@@ -97,6 +97,10 @@ SPEED_MAX = 4.0
 # A-B loop points closer than this are rejected (milliseconds).
 MIN_LOOP_MS = 100.0
 
+# Audio tracks: the longest pause before a loop starts over, or before
+# the next file (Continue Play), in seconds.
+LOOP_GAP_MAX = 30.0
+
 # Uniform scaling (wheel zoom) stops at these sizes.
 SCALE_MIN_SIDE = 20.0       # the shorter side
 SCALE_MAX_SIDE = 20000.0    # the longer side
@@ -125,6 +129,10 @@ def _bounding_box(obj):
 
 def clamp_speed(value) -> float:
     return round(min(SPEED_MAX, max(SPEED_MIN, float(value))), 2)
+
+
+def clamp_loop_gap(value) -> float:
+    return round(min(LOOP_GAP_MAX, max(0.0, float(value))), 1)
 
 
 # ---- Text style ("WordArt"; readme section 5.4) ----
@@ -298,6 +306,10 @@ class SceneObject:
     loop_a: float = -1.0
     loop_b: float = -1.0
 
+    # audio track: seconds of silence before it starts over (Loop) or
+    # goes on to the next file (Continue Play); 0 = straight on.
+    loop_gap: float = 0.0
+
     # Runtime only, not saved: the source's size wasn't known when this
     # instance was placed, so it is resized once the size is reported.
     pending_size: bool = False
@@ -334,7 +346,8 @@ class SceneObject:
     sort_descending: bool = False
 
     # browsing container: when a video ends, play the folder's next
-    # video (Continue Play). Workspace state.
+    # video (Continue Play). Workspace state. Audio track: at the end of
+    # a file, play the next one in its folder (saved and undoable).
     continue_play: bool = False
 
     # browsing container: files added to the folder since it was last
@@ -922,11 +935,27 @@ class Scene:
         obj.sort_by, obj.sort_descending = sort_by, descending
         return True
 
-    def set_continue_play(self, container_id, on) -> bool:
-        obj = self.get(container_id)
-        if obj is None or obj.type != "container" or obj.continue_play == bool(on):
+    def set_continue_play(self, object_id, on) -> bool:
+        """A browsing container's, or an audio track's, Continue Play."""
+        obj = self.get(object_id)
+        if obj is None or obj.type not in ("container", "audio") or obj.continue_play == bool(on):
             return False
         obj.continue_play = bool(on)
+        return True
+
+    def set_track_file(self, track_id, source_id) -> bool:
+        """
+        An audio track goes on to another file (Continue Play, or its
+        previous/next buttons): it keeps its volume, speed, and other
+        settings, starts playing, and drops the old file's A-B points.
+        """
+        obj = self.get(track_id)
+        if (obj is None or obj.type != "audio" or obj.speech
+                or source_id not in self.sources or obj.source_id == source_id):
+            return False
+        obj.source_id = source_id
+        obj.playing = True
+        obj.loop_a = obj.loop_b = -1.0
         return True
 
     def set_new_first(self, container_id, on) -> bool:
@@ -961,17 +990,23 @@ class Scene:
     def set_media_option(self, object_id, name, value) -> bool:
         """
         Set a per-instance option: muted, loop, volume, speed,
-        preserve_pitch, or mirrored (flipped horizontally).
+        preserve_pitch, mirrored (flipped horizontally), or (audio
+        tracks) loop_gap, the pause before starting over or going on.
         """
         obj = self.get(object_id)
         if obj is None or obj.type not in PLAYABLE_TYPES or name not in (
-                "muted", "loop", "volume", "speed", "preserve_pitch", "mirrored"):
+                "muted", "loop", "volume", "speed", "preserve_pitch", "mirrored",
+                "loop_gap"):
             return False
 
         if name == "volume":
             value = min(1.0, max(0.0, float(value)))
         elif name == "speed":
             value = clamp_speed(value)
+        elif name == "loop_gap":
+            if obj.type != "audio":
+                return False
+            value = clamp_loop_gap(value)
         else:
             value = bool(value)
 

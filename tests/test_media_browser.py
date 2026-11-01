@@ -9,7 +9,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from core.media_browser import MediaBrowser, file_patterns, is_animated
+from core.media_browser import MediaBrowser, file_patterns, is_animated, neighbour_file
 
 
 class MediaBrowserTests(unittest.TestCase):
@@ -154,6 +154,35 @@ class AnimatedTests(unittest.TestCase):
     def test_type_filter(self):
         names = [e["name"] for e in MediaBrowser().scan_folder(str(self.root), False, "image")]
         self.assertEqual(len(names), 7)
+
+
+class NeighbourFileTests(unittest.TestCase):
+    """An audio track's Continue Play and previous/next."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self.tmp.name)
+        for name in ("b.mp3", "a.mp3", "c.m4a", "photo.jpg", "clip.mp4"):
+            (self.root / name).write_bytes(b"")
+        (self.root / "sub").mkdir()
+        (self.root / "sub" / "z.mp3").write_bytes(b"")
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def name(self, path):
+        return Path(path).name if path else None
+
+    def test_steps_by_name_among_the_same_type_and_goes_round(self):
+        self.assertEqual(self.name(neighbour_file(self.root / "a.mp3", 1)), "b.mp3")
+        self.assertEqual(self.name(neighbour_file(self.root / "c.m4a", 1)), "a.mp3")
+        self.assertEqual(self.name(neighbour_file(self.root / "a.mp3", -1)), "c.m4a")
+
+    def test_a_file_no_longer_there_starts_over(self):
+        self.assertEqual(self.name(neighbour_file(self.root / "gone.mp3", 1)), "a.mp3")
+
+    def test_no_folder(self):
+        self.assertIsNone(neighbour_file(self.root / "nowhere" / "x.mp3", 1))
 
 
 class FilePatternTests(unittest.TestCase):
