@@ -315,6 +315,27 @@ Dialog {
                     color: "#999999"
                     font.pixelSize: 12
                 }
+
+                // ---- Full Screen and the taskbar ----
+
+                CheckBox {
+                    objectName: "keepTaskbarBox"         // found by tests/app
+                    Layout.topMargin: 8
+                    text: "Full Screen keeps the taskbar showing"
+                    font.bold: true
+                    checked: appSettings.keepTaskbar
+                    onToggled: appSettings.keepTaskbar = checked
+                }
+
+                Label {
+                    Layout.fillWidth: true
+                    wrapMode: Text.WordWrap
+                    text: "Full Screen hides the toolbar but leaves the taskbar (or panel) and the "
+                          + "window's title bar, as a maximized window. Present always fills the "
+                          + "whole screen."
+                    color: "#999999"
+                    font.pixelSize: 12
+                }
             }
 
             // =============================================

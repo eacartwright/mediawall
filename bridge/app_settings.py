@@ -69,6 +69,7 @@ RECENT_KEY = "recent/projects"
 
 # Snapping while moving or resizing (hold Ctrl to skip it for one drag).
 SNAP_KEY = "editing/snapping"
+TASKBAR_KEY = "view/fullScreenKeepsTaskbar"
 
 
 # Hardware video decoding (core/media_cost.py): "auto", "software", or
@@ -130,6 +131,7 @@ class AppSettings(QObject):
     maxImageSizeChanged = Signal()
     speechChanged = Signal()
     snappingChanged = Signal()
+    keepTaskbarChanged = Signal()
 
     def __init__(self, hw_decoding=(HW_AUTO, False), parent=None):
         super().__init__(parent)
@@ -385,6 +387,27 @@ class AppSettings(QObject):
 
     # Objects snap to the wall's edges and each other (default on).
     snapping = Property(bool, _get_snapping, _set_snapping, notify=snappingChanged)
+
+    # ---- Full Screen keeps the taskbar ----
+
+    def _get_keep_taskbar(self):
+        value = self._settings.value(TASKBAR_KEY, False)
+        if isinstance(value, str):          # ini files store "true"/"false"
+            return value.lower() == "true"
+        return bool(value)
+
+    def _set_keep_taskbar(self, on):
+        on = bool(on)
+        if on == self._get_keep_taskbar():
+            return
+        self._settings.setValue(TASKBAR_KEY, on)
+        self._settings.sync()
+        self.keepTaskbarChanged.emit()
+
+    # Full Screen (editing) fills the screen but leaves the taskbar (or
+    # panel) showing: a maximized window without the toolbar. Present
+    # always covers the whole screen. Default off.
+    keepTaskbar = Property(bool, _get_keep_taskbar, _set_keep_taskbar, notify=keepTaskbarChanged)
 
     # ---- Performance: hardware video decoding ----
 

@@ -60,15 +60,28 @@ ApplicationWindow {
     // Restored on leaving full screen (windowed or maximized).
     property int windowedVisibility: Window.Windowed
 
-    onFullScreenChanged: {
-        if (fullScreen) {
-            if (visibility !== Window.FullScreen)
-                windowedVisibility = visibility
-            showFullScreen()
-            exitButton.reveal()
-        } else {
+    // How the window is shown: "window" (as the user left it), "full"
+    // (the whole screen), or "taskbar" (Full Screen with the setting to
+    // keep the taskbar: maximized, toolbar hidden). Present is always
+    // "full".
+    readonly property string screenMode: presenting ? "full"
+                                         : fullScreenEditing ? (appSettings.keepTaskbar ? "taskbar" : "full")
+                                         : "window"
+    property string shownMode: "window"
+
+    onScreenModeChanged: {
+        if (screenMode === "window") {
             visibility = windowedVisibility
+        } else {
+            if (shownMode === "window")
+                windowedVisibility = visibility
+            if (screenMode === "full")
+                showFullScreen()
+            else
+                showMaximized()
+            exitButton.reveal()
         }
+        shownMode = screenMode
     }
 
     onPresentingChanged: if (presenting) sceneModel.select("")
