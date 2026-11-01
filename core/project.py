@@ -50,7 +50,7 @@ TYPE_FIELDS = {
                   "new_first", "favorites"],
     "audio": ["source_id", "playing", "muted", "volume", "loop",
               "speed", "preserve_pitch", "loop_a", "loop_b", "speech"],
-    "text": ["text", "text_style"],
+    "text": ["text", "text_style", "locked"],
 }
 
 

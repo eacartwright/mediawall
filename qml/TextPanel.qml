@@ -102,27 +102,108 @@ ScrollView {
         font.pixelSize: 11
     }
 
+    // Every text object, top first (from the Layers list).
+    readonly property var texts:
+        sceneModel.layers.filter(function(layer) { return layer.type === "text" })
+
     ColumnLayout {
         width: panel.availableWidth
         spacing: 6
 
+        // Only until there is a text: then the toolbar's Add Text (or
+        // the canvas's right-click menu) adds more.
         Button {
             Layout.fillWidth: true
             Layout.margins: 6
             Layout.bottomMargin: 0
+            visible: panel.texts.length === 0
             action: panel.actions.addText
             objectName: "addTextButton"
+        }
+
+        // ---- The text objects, one a line: click to select. Lock makes
+        // one ignore the mouse, so what's behind it can be clicked; it's
+        // unlocked here. ----
+        ColumnLayout {
+            Layout.fillWidth: true
+            Layout.margins: 6
+            Layout.bottomMargin: 0
+            spacing: 2
+            visible: panel.texts.length > 0
+
+            Repeater {
+                model: panel.texts
+
+                Rectangle {
+                    id: textRow
+                    required property var modelData
+                    readonly property bool isSelected: modelData.id === sceneModel.selectedId
+                    readonly property string words: modelData.text.trim()
+
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: 26
+                    radius: 3
+                    color: isSelected ? "#3d7fc4" : rowArea.containsMouse ? "#333333" : "transparent"
+
+                    MouseArea {
+                        id: rowArea
+                        objectName: "textRow:" + textRow.modelData.id     // found by tests/app
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        onClicked: sceneModel.select(textRow.modelData.id)
+                    }
+
+                    RowLayout {
+                        anchors.fill: parent
+                        anchors.leftMargin: 6
+                        spacing: 4
+
+                        Text {
+                            Layout.fillWidth: true
+                            text: textRow.words || "(empty text)"
+                            color: textRow.words ? "#eeeeee" : "#999999"
+                            font.pixelSize: 12
+                            elide: Text.ElideRight
+                        }
+
+                        CheckBox {
+                            objectName: "textLock:" + textRow.modelData.id    // found by tests/app
+                            text: "Lock"
+                            checked: textRow.modelData.locked
+                            onToggled: {
+                                sceneModel.setLocked(textRow.modelData.id, checked)
+                                checked = Qt.binding(function() { return textRow.modelData.locked })
+                            }
+                            ToolTip.visible: hovered
+                            ToolTip.text: "Locked text ignores the mouse, so what's behind it "
+                                          + "can be clicked. Its words and style still change here."
+                            ToolTip.delay: 600
+                        }
+                    }
+                }
+            }
         }
 
         Text {
             Layout.fillWidth: true
             Layout.margins: 10
             visible: panel.target === null
-            text: "Select a text object to change its words and style "
-                  + "(or double-click it). Right-click the canvas to add text where you click."
+            text: panel.texts.length === 0
+                  ? "Add text with the button above, or right-click the canvas to add it where you click."
+                  : "Choose a text above (or click or double-click one on the canvas) "
+                    + "to change its words and style."
             color: "#888888"
             font.pixelSize: 12
             wrapMode: Text.WordWrap
+        }
+
+        Caption {
+            Layout.fillWidth: true
+            Layout.leftMargin: 6
+            Layout.rightMargin: 6
+            visible: panel.target !== null && panel.target.locked
+            wrapMode: Text.WordWrap
+            text: "Locked: the mouse goes through it on the canvas. Untick Lock to move it."
         }
 
         ColumnLayout {

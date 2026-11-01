@@ -118,6 +118,25 @@ class TextObjectTests(unittest.TestCase):
         style = loaded.get(self.text.id).text_style
         self.assertEqual((style["fill"], style["depth"]), ("#ffffff", 40))
 
+    def test_lock(self):
+        # The Text tab's Lock: saved and undoable; the text ignores the
+        # mouse (in QML), but its box still follows the Text tab's edits.
+        self.assertTrue(self.scene.set_locked(self.text.id, True))
+        self.assertFalse(self.scene.set_locked(self.text.id, True))       # no change
+        self.assertTrue(self.scene.set_geometry(self.text.id, 10, 20, 300, 60, 0))
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "t.mediawall"
+            save_project(self.scene, path)
+            loaded, _ = load_project(path)
+        self.assertTrue(loaded.get(self.text.id).locked)
+        self.assertTrue(self.scene.set_locked(self.text.id, False))
+
+    def test_only_containers_and_text_lock(self):
+        source = self.scene.add_source("/a.jpg", "image", 100, 100)
+        media = self.scene.add_media(source.id, 0, 0)
+        self.assertFalse(self.scene.set_locked(media.id, True))
+        self.assertFalse(media.locked)
+
 
 if __name__ == "__main__":
     unittest.main()

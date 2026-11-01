@@ -312,6 +312,9 @@ class SceneObject:
     # Locked (Lock Container): the container can't be moved, resized,
     # or rotated, and its content can't be panned, zoomed, replaced, or
     # stepped to another file, until unlocked. Playback still works.
+    # Also used by text (the Text tab's Lock): there it only means the
+    # text ignores the mouse, so what's behind it can be clicked; its
+    # words and style can still be changed in the Text tab.
     locked: bool = False
     clip_shape: str = "rect"
     fit_mode: str = FIT_CONTAIN   # how new content is framed (Fit/Fill)
@@ -522,6 +525,8 @@ class Scene:
         return None if container is None or container.locked else container
 
     def _frozen(self, obj) -> bool:
+        # Locked text isn't frozen: its box follows edits made in the
+        # Text tab, and the canvas never moves it (it ignores the mouse).
         return obj.type == "container" and obj.locked
 
     def container_at(self, x, y, exclude_id=None) -> Optional[SceneObject]:
@@ -1341,12 +1346,12 @@ class Scene:
             self.adopt_as_content(container.id, media_id)
         return container
 
-    def set_locked(self, container_id, locked) -> bool:
-        """Lock Container / Unlock Container."""
-        container = self._container(container_id)
-        if container is None or container.locked == bool(locked):
+    def set_locked(self, object_id, locked) -> bool:
+        """Lock Container / Unlock Container, or a text's Lock (Text tab)."""
+        obj = self.get(object_id)
+        if obj is None or obj.type not in ("container", "text") or obj.locked == bool(locked):
             return False
-        container.locked = bool(locked)
+        obj.locked = bool(locked)
         return True
 
     def set_lock_content(self, container_id, locked) -> bool:

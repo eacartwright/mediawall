@@ -21,6 +21,7 @@ Item {
     required property int objZ
     required property string objText
     required property var textStyle
+    required property bool locked           // the Text tab's Lock
 
     // The scene item (Main.qml), for coordinate mapping.
     property Item sceneItem
@@ -29,9 +30,10 @@ Item {
     property var contextMenu
 
     // Present mode: view-only, never shown as selected. Disabled items
-    // let clicks through to the canvas.
+    // let clicks through to the canvas, and to whatever is behind: so
+    // does locked text (the Text tab's Lock), e.g. over a video's controls.
     readonly property bool presenting: sceneItem ? sceneItem.presenting : false
-    enabled: !presenting
+    enabled: !presenting && !locked
 
     readonly property bool selected:
         !presenting && sceneModel.selectedId === objectId
@@ -319,8 +321,10 @@ Item {
     // Resize (proportions kept unless stretching or wrapping) and rotate
     // -------------------------------------------------
 
+    // Locked text (selected from the Text or Layers tab) shows its
+    // outline only: it can't be moved, resized, or rotated by the mouse.
     ResizeHandles {
-        visible: root.selected
+        visible: root.selected && !root.locked
 
         target: root
         sceneItem: root.sceneItem
@@ -340,7 +344,7 @@ Item {
     }
 
     RotationHandle {
-        visible: root.selected
+        visible: root.selected && !root.locked
 
         target: root
         sceneItem: root.sceneItem

@@ -624,6 +624,8 @@ class SceneModel(QAbstractListModel):
                 "type": obj.type,
                 "kind": kind,
                 "name": scene.display_name(obj.id),
+                "text": obj.text,               # text: the words (Text tab)
+                "locked": obj.locked,
             })
         return layers
 
@@ -1141,10 +1143,10 @@ class SceneModel(QAbstractListModel):
             self._changed(workspace_only=True)
 
     @Slot(str, bool)
-    def setLocked(self, container_id, locked):
-        """Lock Container / Unlock Container (undoable)."""
-        if self._scene.set_locked(container_id, locked):
-            self._emit_row(container_id, CONTAINER_ROLES)
+    def setLocked(self, object_id, locked):
+        """Lock Container / Unlock Container, or a text's Lock (undoable)."""
+        if self._scene.set_locked(object_id, locked):
+            self._emit_row(object_id, CONTAINER_ROLES)
             self._changed()
 
     @Slot(str, bool)
