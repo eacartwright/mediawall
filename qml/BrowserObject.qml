@@ -312,6 +312,24 @@ Rectangle {
         sceneModel.addMedia(currentEntry.path, currentEntry.type, p.x, p.y)
     }
 
+    // Add File…: files chosen one by one ([{path, type}]), without
+    // browsing their folder. Images and videos go on the canvas beside
+    // the browser, audio becomes tracks, as with Add to Canvas; all of
+    // them one undo step.
+    function addFiles(files) {
+        var key = "add-files:" + objectId + ":" + Date.now()
+        for (var i = 0; i < files.length; i++) {
+            var f = files[i]
+            sceneModel.setMergeKey(key)
+            if (f.type === "audio") {
+                sceneModel.addAudioTrack(f.path, f.type)
+            } else {
+                var p = placementBeside(newMediaWidth)
+                sceneModel.addMedia(f.path, f.type, p.x, p.y)
+            }
+        }
+    }
+
     // The current image or video in a new container of its own, placed
     // like Add to Canvas.
     function addCurrentInNewContainer() {
@@ -500,8 +518,11 @@ Rectangle {
 
             Button {
                 Layout.preferredHeight: 26
+                // As wide as the words (Fusion buttons are 80 px at least),
+                // leaving room for the folder and file name.
+                Layout.preferredWidth: contentItem.implicitWidth + 20
 
-                text: "Choose Folder"
+                text: "Folder…"
 
                 onClicked: {
                     var chosen = browserBackend.chooseFolder()
@@ -509,6 +530,26 @@ Rectangle {
                     if (chosen !== "")
                         root.loadFolder(chosen)
                 }
+
+                ToolTip.visible: hovered
+                ToolTip.text: "Choose a folder to browse"
+                ToolTip.delay: 600
+            }
+
+            // Single files (e.g. one song), without browsing a folder.
+            Button {
+                objectName: "addFileButton"             // found by tests/app
+                Layout.preferredHeight: 26
+                Layout.preferredWidth: contentItem.implicitWidth + 20
+
+                text: "File…"
+
+                onClicked: root.addFiles(browserBackend.chooseFiles(root.folder))
+
+                ToolTip.visible: hovered
+                ToolTip.text: "Add one or more files: pictures and videos go on the "
+                              + "wall, audio to the Playback tab"
+                ToolTip.delay: 600
             }
 
             // Close = delete (a browser is a workspace object; undoable).

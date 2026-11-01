@@ -24,7 +24,7 @@ from bridge.scene_model import SceneModel
 from bridge.speech import SpeechEngine
 from bridge.text_shaper import TextShaper
 from bridge.ui_font import fix_linux_ui_font
-from core.media_browser import MediaBrowser
+from core.media_browser import MediaBrowser, file_patterns, media_type_for
 from core.version import VERSION
 
 
@@ -77,6 +77,16 @@ class BrowserBackend(QObject):
             None,
             "Choose Media Folder"
         )
+
+    # A browser's Add File…: one or more files, without browsing their
+    # folder. Returns [{"path", "type"}] (nothing if cancelled).
+    @Slot(str, result=list)
+    def chooseFiles(self, start_folder):
+        kinds = [("Media files", None), ("Images", "image"), ("Videos", "video"),
+                 ("Audio", "audio")]
+        filters = ";;".join(f"{name} ({' '.join(file_patterns(kind))})" for name, kind in kinds)
+        paths, _ = QFileDialog.getOpenFileNames(None, "Add Files", start_folder or "", filters)
+        return [{"path": p, "type": media_type_for(p)} for p in paths if media_type_for(p)]
 
     @Slot(str, result=bool)
     def folderExists(self, folder):

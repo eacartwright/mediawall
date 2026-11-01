@@ -9,7 +9,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from core.media_browser import MediaBrowser, is_animated
+from core.media_browser import MediaBrowser, file_patterns, is_animated
 
 
 class MediaBrowserTests(unittest.TestCase):
@@ -154,6 +154,19 @@ class AnimatedTests(unittest.TestCase):
     def test_type_filter(self):
         names = [e["name"] for e in MediaBrowser().scan_folder(str(self.root), False, "image")]
         self.assertEqual(len(names), 7)
+
+
+class FilePatternTests(unittest.TestCase):
+    """Add File…'s dialog filters."""
+
+    def test_every_supported_file_in_both_cases(self):
+        patterns = file_patterns()
+        for p in ("*.jpg", "*.JPG", "*.mp4", "*.MP4", "*.mp3", "*.M4A", "*.webp"):
+            self.assertIn(p, patterns)
+
+    def test_one_type(self):
+        self.assertIn("*.wav", file_patterns("audio"))
+        self.assertNotIn("*.jpg", file_patterns("audio"))
 
 
 if __name__ == "__main__":

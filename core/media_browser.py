@@ -27,6 +27,20 @@ def media_type_for(path):
     return None
 
 
+def file_patterns(media_type=None):
+    """
+    Glob patterns ("*.jpg", "*.JPG", ...) for a file dialog: every
+    supported file, or one media type's. Upper case too, since file
+    dialogs on Linux match case-sensitively.
+    """
+    extensions = {
+        "image": IMAGE_EXTENSIONS,
+        "video": VIDEO_EXTENSIONS,
+        "audio": AUDIO_EXTENSIONS,
+    }.get(media_type) or IMAGE_EXTENSIONS | VIDEO_EXTENSIONS | AUDIO_EXTENSIONS
+    return [f"*{e}" for e in sorted(extensions)] + [f"*{e.upper()}" for e in sorted(extensions)]
+
+
 def is_animatable(path):
     """True if the file's format can contain animation (GIF, WebP)."""
     return Path(path).suffix.lower() in ANIMATABLE_EXTENSIONS
