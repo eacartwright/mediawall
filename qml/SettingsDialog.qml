@@ -700,10 +700,12 @@ Dialog {
                     wrapMode: Text.WordWrap
                     textFormat: Text.StyledText
                     color: "#999999"
-                    text: "<b>New in 0.9.13</b><br>"
-                          + "• Animated GIFs and WebPs use far less memory<br>"
-                          + "• Memory is given back after New and Open<br>"
-                          + "• Log window: Pause and Export"
+                    text: "<b>New in 0.9.14</b><br>"
+                          + "• Text animations stack, with Ripple, Fade, Very fast, and Intensity<br>"
+                          + "• The Text tab lists every text, with a Lock for each<br>"
+                          + "• Audio tracks play through their folder, with a pause between<br>"
+                          + "• Up/Down turn the picture; File… adds single files<br>"
+                          + "• Full Screen can keep the taskbar showing (Settings > General)"
                 }
 
                 // The Log window: everything the app would print to a
