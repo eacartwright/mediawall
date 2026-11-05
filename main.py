@@ -16,6 +16,7 @@ from PySide6.QtWidgets import QApplication, QFileDialog
 
 from bridge.app_settings import AppSettings, apply_hw_decoding
 from bridge.key_release import KeyReleaseWatcher
+from bridge.library_model import TagLibrary
 from bridge.log_capture import LogCapture
 from bridge.media_memory import MediaMemory
 from bridge.memory_release import MemoryRelease
@@ -154,6 +155,8 @@ def main():
     text_shaper = TextShaper()
     speech_engine = SpeechEngine(app_settings)
     app.aboutToQuit.connect(speech_engine.shutdown)
+    tag_library = TagLibrary(app_settings)
+    app.aboutToQuit.connect(tag_library.shutdown)
 
     engine = QQmlApplicationEngine()
     context = engine.rootContext()
@@ -165,6 +168,7 @@ def main():
     context.setContextProperty("mediaMemory", media_memory)
     context.setContextProperty("textShaper", text_shaper)
     context.setContextProperty("speechEngine", speech_engine)
+    context.setContextProperty("tagLibrary", tag_library)
     context.setContextProperty("keyRelease", key_release)
     context.setContextProperty("appVersion", VERSION)
     context.setContextProperty("appIconUrl", QUrl.fromLocalFile(str(ICON_PATH)))

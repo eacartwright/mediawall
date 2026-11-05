@@ -23,7 +23,9 @@ EXCLUDES = ["tkinter", "unittest", "pydoc_data", "test"]
 # whose path contains any of these are dropped. (Qt names them
 # Qt6<Name>.dll / libQt6<Name>.so, qml/Qt<Name>, qml/QtQuick/<Name>.)
 # Mediawall's QML imports: QtQuick, QtQuick.Controls (Fusion style),
-# QtQuick.Layouts, QtQuick.Shapes, QtMultimedia, Qt.labs.qmlmodels.
+# QtQuick.Layouts, QtQuick.Shapes, QtMultimedia, Qt.labs.qmlmodels. (The
+# Library's TreeView is part of QtQuick. "Sql" below is Qt's module: it
+# doesn't match Python's sqlite3, which the Library uses.)
 UNUSED_QT = [
     "WebEngine", "WebView", "WebChannel", "WebSockets", "3D", "Charts",
     "DataVisualization", "Graphs", "Pdf", "qpdf", "Location", "Positioning",

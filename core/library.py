@@ -109,6 +109,29 @@ def default_library_path():
     return Path(base) / "Mediawall" / "library.sqlite"
 
 
+def default_thumbnail_dir():
+    """Where thumbnails are cached (MEDIAWALL_THUMBNAILS overrides it)."""
+    override = os.environ.get("MEDIAWALL_THUMBNAILS")
+    if override:
+        return Path(override)
+    if os.name == "nt":
+        base = os.environ.get("LOCALAPPDATA") or Path.home() / "AppData" / "Local"
+        return Path(base) / "Mediawall" / "thumbnails"
+    base = os.environ.get("XDG_CACHE_HOME") or Path.home() / ".cache"
+    return Path(base) / "Mediawall" / "thumbnails"
+
+
+def thumbnail_file(cache_dir, path, size, mtime):
+    """
+    Where a file's thumbnail is cached. A changed file (other size or
+    modification time) gets a new one. In subfolders, as a cache can hold
+    more files than one folder handles well.
+    """
+    name = hashlib.blake2b(f"{path_key(path)}|{size}|{mtime}".encode("utf-8", "surrogatepass"),
+                           digest_size=16).hexdigest()
+    return Path(cache_dir) / name[:2] / f"{name}.jpg"
+
+
 def path_key(path):
     """A path's identity: on Windows, a difference in case is the same file."""
     return os.path.normcase(os.path.normpath(str(path)))
@@ -159,6 +182,60 @@ def _match_rank(name_key, query):
             return 2
         at = name_key.find(query, at + 1)
     return 3
+
+
+class FileSelection:
+    """
+    Which rows of a file list are selected (44.1): click, Ctrl+click,
+    Shift+click, and stepping. Kept apart from the list's delegates, which
+    a grid reuses as it scrolls. `current` is the last row acted on.
+    """
+
+    def __init__(self, count=0):
+        self.reset(count)
+
+    def reset(self, count):
+        """A new list: its first row is selected, so typing can tag straight away."""
+        self.count = count
+        self.current = 0 if count else -1
+        self.anchor = self.current
+        self.selected = {0} if count else set()
+
+    def restore(self, count, selected, current):
+        """A list changed under the selection: keep these rows, or start over if none are left."""
+        selected = {row for row in selected if 0 <= row < count}
+        if not selected:
+            self.reset(count)
+            return
+        self.count = count
+        self.current = current if current in selected else min(selected)
+        self.anchor = self.current
+        self.selected = selected
+
+    def click(self, row, ctrl=False, shift=False):
+        if not 0 <= row < self.count:
+            return
+        if shift and self.anchor >= 0:
+            span = set(range(min(self.anchor, row), max(self.anchor, row) + 1))
+            self.selected = self.selected | span if ctrl else span
+        elif ctrl:
+            self.selected ^= {row}
+            self.anchor = row
+        else:
+            self.selected = {row}
+            self.anchor = row
+        self.current = row
+
+    def step(self, delta):
+        """Move to the next or previous file, selecting only it. False at either end."""
+        row = self.current + delta
+        if not 0 <= row < self.count:
+            return False
+        self.click(row)
+        return True
+
+    def select_all(self):
+        self.selected = set(range(self.count))
 
 
 def _chunks(items):
@@ -258,6 +335,13 @@ class Library:
                 break
             result.append(tag)
         return result
+
+    def has_children(self, tag_id):
+        return bool(self._children.get(tag_id))
+
+    def where(self, tag_id):
+        """Where it sits in the tree, from the top: "Location ▸ Massachusetts"."""
+        return " ▸ ".join(tag.name for tag in reversed(self.ancestors(tag_id)))
 
     def descendants(self, tag_id):
         """Everything under it (tags and groups), at any depth."""

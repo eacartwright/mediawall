@@ -1946,6 +1946,8 @@ mediawall/
 │   ├── app_settings.py     app-wide settings (QSettings), for Settings
 │   ├── memory_release.py   gives memory back after New / Open
 │   ├── scene_model.py      exposes Scene to QML as a list model
+│   ├── library_model.py    the Library window's files, selection, and tags
+│   ├── thumbnails.py       the Library's background thumbnails and their disk cache
 │   ├── text_shaper.py      text outlines: wrap, arc, tilt (section 5.4)
 │   └── project_controller.py  New/Open/Save dialogs, title, unsaved prompts
 │
@@ -1969,6 +1971,10 @@ mediawall/
 │   ├── SettingsDialog.qml  the Settings dialog
 │   ├── LogWindow.qml       the Log window
 │   ├── MemoryWindow.qml    the Media Memory window (estimated video memory per media)
+│   ├── LibraryWindow.qml   the Library: tag media (section 44); its search box and keys
+│   ├── LibraryFolders.qml  ...its folder tree
+│   ├── LibraryGrid.qml     ...its grid of files
+│   ├── LibraryTags.qml     ...its tags: on the selection, and the tree
 │   ├── Sidebar.qml         Wall Features flyout (left edge): Layers, Playback, Speech, Text tabs
 │   └── Zoom.js             shared mouse-wheel zoom step
 │
@@ -2022,13 +2028,6 @@ Every folder of importable Python modules contains an `__init__.py`, normally em
 ```text
 core/
 └── collections.py
-
-bridge/
-├── library_model.py      # the Library window's files, selection, and tags
-└── thumbnails.py         # background thumbnails and their disk cache
-
-qml/
-└── LibraryWindow.qml     # and its panes
 
 (Slideshows became browsing containers; audio lives in `core/scene.py` and `bridge/audio_model.py`.)
 ```
@@ -2239,7 +2238,7 @@ These are deliberately later features.
 
 ---
 
-## Phase 13 — Library and tags — **In progress** (the database is built, no window yet; the design and build order are in section 44)
+## Phase 13 — Library and tags — **In progress** (tagging pictures works; video and audio, Strip view, and finding are next; the design and build order are in section 44)
 
 Tag media quickly in a separate Library window, then find it by tag and put it on the wall.
 
@@ -2355,13 +2354,13 @@ Deleting a cache must never delete the user's original media.
 
 # 44. Media Library and Tags
 
-**Status: in progress** (agreed 2026-11-04; Phase 13). The database (`core/library.py`) is built and unit-tested; nothing in the app uses it yet, and the sections below describe the plan unless they say otherwise. The goal is to tag media manually as quickly as possible, one file or many, then use the tags to find media and put it on the wall.
+**Status: in progress** (agreed 2026-11-04; Phase 13). Steps 2 and 3 of the build order (44.8) are done: the database and the Library window, so pictures can be tagged, in all the ways described here. Step 1's checks are done on Windows, apart from the drag. What's left is marked in 44.8; the sections below describe the plan for those parts. The goal is to tag media manually as quickly as possible, one file or many, then use the tags to find media and put it on the wall.
 
 The rest of the app keeps working directly from filesystem paths and never needs the library. There is no import step (section 41): a file gets a database row only when it is first tagged, and "untagged" is simply a folder scan minus the database.
 
 ## 44.1 The Library window
 
-One separate top-level window (like the Log and Media Memory windows, in the same process, so it can call `sceneModel` directly) handles both tagging and finding. It is about as large as the main window, and created only when opened, so it costs nothing otherwise.
+One separate top-level window (like the Log and Media Memory windows, in the same process, so it can call `sceneModel` directly) handles both tagging and finding. It is about as large as the main window, and created only when opened (destroyed when closed, freeing its thumbnails; what it shows lives in `bridge/library_model.py`, so nothing is lost), so it costs nothing otherwise. Unlike those windows it can go behind the main window (`transientParent: null`), or it could never get out of the way of the wall on one monitor; so the main window closes it on quitting. Library on the toolbar, or Ctrl+L.
 
 ```text
 ┌──────────────────────────────────────────────────────────────────┐
@@ -2379,11 +2378,11 @@ One separate top-level window (like the Log and Media Memory windows, in the sam
 └──────────┴────────────────────────────────────┴──────────────────┘
 ```
 
-- **Folders pane (left):** a folder tree, with a Subfolders option and an **Untagged only** filter, which shows what is left to do.
+- **Folders pane (left):** a folder tree, with a Subfolders option and an **Untagged only** filter, which shows what is left to do. A file tagged while that's on stays in view until the next scan, so a series of tags can go on it. Tiles with tags have a green dot.
 - **Tags pane (right):** the selection's tags with counts (`3/12` means 3 of the 12 selected files have it), then the whole tag tree (44.3). Clicking a tag applies or removes it.
 - **Grid view:** large thumbnails, row after row, scrolling like a file browser. The tile size is adjustable.
 - **Strip view:** one large file above a single carousel row. Grid and Strip share one file list and selection. Double-click opens Strip, and Esc returns to Grid.
-- **Selection:** click, Ctrl+click, and Shift+click. It lives in the model rather than in delegates, because the grid reuses delegates as it scrolls. It stays after tagging, for adding more tags to a series of files. The "Tagging 12 files" label always shows what Enter will affect.
+- **Selection:** click, Ctrl+click, and Shift+click, and Ctrl+A with the box empty. A folder's first file starts selected, so typing can begin at once. It lives in the model rather than in delegates, because the grid reuses delegates as it scrolls. It stays after tagging, for adding more tags to a series of files. The "Tagging 12 files" label always shows what Enter will affect.
 
 ## 44.2 The search box
 
@@ -2484,7 +2483,7 @@ Each step ends with something testable, unit tests and `tests/app/check_library*
 
 1. **Check the unknowns** below, on the dev VM (Windows and Mint). **Windows measured, except the drag; Mint to do.**
 2. **Database:** `core/library.py` and its unit tests, including groups, parent tags, and export/import. **Done** (2026-11-04). Relinking and Clean Up wait for step 8; `fingerprint` is already stored.
-3. **Library window:** folder tree, image grid with thumbnails, selection, search box, and tags pane with the tree. Tagging images works from here on.
+3. **Library window:** folder tree, image grid with thumbnails, selection, search box, and tags pane with the tree. Tagging images works from here on. **Done** (2026-11-04), with export and import in the Library ▾ menu. Pictures only for now (GIFs show their first frame), and the Tag|Find and Grid|Strip switches and Ctrl+Space come with their steps. `tests/app/check_library.py`.
 4. **GIFs, video, and audio:** their tiles, thumbnails, and hover playback.
 5. **Strip view.**
 6. **Find mode, Add to Wall, and drag to the wall.**
@@ -2496,12 +2495,12 @@ Each step ends with something testable, unit tests and `tests/app/check_library*
 `tools/library_probe.py` (delete it when this list is finished) takes these measurements on either platform: `images`, `video`, and `drag`. Results so far, on the Windows dev VM (6 threads, no working hardware video decoding, files already in the disk cache), 2026-11-04:
 
 - **Video frames: `QMediaPlayer` with `QVideoSink` is good enough, so no PyAV.** 300 videos at 12.7 a second, none failed, none blank (median 33 ms WebM, 62 ms MOV, 105 ms for a 268 MB MP4), and each frame at most 200 ms from the 10% point. A phone clip's rotation comes out right. **Run it on its own thread:** on the UI thread it stalled the UI for up to 129 ms (36 gaps over 33 ms), against 68 ms (8 gaps) on its own thread, at the same speed. **To do:** the same on Mint, with its hardware decoder.
-- **Thumbnail workers: fine.** `QImageReader` with a scaled size on Qt's thread pool made 2000 thumbnails at 211 a second, including 24-megapixel JPEGs, and the UI thread's longest gap was 40 ms, so Python's global lock isn't a problem here. **To do:** the same on Mint, and from a folder not already in the disk cache.
+- **Thumbnail workers: fine.** `QImageReader` with a scaled size on Qt's thread pool made 2000 thumbnails at 211 a second, including 24-megapixel JPEGs, and the UI thread's longest gap was 40 ms, so Python's global lock isn't a problem here. In the real window, on a folder of 3,000 of them: scanned and open in 0.5 s, and scrolling at about 2,500 px a second while thumbnails were being made never stalled the UI for more than 21 ms. **To do:** the same on Mint, and from a folder not already in the disk cache.
 - **GIF still frames:** `QImageReader` reached the frame at 10% of a 13 MB, 111-frame GIF in 63 ms, so these can use the same workers.
 - **Dragging between windows: to do by hand, on both platforms** (`library_probe.py drag`). The test windows open, but a real drag needs a person at the mouse.
-- **`sqlite3` in the installers:** `UNUSED_QT` doesn't match its file names (checked against the list). The real test has to wait until the app imports `core/library.py` (step 3), since PyInstaller doesn't collect it until then: then confirm in a Windows and a Linux build, and that the installed app can create its database.
+- **`sqlite3` in the installers:** a Windows PyInstaller build has `sqlite3.dll`, `_sqlite3.pyd`, and the Library's QML files, at 144 MB, so `UNUSED_QT` isn't dropping them. **To do:** the Linux build, and open the Library in an installed app on each, to see it create its database.
 
-`core/library.py`, measured on a generous library (5,000 tags, 100,000 files, about 400,000 tag links): a search on a key press 2 to 19 ms, Find about 150 to 330 ms, applying a tag to 2,000 known files 29 ms, the tags of a 2,000-file selection 63 ms. Two costs to design around in step 3: **every tag's count takes about 770 ms** at this size, so the pane should update counts as tags change rather than ask again each time; and **first-time tagging reads each file for its fingerprint**, about 1 s per 2,000 files already in the disk cache and more from a slow drive, so large first-time selections may need to run in the background.
+`core/library.py`, measured on a generous library (5,000 tags, 100,000 files, about 400,000 tag links): a search on a key press 2 to 19 ms, Find about 150 to 330 ms, applying a tag to 2,000 known files 29 ms, the tags of a 2,000-file selection 63 ms. Two costs to design around in step 3: **every tag's count takes about 770 ms** at this size, so the pane should update counts as tags change rather than ask again each time; and **first-time tagging reads each file for its fingerprint**, about 1.2 s per 3,000 files already in the disk cache and more from a slow drive, so large first-time selections may need to run in the background. Step 3 does the first by recounting only once tagging pauses for 300 ms (at a more usual 40,000 tag links, about 80 ms). The second is still on the UI thread: watch for it.
 
 ---
 
@@ -2669,6 +2668,7 @@ The prototype currently provides:
 - per-video speed (0.5x to 3x by default; the range is a setting), Keep pitch, and A-B loop; a Playback tab in the Wall Features panel with every video's sound and playback settings, and a master volume for the window (not saved; section 14.5)
 - a Settings dialog (toolbar): the mouse-wheel zoom step, the speed range, the hold-to-step pace, the container background colour, and snapping; a Performance tab (hardware video decoding, largest still image size, the Media Memory window); a Speech tab (Piper and its voices); a Shortcuts tab listing every key; an About tab with the version (section 25)
 - audio tracks added from a browser (double-click or Add to Audio), controlled in the Playback tab; a track can step through its folder (◀ ▶), play through it (Continue Play), and pause before it loops or goes on (section 14.5)
+- the Library (section 44, in progress): a separate window for tagging pictures quickly from the keyboard, with a folder tree, a grid of thumbnails, tag groups and parent tags, tagging undo, and export/import
 - single files added from a browser's **File…** button (pictures and videos to the canvas, audio to the Playback tab), without browsing a folder (section 26)
 - video as audio: Convert to Audio Track (right-click a video), or Add to Audio for a video in a browser (section 14.2)
 - browsing containers: viewer-style (qView) controls: pan, wheel zoom, back/forward buttons, double-click reset; moved by the border strip or middle-drag; also in Present (section 6.4); containers remember Fit/Fill
@@ -2707,6 +2707,7 @@ During a drag, resize, or rotate, QML moves the item directly so interaction sta
 - **Media Memory figures are estimates** from decoded sizes: Qt doesn't report GPU memory per image or player, or whether a given player actually got a hardware decoder. Driver overhead (e.g. a CUDA context per decoder) isn't counted.
 - **Some video memory stays after New** (Linux Mint, NVIDIA, 2026-10-30): about 850 MB after clearing a wall with two videos, against 9 MB at a fresh start. Probably CUDA decoder contexts or driver state that live until the app exits; not confirmed yet (see section 51).
 - **Off-screen and hidden videos keep decoding** (and keep their decoders' memory).
+- **The Library's thumbnail cache only grows** so far: no size limit or clean-up yet (it can always be deleted; it never touches the originals). The first tag on a large selection of new files runs on the UI thread (section 44.8).
 - **Harmless FFmpeg messages in the Log.** `[aac @ …] Could not update timestamps for skipped samples` repeats for some video/audio files (e.g. `test_mov.mov` in tests/media): FFmpeg trimming the encoder's start-up delay samples. Playback is unaffected. The `Input #0, …` summaries printed whenever a file is opened are normal too. (FFmpeg's log level could be lowered if the noise ever matters.)
 
 ---
@@ -2774,7 +2775,7 @@ Watching (2026-10-17):
 
 ### Next
 
-- **Library and tags** (Phase 13, on branch `library`): the design and build order are in section 44. The database is done (step 2); next, finish "To check first" (44.8: Mint, and the drag by hand), then build the Library window (step 3).
+- **Library and tags** (Phase 13, on branch `library`): the design and build order are in section 44. Tagging pictures works (steps 2 and 3). Next: try it on Mint with "To check first" (44.8), then GIFs, video, and audio (step 4). The thumbnail cache has no size limit or clean-up yet.
 
 Also done 2026-10-17: Speech, text to speech with Piper (section 14.6), and Continue Play replaces Loop in browsing containers (off = loop; next to Play and Mute), an A-B loop overrides it, and a locked container keeps playing on (section 6.4). The 2026-10-17 batch is done: a Size control for text (wrapped or not); colour emoji in text; the glow now follows arc and tilt changes; a fix for presets applying only partly (to confirm on Linux, above); a master volume for the window; Lock Container; a container background colour setting; favorites per browsing container with a Show Favorites Only filter; Show New Files First; and Fit as the default framing (sections 5.4, 6.4, 14.5, 25).
 
@@ -3084,6 +3085,7 @@ The following design decisions are currently established:
 - **The tag database is per machine, with export** (2026-11-04): media isn't shared between the Windows and Mint machines, so no path mapping is needed. Tags belong to a file path, so identical copies are tagged separately; a sampled fingerprint only serves to reattach tags after a move. Audio files are tagged too.
 - **Tags form one tree with groups and parent tags** (2026-11-04): a group (`Location`) only organizes the pane and can't be applied; a parent tag (`car` over `ferrari`) is implied by its children. Implied tags are worked out when read, not stored, so moving a tag takes effect everywhere and undo leaves nothing behind. One parent per tag for now.
 - **Nothing autoplays in the Library's grid** (2026-11-04): stills at rest, one muted file playing on hover, for the memory reasons in section 51.
+- **The Library can go behind the wall** (2026-11-04, building it): unlike the Log and Media Memory windows, it isn't kept in front of the main window. The main window hides and destroys it on closing, before Qt decides whether any window is left, or the app would keep running with nothing on screen.
 - **Tree edits aren't undone; tagging is** (2026-11-04, building `core/library.py`): the Library's undo covers tagging only, as planned. A tree edit clears redo and forgets the steps of a tag it removes, rather than growing undo into a second system of snapshots. A tag's name can't start with `-`, which Find uses to exclude; case is ignored through a stored `name_key`, because SQLite's `NOCASE` covers only ASCII.
 
 ### Open decisions

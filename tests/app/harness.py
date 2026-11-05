@@ -11,7 +11,8 @@ These need a display, PySide6, and the sample media in tests/media/
 fast unit tests in tests/, which `python -m unittest` runs.
 
 Settings: MEDIAWALL_SETTINGS is pointed at a scratch .ini file (set by
-run.py, or here if missing), so the real settings are never touched.
+run.py, or here if missing), so the real settings are never touched. The
+tag library and its thumbnails get scratch places too.
 """
 
 import os
@@ -29,6 +30,8 @@ MEDIA = APP_DIR / "tests" / "media"
 OUT = Path(os.environ.get("MEDIAWALL_CHECK_OUT") or tempfile.mkdtemp(prefix="mediawall-checks-"))
 OUT.mkdir(parents=True, exist_ok=True)
 os.environ.setdefault("MEDIAWALL_SETTINGS", str(OUT / "settings.ini"))
+os.environ.setdefault("MEDIAWALL_LIBRARY", str(OUT / "library.sqlite"))
+os.environ.setdefault("MEDIAWALL_THUMBNAILS", str(OUT / "thumbnails"))
 
 from PySide6.QtCore import QPoint, QPointF, Qt, QTimer            # noqa: E402
 from PySide6.QtGui import QGuiApplication, QWheelEvent             # noqa: E402

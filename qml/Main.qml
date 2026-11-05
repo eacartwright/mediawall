@@ -42,6 +42,14 @@ ApplicationWindow {
     // Ask about unsaved changes before closing.
     onClosing: function(close) {
         close.accepted = projectController.confirmClose()
+        // The Library doesn't close with this window by itself, and the app
+        // runs until its last independent window has closed. Qt checks that
+        // as soon as this returns, before the Loader's window is really
+        // gone: so hide it first, or the app would stay running, unseen.
+        if (close.accepted && libraryLoader.item) {
+            libraryLoader.item.visible = false
+            libraryLoader.active = false
+        }
     }
 
 
@@ -119,6 +127,30 @@ ApplicationWindow {
     MemoryWindow {
         id: memoryWindow
         palette: window.palette
+    }
+
+    // The Library (readme section 44): created when opened and destroyed
+    // when closed, which frees its thumbnails.
+    Loader {
+        id: libraryLoader
+        active: false
+        source: "LibraryWindow.qml"
+
+        Connections {
+            target: libraryLoader.item
+            function onClosing() {
+                Qt.callLater(function() { libraryLoader.active = false })
+            }
+        }
+    }
+
+    function showLibrary() {
+        libraryLoader.active = true
+        var library = libraryLoader.item
+        library.palette = window.palette
+        library.show()
+        library.raise()
+        library.requestActivate()
     }
 
     SettingsDialog {
@@ -261,7 +293,7 @@ ApplicationWindow {
                 anchors.leftMargin: 10
                 anchors.rightMargin: 10
 
-                spacing: 8
+                spacing: 5
 
                 Button { action: appActions.newWall }
                 // Open, with Open Recent on the ▾ beside it.
@@ -349,8 +381,8 @@ ApplicationWindow {
                 Rectangle {
                     Layout.preferredWidth: 1
                     Layout.preferredHeight: 28
-                    Layout.leftMargin: 6
-                    Layout.rightMargin: 6
+                    Layout.leftMargin: 4
+                    Layout.rightMargin: 4
                     color: "#555555"
                 }
 
@@ -361,8 +393,8 @@ ApplicationWindow {
                 Rectangle {
                     Layout.preferredWidth: 1
                     Layout.preferredHeight: 28
-                    Layout.leftMargin: 6
-                    Layout.rightMargin: 6
+                    Layout.leftMargin: 4
+                    Layout.rightMargin: 4
                     color: "#555555"
                 }
 
@@ -374,9 +406,10 @@ ApplicationWindow {
                     Layout.fillWidth: true
                 }
 
+                Button { action: appActions.library; objectName: "toolbarLibrary" }
                 Button { action: appActions.fullScreen }
                 Button { action: appActions.present }
-                Button { action: appActions.settings }
+                Button { action: appActions.settings; objectName: "toolbarSettings" }
             }
         }
 

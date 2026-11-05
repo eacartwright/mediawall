@@ -275,6 +275,13 @@ Item {
         onTriggered: actions.window.presenting = !actions.window.presenting
     }
 
+    // Tag media, and find it by tag (readme section 44).
+    readonly property Action library: Action {
+        text: "Library"
+        shortcut: "Ctrl+L"
+        onTriggered: actions.window.showLibrary()
+    }
+
     readonly property Action settings: Action {
         text: "Settings"
         onTriggered: actions.settingsDialog.open()

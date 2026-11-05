@@ -585,6 +585,7 @@ Dialog {
                             "Mouse back / forward buttons"])
                     r.push(["Browsing files", "Previous / next file",
                             "Tilt the wheel left / right"])
+                    cmd("View", a.library)
                     cmd("View", a.fullScreen)
                     cmd("View", a.present)
                     r.push(["View", "Leave Present", dialog.keys("Esc")])

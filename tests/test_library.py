@@ -7,7 +7,8 @@ from pathlib import Path
 from unittest import mock
 
 from core.library import (
-    Library, LibraryError, SCHEMA_VERSION, default_library_path, file_fingerprint, normalized_name,
+    FileSelection, Library, LibraryError, SCHEMA_VERSION, default_library_path,
+    default_thumbnail_dir, file_fingerprint, normalized_name, thumbnail_file,
 )
 
 
@@ -97,6 +98,15 @@ class TreeRuleTests(LibraryTestCase):
         self.lib.create_tag("Boston", ma.id)
         self.assertEqual([(t.name, d) for t, d in self.lib.tree()], [
             ("Location", 0), ("London", 1), ("Massachusetts", 1), ("Boston", 2), ("zebra", 0)])
+
+    def test_where_reads_from_the_top(self):
+        loc = self.lib.create_group("Location")
+        ma = self.lib.create_tag("Massachusetts", loc.id)
+        boston = self.lib.create_tag("Boston", ma.id)
+        self.assertEqual(self.lib.where(boston.id), "Location ▸ Massachusetts")
+        self.assertEqual(self.lib.where(loc.id), "")
+        self.assertTrue(self.lib.has_children(ma.id))
+        self.assertFalse(self.lib.has_children(boston.id))
 
     def test_implied_stops_at_a_group(self):
         loc = self.lib.create_group("Location")
@@ -316,6 +326,63 @@ class TaggingTests(LibraryTestCase):
             self.assertEqual(self.lib.selection_tags(paths)[0]["count"], 7)
             self.assertEqual(self.lib.remove_tag(tag.id, paths), 7)
             self.assertEqual(len(self.lib.untagged(paths)), 7)
+
+
+class FileSelectionTests(unittest.TestCase):
+
+    def test_a_new_list_selects_its_first_row(self):
+        selection = FileSelection(3)
+        self.assertEqual((selection.selected, selection.current), ({0}, 0))
+        selection.reset(0)
+        self.assertEqual((selection.selected, selection.current), (set(), -1))
+
+    def test_click_replaces(self):
+        selection = FileSelection(5)
+        selection.click(3)
+        self.assertEqual((selection.selected, selection.current), ({3}, 3))
+
+    def test_ctrl_click_toggles(self):
+        selection = FileSelection(5)
+        selection.click(2, ctrl=True)
+        self.assertEqual(selection.selected, {0, 2})
+        selection.click(0, ctrl=True)
+        self.assertEqual(selection.selected, {2})
+
+    def test_shift_click_spans_from_the_anchor_either_way(self):
+        selection = FileSelection(9)
+        selection.click(4)
+        selection.click(6, shift=True)
+        self.assertEqual(selection.selected, {4, 5, 6})
+        selection.click(2, shift=True)
+        self.assertEqual(selection.selected, {2, 3, 4})
+        self.assertEqual(selection.current, 2)
+
+    def test_ctrl_shift_click_adds_the_span(self):
+        selection = FileSelection(9)
+        selection.click(1)
+        selection.click(4, ctrl=True)
+        selection.click(6, ctrl=True, shift=True)
+        self.assertEqual(selection.selected, {1, 4, 5, 6})
+
+    def test_step_selects_only_the_next_and_stops_at_the_ends(self):
+        selection = FileSelection(2)
+        selection.select_all()
+        self.assertTrue(selection.step(1))
+        self.assertEqual(selection.selected, {1})
+        self.assertFalse(selection.step(1))
+        self.assertEqual(selection.selected, {1})
+
+    def test_row_out_of_range_is_ignored(self):
+        selection = FileSelection(2)
+        selection.click(5)
+        self.assertEqual(selection.selected, {0})
+
+    def test_restore_keeps_rows_still_there(self):
+        selection = FileSelection(9)
+        selection.restore(3, {1, 2, 7}, 7)
+        self.assertEqual((selection.selected, selection.current), ({1, 2}, 1))
+        selection.restore(3, {8}, 8)
+        self.assertEqual((selection.selected, selection.current), ({0}, 0))
 
 
 class CountTests(LibraryTestCase):
@@ -565,6 +632,18 @@ class StorageTests(LibraryTestCase):
         with mock.patch.dict(os.environ, {"LOCALAPPDATA": "C:/Local"}):
             os.environ.pop("MEDIAWALL_LIBRARY", None)
             self.assertEqual(default_library_path(), Path("C:/Local/Mediawall/library.sqlite"))
+
+    def test_thumbnail_dir_override(self):
+        with mock.patch.dict(os.environ, {"MEDIAWALL_THUMBNAILS": "/somewhere/thumbs"}):
+            self.assertEqual(default_thumbnail_dir(), Path("/somewhere/thumbs"))
+
+    def test_thumbnail_file_changes_with_the_file(self):
+        here = thumbnail_file("/cache", "/m/a.jpg", 10, 1.5)
+        self.assertEqual(here, thumbnail_file("/cache", "/m/a.jpg", 10, 1.5))
+        self.assertEqual(here.parent.parent, Path("/cache"))
+        self.assertEqual(here.suffix, ".jpg")
+        for other in [("/m/b.jpg", 10, 1.5), ("/m/a.jpg", 11, 1.5), ("/m/a.jpg", 10, 2.5)]:
+            self.assertNotEqual(here, thumbnail_file("/cache", *other))
 
     def test_fingerprint(self):
         big = self.dir / "big.mp4"
