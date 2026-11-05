@@ -331,6 +331,8 @@ class TagLibrary(QObject):
     resultsChanged = Signal()
     historyChanged = Signal()
     treeChanged = Signal()
+    # Tagging has paused: browsing containers with a saved search look again.
+    searchesChanged = Signal()
     currentRowChanged = Signal(int)
 
     _scanned = Signal(int, object)
@@ -359,7 +361,7 @@ class TagLibrary(QObject):
         self._counts_timer = QTimer(self)
         self._counts_timer.setSingleShot(True)
         self._counts_timer.setInterval(COUNTS_DELAY_MS)
-        self._counts_timer.timeout.connect(self._refresh_counts)
+        self._counts_timer.timeout.connect(self._tagging_paused)
         self._message_timer = QTimer(self)
         self._message_timer.setSingleShot(True)
         self._message_timer.setInterval(MESSAGE_MS)
@@ -370,20 +372,28 @@ class TagLibrary(QObject):
     # Opening and closing
     # -------------------------------------------------
 
-    @Slot()
-    def open(self):
-        """The window opened. Later openings find everything as it was left."""
+    def _open_database(self):
+        """
+        The first time anything needs it: the window opening, or a project
+        with a browsing container that has a saved search. True if it's open.
+        """
         if self._library is None and not self._error:
             try:
                 self._library = Library(default_library_path())
             except LibraryError as e:
                 self._error = str(e)
                 self.errorChanged.emit()
-                return
+                return False
+            self._tags.set_library(self._library)
+        return self._library is not None
+
+    @Slot()
+    def open(self):
+        """The window opened. Later openings find everything as it was left."""
+        if self._files is None and self._open_database():
             self._thumbnails = ThumbnailMaker(default_thumbnail_dir(), self)
             self._files = FilesModel(self._thumbnails, self)
             self._files.selectionChanged.connect(self._selection_updated)
-            self._tags.set_library(self._library)
             self._refresh_counts()
             self.openedChanged.emit()
             self._folder = self._settings.libraryFolder
@@ -400,7 +410,7 @@ class TagLibrary(QObject):
             self._library = None
 
     def _get_opened(self):
-        return self._library is not None
+        return self._files is not None
 
     opened = Property(bool, _get_opened, notify=openedChanged)
 
@@ -860,12 +870,38 @@ class TagLibrary(QObject):
         if self._find_mode:
             self._forget_gone_filters()
             self._scan()                 # the results may have changed
-        else:
-            self._counts_timer.start()
+        self._counts_timer.start()
 
     def _refresh_counts(self):
         if self._library is not None and not self._find_mode:
             self._tags.set_counts(self._library.tag_counts())
+
+    def _tagging_paused(self):
+        self._refresh_counts()
+        self.searchesChanged.emit()
+
+    # -------------------------------------------------
+    # A browsing container's saved search (section 44.5)
+    # -------------------------------------------------
+
+    @Slot(list, list, str, str, bool, str, list, result=list)
+    def searchFiles(self, include, exclude, media_filter, sort_by, descending, seed, favorites):
+        """Like BrowserBackend.scanContainerFolder, for a search rather than a folder."""
+        if not self._open_database():
+            return []
+        try:
+            return self._library.search_files([str(n) for n in include], [str(n) for n in exclude],
+                                              media_filter, sort_by, descending, seed,
+                                              [str(p) for p in favorites])
+        except sqlite3.Error as e:
+            print(f"Tag library: {e}", flush=True)  # the Log window
+            return []
+
+    @Slot(result="QVariantMap")
+    def currentSearch(self):
+        """What New Browsing Container from This Search saves: {include, exclude} names."""
+        return {"include": [f["name"] for f in self._filters if not f["exclude"]],
+                "exclude": [f["name"] for f in self._filters if f["exclude"]]}
 
     # -------------------------------------------------
     # Undo (tagging only: section 44.6)

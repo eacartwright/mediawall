@@ -58,6 +58,7 @@ def layout_to_dict(scene: Scene) -> dict:
         fields = COMMON_FIELDS + TYPE_FIELDS["container"]
         entry = {name: getattr(obj, name) for name in fields}
         entry["browse_folder"] = ""
+        entry["browse_query"] = None
         objects.append(entry)
     return {
         "format": LAYOUT_FORMAT,

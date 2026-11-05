@@ -180,6 +180,15 @@ ApplicationWindow {
         return files.length
     }
 
+    // The Library's New Browsing Container from This Search. False during Present.
+    function addSearchContainer(search) {
+        if (presenting)
+            return false
+        sceneModel.addSearchContainer(search.include, search.exclude,
+                                      150 + Math.random() * 100, 150 + Math.random() * 100)
+        return true
+    }
+
     // A file dropped on an empty container goes in it; otherwise on the
     // canvas, from where it was dropped.
     function dropFiles(files, x, y) {

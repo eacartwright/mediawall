@@ -35,6 +35,7 @@ Item {
     required property string fitMode
     required property bool browseMode
     required property string browseFolder
+    required property var browseQuery           // a saved tag search; {} for none (section 44.5)
     required property bool browseSubfolders
     required property string mediaFilter        // core/scene.py MEDIA_FILTERS["container"]
     required property string sortBy             // core/scene.py SORT_KEYS
@@ -154,13 +155,29 @@ Item {
 
     property var browseFiles: []
 
+    readonly property bool browsesSearch: browseQuery.include !== undefined
+
+    // The saved search, in words: "car, not ferrari".
+    readonly property string searchText: {
+        if (!browsesSearch)
+            return ""
+        return browseQuery.include.concat(browseQuery.exclude.map(function(n) { return "not " + n })).join(", ")
+    }
+
     function rescanBrowse() {
-        if (!browseMode || browseFolder === "") {
+        // While the item is being built, its settings arrive one at a time,
+        // each change landing here. Component.onCompleted scans once they're in.
+        if (favorites === undefined)
+            return
+        if (!browseMode || (browseFolder === "" && !browsesSearch)) {
             browseFiles = []
             return
         }
-        browseFiles = browserBackend.scanContainerFolder(browseFolder, browseSubfolders, mediaFilter,
-                                                         sortBy, sortDescending, objectId, favorites)
+        browseFiles = (browsesSearch
+                       ? tagLibrary.searchFiles(browseQuery.include, browseQuery.exclude, mediaFilter,
+                                                sortBy, sortDescending, objectId, favorites)
+                       : browserBackend.scanContainerFolder(browseFolder, browseSubfolders, mediaFilter,
+                                                            sortBy, sortDescending, objectId, favorites))
             .filter(function(e) { return e.type === "image" || e.type === "video" })
 
         // What's there now isn't new (a new folder, filter, or session).
@@ -190,6 +207,7 @@ Item {
 
     onBrowseModeChanged: { forgetSeen(); rescanBrowse() }
     onBrowseFolderChanged: { forgetSeen(); rescanBrowse() }
+    onBrowseQueryChanged: { forgetSeen(); rescanBrowse() }
     onBrowseSubfoldersChanged: { forgetSeen(); rescanBrowse() }
     onSortByChanged: rescanBrowse()
     onSortDescendingChanged: rescanBrowse()
@@ -202,6 +220,15 @@ Item {
     // Favorites Only: the list follows the marks (no other filter does).
     onFavoritesChanged: if (mediaFilter === "favorites") rescanBrowse()
     onNewFirstChanged: if (newFirst) { forgetSeen(); rescanBrowse() }
+
+    // Files tagged, or tags changed, in the Library.
+    Connections {
+        target: tagLibrary
+        function onSearchesChanged() {
+            if (root.browsesSearch)
+                root.rescanBrowse()
+        }
+    }
 
 
     // -------------------------------------------------
@@ -795,7 +822,8 @@ Item {
             if (mouse.button !== Qt.LeftButton)
                 return
             if (!root.hasContent) {
-                if (!root.presenting && !root.locked && !(root.browseMode && root.browseFolder !== ""))
+                if (!root.presenting && !root.locked
+                        && !(root.browseMode && (root.browseFolder !== "" || root.browsesSearch)))
                     sceneModel.startBrowsing(root.objectId)
                 return
             }
@@ -978,7 +1006,8 @@ Item {
                 width: parent.width - 12
                 elide: Text.ElideMiddle
                 text: root.mediaFilter === "favorites" ? "Browsing · no favorites yet"
-                                                       : "Browsing · no media found"
+                      : root.browsesSearch ? "No files match: " + root.searchText
+                      : "Browsing · no media found"
                 color: "#dddddd"
                 font.pixelSize: 11
             }

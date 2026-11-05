@@ -231,6 +231,20 @@ def normalized_text_style(raw) -> dict:
     return style
 
 
+def normalized_browse_query(value):
+    """
+    A browsing container's saved tag search (readme section 44.5):
+    {"include": [names], "exclude": [names]}, or None if it isn't one.
+    """
+    if not isinstance(value, dict):
+        return None
+    query = {}
+    for key in ("include", "exclude"):
+        names = value.get(key)
+        query[key] = [n for n in names if isinstance(n, str) and n] if isinstance(names, list) else []
+    return query if query["include"] or query["exclude"] else None
+
+
 def one_line(text: str) -> str:
     """Text objects hold a single line."""
     return text.replace("\r\n", " ").replace("\r", " ").replace("\n", " ")
@@ -352,6 +366,9 @@ class SceneObject:
     browse_mode: bool = False
     browse_folder: str = ""
     browse_subfolders: bool = True
+    # Its files come from this tag search rather than a folder, if set
+    # (normalized_browse_query; tag names, looked up when it rescans).
+    browse_query: dict | None = None
 
     # browser and browsing container: "all" or one media type
     # (MEDIA_FILTERS), and the order files are stepped through
@@ -1338,6 +1355,7 @@ class Scene:
             if not container.browse_mode:
                 return False
             container.browse_mode = False
+            container.browse_query = None
             return True
 
         if not folder:
@@ -1347,11 +1365,19 @@ class Scene:
                 return False
             folder = str(Path(source.path).parent)
 
-        if container.browse_mode and container.browse_folder == folder:
+        if container.browse_mode and container.browse_folder == folder and not container.browse_query:
             return False
         container.browse_mode = True
         container.browse_folder = folder
+        container.browse_query = None
         return True
+
+    def add_search_container(self, include, exclude, x, y):
+        """A new browsing container whose files come from a tag search."""
+        container = self.add_object("container", x, y)
+        container.browse_mode = True
+        container.browse_query = normalized_browse_query({"include": include, "exclude": exclude})
+        return container
 
     def set_browse_subfolders(self, container_id, include) -> bool:
         container = self._container(container_id)

@@ -2239,7 +2239,7 @@ These are deliberately later features.
 
 ---
 
-## Phase 13 — Library and tags — **In progress** (tagging and finding work, and files reach the wall; browsing containers from a search are next; the design and build order are in section 44)
+## Phase 13 — Library and tags — **In progress** (tagging, finding, the wall, and browsing containers from a search work; relinking moved files is next; the design and build order are in section 44)
 
 Tag media quickly in a separate Library window, then find it by tag and put it on the wall.
 
@@ -2355,7 +2355,7 @@ Deleting a cache must never delete the user's original media.
 
 # 44. Media Library and Tags
 
-**Status: in progress** (agreed 2026-11-04; Phase 13). Steps 2 to 6 of the build order (44.8) are done: the database and the Library window, so any media can be tagged, found, and added to the wall, in all the ways described here. (Dragging to the wall hasn't been tried with a real mouse yet: see 44.8.) Step 1's checks are done on Windows, apart from the drag. What's left is marked in 44.8; the sections below describe the plan for those parts. The goal is to tag media manually as quickly as possible, one file or many, then use the tags to find media and put it on the wall.
+**Status: in progress** (agreed 2026-11-04; Phase 13). Steps 2 to 7 of the build order (44.8) are done: the database and the Library window, so any media can be tagged, found, and added to the wall, in all the ways described here. (Dragging to the wall hasn't been tried with a real mouse yet: see 44.8.) Step 1's checks are done on Windows, apart from the drag. What's left is marked in 44.8; the sections below describe the plan for those parts. The goal is to tag media manually as quickly as possible, one file or many, then use the tags to find media and put it on the wall.
 
 The rest of the app keeps working directly from filesystem paths and never needs the library. There is no import step (section 41): a file gets a database row only when it is first tagged, and "untagged" is simply a folder scan minus the database.
 
@@ -2456,7 +2456,7 @@ There are three ways from the Library to the wall:
 
 1. **Add to Wall** (button and Ctrl+Enter, for the selection): pictures and videos go on the canvas and audio to the Playback tab, through the existing `addMedia` and `addAudioTrack`, or from the ▾ beside it, each picture or video in a new container (`addMediaInNewContainer`). It's one undo step on the wall, and does nothing during Present. This comes first, because a window as large as the main one covers the wall when there is only one monitor.
 2. **Drag to the wall**, onto the canvas or a container, when the windows are side by side. It's a real file drag (`text/uri-list`), so the main window gets a `DropArea`. So drags from a file manager work too. One file dropped on an empty container goes in it; otherwise files go on the canvas from where they're dropped.
-3. **New Browsing Container from This Search**: a browsing container whose files come from the search rather than a folder, picking up newly tagged files at its next rescan. The search stays in the Library, with no search UI on containers. The container only stores the query, in a new saved field (`browse_query`, added to `TYPE_FIELDS`), holding tag names as `include` and `exclude` lists, and `rescanBrowse` is the one place its file list loads. Its favorites, sorting, and stepping keep working. A tag that no longer exists (renamed or deleted, or a project opened on another machine) matches nothing and the container says so, as with a missing folder.
+3. **New Browsing Container from This Search**: a browsing container whose files come from the search rather than a folder, picking up newly tagged files at its next rescan. The search stays in the Library, with no search UI on containers. The container only stores the query, in a new saved field (`browse_query`, added to `TYPE_FIELDS`), holding tag names as `include` and `exclude` lists, and `rescanBrowse` is the one place its file list loads. Its favorites, sorting, and stepping keep working. A tag that no longer exists (renamed or deleted, or a project opened on another machine) matches nothing and the container says so, as with a missing folder; an excluded tag that no longer exists just excludes nothing. It looks again whenever tagging pauses in the Library. A folder limit in the Library isn't part of what's saved. It's in the Add to Wall ▾ menu, and shown in the container's right-click menu; Browse Folder… there turns it into an ordinary folder container, and Stop Browsing forgets the search. A layout doesn't keep it, as with a folder. Opening a project with one opens the database, without the window.
 
 ## 44.6 The database
 
@@ -2491,7 +2491,7 @@ Each step ends with something testable, unit tests and `tests/app/check_library*
 4. **GIFs, video, and audio:** their tiles, thumbnails, and hover playback. **Done** (2026-11-04), with Ctrl+Space. `tests/app/check_library_media.py`.
 5. **Strip view.** **Done** (2026-11-04). `tests/app/check_library_strip.py`.
 6. **Find mode, Add to Wall, and drag to the wall.** **Done** (2026-11-04), apart from trying a real drag by hand (above). `tests/app/check_library_find.py`.
-7. **Browsing containers from a search.**
+7. **Browsing containers from a search.** **Done** (2026-11-04). `tests/app/check_library_search.py`.
 8. **Relinking moved files** in the scan, and Clean Up.
 
 ### To check first
@@ -2672,7 +2672,7 @@ The prototype currently provides:
 - per-video speed (0.5x to 3x by default; the range is a setting), Keep pitch, and A-B loop; a Playback tab in the Wall Features panel with every video's sound and playback settings, and a master volume for the window (not saved; section 14.5)
 - a Settings dialog (toolbar): the mouse-wheel zoom step, the speed range, the hold-to-step pace, the container background colour, and snapping; a Performance tab (hardware video decoding, largest still image size, the Media Memory window); a Speech tab (Piper and its voices); a Shortcuts tab listing every key; an About tab with the version (section 25)
 - audio tracks added from a browser (double-click or Add to Audio), controlled in the Playback tab; a track can step through its folder (◀ ▶), play through it (Continue Play), and pause before it loops or goes on (section 14.5)
-- the Library (section 44, in progress): a separate window for tagging media quickly from the keyboard, with a folder tree, a grid of thumbnails (a video or GIF plays muted while hovered, and Ctrl+Space plays a file with sound), a Strip view (one large file above a row of the others), tag groups and parent tags, tagging undo, export/import, Find mode (search by tags, excluding some), and Add to Wall
+- the Library (section 44, in progress): a separate window for tagging media quickly from the keyboard, with a folder tree, a grid of thumbnails (a video or GIF plays muted while hovered, and Ctrl+Space plays a file with sound), a Strip view (one large file above a row of the others), tag groups and parent tags, tagging undo, export/import, Find mode (search by tags, excluding some), Add to Wall, and browsing containers that step through a saved tag search
 - files dragged onto the wall, from the Library or a file manager (section 44.5)
 - single files added from a browser's **File…** button (pictures and videos to the canvas, audio to the Playback tab), without browsing a folder (section 26)
 - video as audio: Convert to Audio Track (right-click a video), or Add to Audio for a video in a browser (section 14.2)
@@ -2780,7 +2780,7 @@ Watching (2026-10-17):
 
 ### Next
 
-- **Library and tags** (Phase 13, on branch `library`): the design and build order are in section 44. Tagging and finding work, in a grid or Strip view, and files reach the wall (steps 2 to 6). Still to try: "To check first" (44.8: Mint, and a real drag on both). Next: browsing containers from a search (step 7). The thumbnail cache has no size limit or clean-up yet.
+- **Library and tags** (Phase 13, on branch `library`): the design and build order are in section 44. Tagging and finding work, in a grid or Strip view, and files reach the wall (steps 2 to 6). Still to try: "To check first" (44.8: Mint, and a real drag on both). Next: relinking moved files, and Clean Up (step 8). The thumbnail cache has no size limit or clean-up yet.
 
 Also done 2026-10-17: Speech, text to speech with Piper (section 14.6), and Continue Play replaces Loop in browsing containers (off = loop; next to Play and Mute), an A-B loop overrides it, and a locked container keeps playing on (section 6.4). The 2026-10-17 batch is done: a Size control for text (wrapped or not); colour emoji in text; the glow now follows arc and tilt changes; a fix for presets applying only partly (to confirm on Linux, above); a master volume for the window; Lock Container; a container background colour setting; favorites per browsing container with a Show Favorites Only filter; Show New Files First; and Fit as the default framing (sections 5.4, 6.4, 14.5, 25).
 

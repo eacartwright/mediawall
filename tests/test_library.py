@@ -328,6 +328,45 @@ class TaggingTests(LibraryTestCase):
             self.assertEqual(len(self.lib.untagged(paths)), 7)
 
 
+class SearchFilesTests(LibraryTestCase):
+
+    def setUp(self):
+        super().setUp()
+        self.a, self.b, self.c = self.files("a.jpg", "b10.jpg", "b2.mp4")
+        self.car = self.lib.create_tag("car")
+        self.ferrari = self.lib.create_tag("ferrari", self.car.id)
+        self.lib.apply_tag(self.ferrari.id, [self.a, self.b])
+        self.lib.apply_tag(self.car.id, [self.c])
+
+    def names(self, *args, **kwargs):
+        return [e["name"] for e in self.lib.search_files(*args, **kwargs)]
+
+    def test_by_tag_name_with_children_ignoring_case(self):
+        self.assertEqual(self.names(["CAR"]), ["a.jpg", "b2.mp4", "b10.jpg"])
+
+    def test_exclude(self):
+        self.assertEqual(self.names(["car"], ["ferrari"]), ["b2.mp4"])
+
+    def test_a_tag_gone_from_include_matches_nothing(self):
+        self.assertEqual(self.names(["car", "nobody"]), [])
+
+    def test_a_tag_gone_from_exclude_excludes_nothing(self):
+        self.assertEqual(len(self.names(["car"], ["nobody"])), 3)
+
+    def test_filter_and_order_work_like_a_folder_scan(self):
+        self.assertEqual(self.names(["car"], media_filter="video"), ["b2.mp4"])
+        self.assertEqual(self.names(["car"], media_filter="favorites", favorites=[self.a]), ["a.jpg"])
+        self.assertEqual(self.names(["car"], descending=True), ["b10.jpg", "b2.mp4", "a.jpg"])
+
+    def test_a_file_that_has_gone_is_left_out(self):
+        os.unlink(self.a)
+        self.assertEqual(self.names(["car"]), ["b2.mp4", "b10.jpg"])
+
+    def test_an_entry_can_go_in_a_container(self):
+        entry = self.lib.search_files(["car"])[0]
+        self.assertEqual((entry["path"], entry["type"]), (self.a, "image"))
+
+
 class FileSelectionTests(unittest.TestCase):
 
     def test_a_new_list_selects_its_first_row(self):

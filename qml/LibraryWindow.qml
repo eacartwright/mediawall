@@ -43,6 +43,18 @@ ApplicationWindow {
                                                    100 + Math.random() * 100, inContainers))
     }
 
+    // A browsing container whose files come from the search in the box.
+    function addSearchContainer() {
+        if (!wall)
+            return
+        if (!wall.addSearchContainer(tagLibrary.currentSearch())) {
+            tagLibrary.say("Leave Present first to add to the wall.")
+            return
+        }
+        tagLibrary.say("Added a browsing container for this search."
+                       + (tagLibrary.folder !== "" ? " It looks everywhere, not only in the folder." : ""))
+    }
+
     // A file drag, of what a tile says. A real one, so it reaches the wall
     // or anything else that takes files, and only ends with a real mouse.
     function dragFiles(row) {
@@ -247,15 +259,24 @@ ApplicationWindow {
                     width: 22
                     text: "▾"
                     focusPolicy: Qt.NoFocus
-                    enabled: tagLibrary.selectedCount > 0
                     onClicked: addMenu.popup(addMenuButton, 0, addMenuButton.height)
 
                     Menu {
                         id: addMenu
-                        width: 220
+                        width: 300
                         onClosed: libraryWindow.refocus()
 
-                        MenuItem { text: "In New Containers"; onTriggered: libraryWindow.addToWall(true) }
+                        MenuItem {
+                            text: "In New Containers"
+                            enabled: tagLibrary.selectedCount > 0
+                            onTriggered: libraryWindow.addToWall(true)
+                        }
+                        MenuItem {
+                            objectName: "libraryNewSearchContainer"   // found by tests/app
+                            text: "New Browsing Container from This Search"
+                            enabled: tagLibrary.findMode && tagLibrary.filters.length > 0
+                            onTriggered: libraryWindow.addSearchContainer()
+                        }
                     }
                 }
             }

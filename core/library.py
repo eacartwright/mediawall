@@ -30,7 +30,9 @@ import time
 from dataclasses import dataclass, field, replace
 from pathlib import Path
 
-from core.media_browser import is_animatable, media_type_for, natural_key
+from core.media_browser import (
+    is_animatable, matches_filter, media_type_for, natural_key, sort_entries,
+)
 from core.project import write_json_atomic
 
 
@@ -773,6 +775,23 @@ class Library:
         rows = self._db.execute(" ".join(sql), values)
         return [{"id": r[0], "path": r[1], "type": r[2], "size": r[3], "mtime": r[4]} for r in rows
                 if recursive or prefix is None or os.path.dirname(r[5]) == prefix]
+
+    def search_files(self, include=(), exclude=(), media_filter="all", sort_by="name",
+                     descending=False, seed="", favorites=()):
+        """
+        What a browsing container's saved search finds (44.5), by tag name:
+        files that are there, filtered and ordered like a folder scan's. A
+        tag to include that no longer exists matches nothing.
+        """
+        included = [self.tag_by_name(name) for name in include]
+        if None in included:
+            return []
+        excluded = [self.tag_by_name(name) for name in exclude]
+        rows = self.find([t.id for t in included], [t.id for t in excluded if t is not None])
+        favorites = set(favorites or ())
+        entries = [e for e in found_entries(rows)
+                   if not e["missing"] and matches_filter(e, media_filter, favorites)]
+        return sort_entries(entries, sort_by, descending, seed)
 
     # ---- Export and import (44.6) ----
 
