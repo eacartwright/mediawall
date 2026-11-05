@@ -18,6 +18,10 @@ Rectangle {
     property bool playing: true
     property bool muted: true
 
+    // Whether clicking a control takes the keyboard focus. The Library's
+    // search box keeps it (Qt.NoFocus).
+    property int controlsFocusPolicy: Qt.StrongFocus
+
     // Show the Play/Pause and Mute buttons.
     property bool showButtons: true
 
@@ -66,6 +70,7 @@ Rectangle {
         spacing: 4
 
         Button {
+            focusPolicy: bar.controlsFocusPolicy
             Layout.preferredHeight: 26
 
             visible: bar.showButtons
@@ -85,6 +90,7 @@ Rectangle {
         }
 
         Slider {
+            focusPolicy: bar.controlsFocusPolicy
             id: seekSlider
 
             Layout.fillWidth: true
@@ -163,6 +169,7 @@ Rectangle {
         }
 
         Button {
+            focusPolicy: bar.controlsFocusPolicy
             id: loopButton
             objectName: "loopButton"           // found by tests/app
 
@@ -188,6 +195,7 @@ Rectangle {
         }
 
         Button {
+            focusPolicy: bar.controlsFocusPolicy
             Layout.preferredHeight: 26
 
             visible: bar.showButtons

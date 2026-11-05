@@ -19,6 +19,10 @@ Rectangle {
     required property var files
 
     signal focusReturned()
+    signal openStrip()
+
+    // Hidden for the Strip view, which has its own player.
+    onVisibleChanged: if (!visible) tilePlayer.stop()
 
     // Ctrl+Space: play the current file with sound, or pause it.
     function togglePlay() {
@@ -176,6 +180,7 @@ Rectangle {
                                          (mouse.modifiers & Qt.ShiftModifier) !== 0)
                     pane.focusReturned()
                 }
+                onDoubleClicked: pane.openStrip()
             }
         }
 

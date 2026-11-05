@@ -92,8 +92,10 @@ class FilesModel(QAbstractListModel):
         if not 0 <= row < len(self._entries):
             return {}
         entry = self._entries[row]
+        thumb = self._thumbnails.url(entry["path"], entry["size"], entry["mtime"],
+                                     entry["type"], entry["animatable"])
         return {"url": entry["url"], "path": entry["path"], "name": entry["name"],
-                "type": entry["type"], "animatable": entry["animatable"]}
+                "type": entry["type"], "animatable": entry["animatable"], "thumb": thumb}
 
     def data(self, index, role=Qt.DisplayRole):
         if not index.isValid():
@@ -496,6 +498,7 @@ class TagLibrary(QObject):
             left = {path_key(p) for p in untagged}
             entries = [e for e in entries if path_key(e["path"]) in left]
         self._files.set_entries(entries, untagged)
+        self.currentRowChanged.emit(self._files.selection.current)
 
     def _get_scanning(self):
         return self._scanning

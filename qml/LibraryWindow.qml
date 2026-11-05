@@ -24,6 +24,9 @@ ApplicationWindow {
 
     readonly property var files: tagLibrary.opened ? tagLibrary.files : null
 
+    // The middle pane: the grid, or one large file above a row of the others.
+    property bool stripView: false
+
     function refocus() {
         searchBox.forceActiveFocus()
     }
@@ -94,9 +97,15 @@ ApplicationWindow {
                     } else if (event.key === Qt.Key_Backspace && plain && empty) {
                         tagLibrary.removeLastApplied()
                     } else if (event.key === Qt.Key_Space && (event.modifiers & Qt.ControlModifier)) {
-                        fileGrid.togglePlay()
+                        if (libraryWindow.stripView)
+                            fileStrip.togglePlay()
+                        else
+                            fileGrid.togglePlay()
                     } else if (event.key === Qt.Key_Escape) {
-                        clear()
+                        if (empty)
+                            libraryWindow.stripView = false
+                        else
+                            clear()
                     } else if (event.matches(StandardKey.SelectAll) && empty) {
                         tagLibrary.selectAll()
                     } else if (event.matches(StandardKey.Undo)) {
@@ -122,6 +131,26 @@ ApplicationWindow {
             }
 
             Item { Layout.fillWidth: true }
+
+            Row {
+                spacing: 1
+
+                Button {
+                    objectName: "libraryGridButton"      // found by tests/app
+                    text: "Grid"
+                    focusPolicy: Qt.NoFocus
+                    highlighted: !libraryWindow.stripView
+                    onClicked: libraryWindow.stripView = false
+                }
+
+                Button {
+                    objectName: "libraryStripButton"     // found by tests/app
+                    text: "Strip"
+                    focusPolicy: Qt.NoFocus
+                    highlighted: libraryWindow.stripView
+                    onClicked: libraryWindow.stripView = true
+                }
+            }
 
             Button {
                 text: "Undo"
@@ -231,12 +260,26 @@ ApplicationWindow {
             onFocusReturned: libraryWindow.refocus()
         }
 
-        LibraryGrid {
-            id: fileGrid
+        Item {
             SplitView.fillWidth: true
             SplitView.minimumWidth: 200
-            files: libraryWindow.files
-            onFocusReturned: libraryWindow.refocus()
+
+            LibraryGrid {
+                id: fileGrid
+                anchors.fill: parent
+                visible: !libraryWindow.stripView
+                files: libraryWindow.files
+                onFocusReturned: libraryWindow.refocus()
+                onOpenStrip: libraryWindow.stripView = true
+            }
+
+            LibraryStrip {
+                id: fileStrip
+                anchors.fill: parent
+                visible: libraryWindow.stripView
+                files: libraryWindow.files
+                onFocusReturned: libraryWindow.refocus()
+            }
         }
 
         LibraryTags {

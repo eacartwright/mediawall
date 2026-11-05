@@ -1974,6 +1974,7 @@ mediawall/
 │   ├── LibraryWindow.qml   the Library: tag media (section 44); its search box and keys
 │   ├── LibraryFolders.qml  ...its folder tree
 │   ├── LibraryGrid.qml     ...its grid of files
+│   ├── LibraryStrip.qml    ...one large file above a row of the others
 │   ├── LibraryTags.qml     ...its tags: on the selection, and the tree
 │   ├── Sidebar.qml         Wall Features flyout (left edge): Layers, Playback, Speech, Text tabs
 │   └── Zoom.js             shared mouse-wheel zoom step
@@ -2238,7 +2239,7 @@ These are deliberately later features.
 
 ---
 
-## Phase 13 — Library and tags — **In progress** (tagging works for every kind of media; Strip view and finding are next; the design and build order are in section 44)
+## Phase 13 — Library and tags — **In progress** (tagging works for every kind of media, in a grid or Strip view; finding is next; the design and build order are in section 44)
 
 Tag media quickly in a separate Library window, then find it by tag and put it on the wall.
 
@@ -2354,7 +2355,7 @@ Deleting a cache must never delete the user's original media.
 
 # 44. Media Library and Tags
 
-**Status: in progress** (agreed 2026-11-04; Phase 13). Steps 2 to 4 of the build order (44.8) are done: the database and the Library window, so any media can be tagged, in all the ways described here. Step 1's checks are done on Windows, apart from the drag. What's left is marked in 44.8; the sections below describe the plan for those parts. The goal is to tag media manually as quickly as possible, one file or many, then use the tags to find media and put it on the wall.
+**Status: in progress** (agreed 2026-11-04; Phase 13). Steps 2 to 5 of the build order (44.8) are done: the database and the Library window, so any media can be tagged, in all the ways described here. Step 1's checks are done on Windows, apart from the drag. What's left is marked in 44.8; the sections below describe the plan for those parts. The goal is to tag media manually as quickly as possible, one file or many, then use the tags to find media and put it on the wall.
 
 The rest of the app keeps working directly from filesystem paths and never needs the library. There is no import step (section 41): a file gets a database row only when it is first tagged, and "untagged" is simply a folder scan minus the database.
 
@@ -2381,7 +2382,7 @@ One separate top-level window (like the Log and Media Memory windows, in the sam
 - **Folders pane (left):** a folder tree, with a Subfolders option and an **Untagged only** filter, which shows what is left to do. A file tagged while that's on stays in view until the next scan, so a series of tags can go on it. Tiles with tags have a green dot.
 - **Tags pane (right):** the selection's tags with counts (`3/12` means 3 of the 12 selected files have it), then the whole tag tree (44.3). Clicking a tag applies or removes it.
 - **Grid view:** large thumbnails, row after row, scrolling like a file browser. The tile size is adjustable.
-- **Strip view:** one large file above a single carousel row. Grid and Strip share one file list and selection. Double-click opens Strip, and Esc returns to Grid.
+- **Strip view:** one large file above a single carousel row. Grid and Strip share one file list and selection. Double-click opens Strip (or the Strip button), and Esc returns to Grid (Esc clears the box first, if there's text in it). While stepping, the thumbnail shows at once and the file itself opens an eighth of a second later, so holding an arrow key doesn't open every file on the way.
 - **Selection:** click, Ctrl+click, and Shift+click, and Ctrl+A with the box empty. A folder's first file starts selected, so typing can begin at once. It lives in the model rather than in delegates, because the grid reuses delegates as it scrolls. It stays after tagging, for adding more tags to a series of files. The "Tagging 12 files" label always shows what Enter will affect.
 
 ## 44.2 The search box
@@ -2438,7 +2439,7 @@ The rules:
 |---|---|---|---|
 | **Grid, at rest** | Still thumbnail | Still frame from about 10% in (to skip black intros), with a type and duration badge | Tile with an icon, name, and duration |
 | **Grid, hovered** | Same | Plays muted from the start, one at a time | No sound on hover (Ctrl+Space plays it) |
-| **Strip, current file** | Large image | Plays in full and loops, muted, with a sound toggle | Plays with sound |
+| **Strip, current file** | Large image | Plays in full and loops, muted, with a sound toggle (the first Ctrl+Space brings up the sound, then it pauses and resumes; the choice carries from file to file) | Plays with sound |
 
 Nothing plays across the whole grid. Section 51 records 8 copies of one GIF reaching 833 MB and busy walls running out of video memory, and a grid of large tiles would hit the same limits. At most one file decodes at a time: the grid has a single `MediaView`, moved over whichever tile is playing, so a second can't happen. It shows in the Media Memory window as "library". Hovering waits a quarter of a second, so the pointer crossing tiles starts nothing, and scrolling stops it. Ctrl+Space plays the current file with sound; while it does, hovering leaves the player alone, and moving to another file stops it.
 
@@ -2485,9 +2486,9 @@ Each step ends with something testable, unit tests and `tests/app/check_library*
 
 1. **Check the unknowns** below, on the dev VM (Windows and Mint). **Windows measured, except the drag; Mint to do.**
 2. **Database:** `core/library.py` and its unit tests, including groups, parent tags, and export/import. **Done** (2026-11-04). Relinking and Clean Up wait for step 8; `fingerprint` is already stored.
-3. **Library window:** folder tree, image grid with thumbnails, selection, search box, and tags pane with the tree. Tagging images works from here on. **Done** (2026-11-04), with export and import in the Library ▾ menu. The Tag|Find and Grid|Strip switches come with their steps. `tests/app/check_library.py`.
+3. **Library window:** folder tree, image grid with thumbnails, selection, search box, and tags pane with the tree. Tagging images works from here on. **Done** (2026-11-04), with export and import in the Library ▾ menu. The Tag|Find switch comes with step 6. `tests/app/check_library.py`.
 4. **GIFs, video, and audio:** their tiles, thumbnails, and hover playback. **Done** (2026-11-04), with Ctrl+Space. `tests/app/check_library_media.py`.
-5. **Strip view.**
+5. **Strip view.** **Done** (2026-11-04). `tests/app/check_library_strip.py`.
 6. **Find mode, Add to Wall, and drag to the wall.**
 7. **Browsing containers from a search.**
 8. **Relinking moved files** in the scan, and Clean Up.
@@ -2670,7 +2671,7 @@ The prototype currently provides:
 - per-video speed (0.5x to 3x by default; the range is a setting), Keep pitch, and A-B loop; a Playback tab in the Wall Features panel with every video's sound and playback settings, and a master volume for the window (not saved; section 14.5)
 - a Settings dialog (toolbar): the mouse-wheel zoom step, the speed range, the hold-to-step pace, the container background colour, and snapping; a Performance tab (hardware video decoding, largest still image size, the Media Memory window); a Speech tab (Piper and its voices); a Shortcuts tab listing every key; an About tab with the version (section 25)
 - audio tracks added from a browser (double-click or Add to Audio), controlled in the Playback tab; a track can step through its folder (◀ ▶), play through it (Continue Play), and pause before it loops or goes on (section 14.5)
-- the Library (section 44, in progress): a separate window for tagging media quickly from the keyboard, with a folder tree, a grid of thumbnails (a video or GIF plays muted while hovered, and Ctrl+Space plays a file with sound), tag groups and parent tags, tagging undo, and export/import
+- the Library (section 44, in progress): a separate window for tagging media quickly from the keyboard, with a folder tree, a grid of thumbnails (a video or GIF plays muted while hovered, and Ctrl+Space plays a file with sound), a Strip view (one large file above a row of the others), tag groups and parent tags, tagging undo, and export/import
 - single files added from a browser's **File…** button (pictures and videos to the canvas, audio to the Playback tab), without browsing a folder (section 26)
 - video as audio: Convert to Audio Track (right-click a video), or Add to Audio for a video in a browser (section 14.2)
 - browsing containers: viewer-style (qView) controls: pan, wheel zoom, back/forward buttons, double-click reset; moved by the border strip or middle-drag; also in Present (section 6.4); containers remember Fit/Fill
@@ -2777,7 +2778,7 @@ Watching (2026-10-17):
 
 ### Next
 
-- **Library and tags** (Phase 13, on branch `library`): the design and build order are in section 44. Tagging works for every kind of media (steps 2 to 4). Still to try on Mint: "To check first" (44.8). Next: Strip view (step 5). The thumbnail cache has no size limit or clean-up yet.
+- **Library and tags** (Phase 13, on branch `library`): the design and build order are in section 44. Tagging works for every kind of media, in a grid or Strip view (steps 2 to 5). Still to try on Mint: "To check first" (44.8). Next: Find mode, Add to Wall, and drag to the wall (step 6). The thumbnail cache has no size limit or clean-up yet.
 
 Also done 2026-10-17: Speech, text to speech with Piper (section 14.6), and Continue Play replaces Loop in browsing containers (off = loop; next to Play and Mute), an A-B loop overrides it, and a locked container keeps playing on (section 6.4). The 2026-10-17 batch is done: a Size control for text (wrapped or not); colour emoji in text; the glow now follows arc and tilt changes; a fix for presets applying only partly (to confirm on Linux, above); a master volume for the window; Lock Container; a container background colour setting; favorites per browsing container with a Show Favorites Only filter; Show New Files First; and Fit as the default framing (sections 5.4, 6.4, 14.5, 25).
 
