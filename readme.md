@@ -58,13 +58,13 @@ venv/bin/python main.py                         # Windows: venv\Scripts\python.e
 
 The rest of this file is the design document: the principles, object model, and decisions behind the app, the current state (section 50), the backlog (section 51), and the decision log (section 55).
 
-**Last updated:** 2026-09-29 22:52 EDT  
+**Last updated:** 2026-11-04  
 **Project status:** In daily use; minor tweaks and polish (see section 51)  
 **Target platform:** Cross-platform desktop; Linux (Mint/Ubuntu) primary, Windows also used for development  
 **Primary implementation language:** Python  
 **UI framework:** PySide6 + QML  
 **Media playback:** QtMultimedia (FFmpeg backend)  
-**Project/layout persistence:** JSON, with SQLite reserved for a later media index/library  
+**Project/layout persistence:** JSON, with SQLite planned for the tag library (section 44)  
 **Rendering philosophy:** GPU-accelerated Qt/QML scene graph; avoid CPU-side pixel processing for normal canvas operations
 
 ---
@@ -795,6 +795,8 @@ Sort:
 ```
 
 A Browse Object can use a collection as its source.
+
+Tags are planned separately, in the Library (section 44). Its saved tag search on a browsing container covers part of what a collection would do.
 
 ---
 
@@ -2016,7 +2018,15 @@ Every folder of importable Python modules contains an `__init__.py`, normally em
 
 ```text
 core/
-└── collections.py
+├── collections.py
+└── library.py            # the tag database (section 44)
+
+bridge/
+├── library_model.py      # the Library window's files, selection, and tags
+└── thumbnails.py         # background thumbnails and their disk cache
+
+qml/
+└── LibraryWindow.qml     # and its panes
 
 (Slideshows became browsing containers; audio lives in `core/scene.py` and `bridge/audio_model.py`.)
 ```
@@ -2227,6 +2237,12 @@ These are deliberately later features.
 
 ---
 
+## Phase 13 — Library and tags — **Not started** (next; the design and build order are in section 44)
+
+Tag media quickly in a separate Library window, then find it by tag and put it on the wall.
+
+---
+
 # 40. Important UX Goals
 
 The application should avoid forcing the user through rigid workflows.
@@ -2335,28 +2351,151 @@ Deleting a cache must never delete the user's original media.
 
 ---
 
-# 44. Future Media Library
+# 44. Media Library and Tags
 
-SQLite may eventually maintain an indexed library.
+**Status: planned, nothing built yet** (agreed 2026-11-04; Phase 13). The goal is to tag media manually as quickly as possible, one file or many, then use the tags to find media and put it on the wall.
 
-Potential indexed data:
+The rest of the app keeps working directly from filesystem paths and never needs the library. There is no import step (section 41): a file gets a database row only when it is first tagged, and "untagged" is simply a folder scan minus the database.
+
+## 44.1 The Library window
+
+One separate top-level window (like the Log and Media Memory windows, in the same process, so it can call `sceneModel` directly) handles both tagging and finding. It is about as large as the main window, and created only when opened, so it costs nothing otherwise.
 
 ```text
-path
-media type
-width
-height
-duration
-creation date
-modification date
-thumbnail
-folder
-metadata
+┌──────────────────────────────────────────────────────────────────┐
+│ [Tag|Find]  [ race c__________ ]   Tagging 12 files   [Grid|Strip]│
+│             ▸ race car (214)                                     │
+├──────────┬────────────────────────────────────┬──────────────────┤
+│ Folders  │ ▓▓▓▓▓  ▓▓▓▓▓  ▓▓▓▓▓  ▓▓▓▓▓         │ On selection     │
+│ ▸ Cars   │ ▓▓▓▓▓  ▓▓▓▓▓  ▓▓▓▓▓  ▓▓▓▓▓         │  race car  12/12 │
+│ ▸ Japan  │ ▓▓▓▓▓  ▓▓▓▓▓  ▓▓▓▓▓  ▓▓▓▓▓         │  ferrari    3/12 │
+│          │                                    │ All tags         │
+│          │                                    │ ▾ Location       │
+│          │                                    │    Boston   (40) │
+│          │                                    │    London   (12) │
+│ □ Subfolders  □ Untagged only                 │ ▾ car      (214) │
+└──────────┴────────────────────────────────────┴──────────────────┘
 ```
 
-This is a future optimization and should not be required for the first prototype.
+- **Folders pane (left):** a folder tree, with a Subfolders option and an **Untagged only** filter, which shows what is left to do.
+- **Tags pane (right):** the selection's tags with counts (`3/12` means 3 of the 12 selected files have it), then the whole tag tree (44.3). Clicking a tag applies or removes it.
+- **Grid view:** large thumbnails, row after row, scrolling like a file browser. The tile size is adjustable.
+- **Strip view:** one large file above a single carousel row. Grid and Strip share one file list and selection. Double-click opens Strip, and Esc returns to Grid.
+- **Selection:** click, Ctrl+click, and Shift+click. It lives in the model rather than in delegates, because the grid reuses delegates as it scrolls. It stays after tagging, for adding more tags to a series of files. The "Tagging 12 files" label always shows what Enter will affect.
 
-The application should work directly from filesystem paths before introducing a database.
+## 44.2 The search box
+
+The box is always visible and keeps focus through tagging, so the hands stay on the keyboard.
+
+| Key | Action |
+|---|---|
+| Typing | Results filter with each letter |
+| **Enter** | Apply the top result (Find: add it as a filter), clear the box, keep focus |
+| **Up / Down** | Choose a different result |
+| **Shift+Enter** | Create a new tag from exactly what was typed, and apply it |
+| **Enter, box empty** | Go to the next file |
+| **Left / Right, box empty** | Previous or next file (with text in the box, they move the cursor) |
+| **Backspace, box empty** | Remove the last tag applied |
+| **Ctrl+Space** | Play or pause the current file, with sound |
+| **Tab** | Switch between Tag and Find |
+| **Ctrl+Z / Ctrl+Y** | Undo or redo tagging (44.6) |
+
+- **Creating needs its own key.** Otherwise typing "race" to create that tag, while "race car" exists, would apply "race car". If nothing matches, plain Enter offers to create the tag, shown as a `Create "…"` row. New tags start at the top level of the tree, to be sorted later, so creating one doesn't interrupt tagging.
+- **Ranking:** exact name, then start of the name, start of any word, and anywhere in the name; ties go to the most used.
+- **Results are synchronous and in memory.** All tags are held in memory and filtered on each key, so a fast Enter can never apply a stale result.
+- Each result shows where the tag sits, for example `Boston  Location ▸ Massachusetts`. Groups (44.3) are never results in Tag mode, because they can't be applied.
+- Tag and Find modes look clearly different, so a search can't be mistaken for tagging.
+
+## 44.3 Organizing tags: groups and parent tags
+
+Tags form one tree in the tags pane, with two kinds of parent:
+
+- **Group:** a heading for keeping the pane orderly, and nothing more. It can't be applied to a file. `Location` is a group holding `Boston` and `London`.
+- **Parent tag:** a real tag whose child tags imply it. With `car` as the parent of `ferrari`, a file tagged `ferrari` also counts as `car`, without `car` being stored on it.
+
+```text
+Location                 (group: never on a file)
+├── Massachusetts        (tag)
+│   └── Boston           (tag: a file tagged Boston also counts as Massachusetts, not as Location)
+└── London               (tag)
+car                      (tag)
+└── ferrari              (tag: a file tagged ferrari also counts as car)
+```
+
+The rules:
+
+- **Implied tags are worked out when read, never stored.** So moving a tag in the tree updates every file straight away, and undoing or removing a tag leaves nothing behind.
+- **Removing:** an implied tag is shown dimmed in the pane ("from ferrari") and goes away when `ferrari` is removed. A file tagged both `ferrari` and `car` directly keeps `car`.
+- **Finding:** searching `car` finds files tagged `car` or anything under it.
+- **Names are unique** across all tags and groups, ignoring case, since typing must be unambiguous. A tag has one parent, so it has one place in the pane. Several parents can be added later if they are really needed; the database's version number allows the change.
+- **What can hold what:** a group can hold groups and tags; a tag holds only tags. Otherwise a tag's implied parents could pass through a group. The core refuses this, and refuses loops.
+- **Editing** happens in the tags pane: drag a tag onto another or onto a group to move it, and right-click to New Group, Rename, Merge Into, Make Group / Make Tag, or Delete. Deleting a group moves its contents up a level and never deletes tags. Deleting a tag used by files asks first, showing how many. A tag can become a group only when no files use it directly. Siblings sort by name.
+
+## 44.4 Thumbnails and playback
+
+| Where | Image | GIF / animated WebP / video | Audio |
+|---|---|---|---|
+| **Grid, at rest** | Still thumbnail | Still frame from about 10% in (to skip black intros), with a type and duration badge | Tile with an icon, name, and duration |
+| **Grid, hovered** | Same | Plays muted from the start, one at a time | No sound on hover (Ctrl+Space plays it) |
+| **Strip, current file** | Large image | Plays in full and loops, muted, with a sound toggle | Plays with sound |
+
+Nothing plays across the whole grid. Section 51 records 8 copies of one GIF reaching 833 MB and busy walls running out of video memory, and a grid of large tiles would hit the same limits. At most one file decodes at a time. `MediaView.qml` looks reusable for this, since it doesn't touch `sceneModel`.
+
+Thumbnails are made by background workers and kept in a disk cache, keyed by path, size, and modification time: `%LOCALAPPDATA%/Mediawall/thumbnails` on Windows, `~/.cache/Mediawall/thumbnails` on Linux (`$XDG_CACHE_HOME` if set). QML shows them with an asynchronous `Image` and a placeholder until each is ready. Large folders need a background scan and a real list model (`QAbstractListModel`, `GridView` with `reuseItems`), not the UI-thread scan and JS array the browser uses (section 50).
+
+## 44.5 Finding media and putting it on the wall
+
+In Find mode the same box builds a search: Enter adds the tag as a chip, chips combine as AND, and `-ferrari` excludes. Find searches the whole library, and clicking a folder limits it to that folder. The tags pane shows which tags remain in the results, with counts, and clicking one narrows the search. Files that have gone missing show the "Missing file" box and can't be added.
+
+There are three ways from the Library to the wall:
+
+1. **Add to Wall** (button and shortcut, for the selection): pictures and videos go on the canvas and audio to the Playback tab, through the existing `addMedia`, `addMediaInNewContainer`, and `addAudioTrack`. This comes first, because a window as large as the main one covers the wall when there is only one monitor.
+2. **Drag to the wall**, onto the canvas or a container, when the windows are side by side. It's a real file drag (`text/uri-list`), so the main window gets a `DropArea`. Nothing accepts dropped files today, so this also makes drags from a file manager work.
+3. **New Browsing Container from This Search**: a browsing container whose files come from the search rather than a folder, picking up newly tagged files at its next rescan. The search stays in the Library, with no search UI on containers. The container only stores the query, in a new saved field (`browse_query`, added to `TYPE_FIELDS`), holding tag names as `include` and `exclude` lists, and `rescanBrowse` is the one place its file list loads. Its favorites, sorting, and stepping keep working. A tag that no longer exists (renamed or deleted, or a project opened on another machine) matches nothing and the container says so, as with a missing folder.
+
+## 44.6 The database
+
+One SQLite file per machine, shared by all projects, and never on a shared drive: `%LOCALAPPDATA%/Mediawall/library.sqlite` on Windows, `~/.local/share/Mediawall/library.sqlite` on Linux (`$XDG_DATA_HOME` if set). `MEDIAWALL_LIBRARY` overrides the path, so app checks never touch the real library (like `MEDIAWALL_SETTINGS`).
+
+```text
+tags       id, name (unique, ignoring case), parent_id, is_group, created_at, last_used
+files      id, path, path_key (unique), media_type, size, mtime, fingerprint
+file_tags  file_id, tag_id, added_at  (primary key: file_id + tag_id)
+```
+
+- **Tags belong to a file path** (decided 2026-11-04). Two identical copies of a file are tagged separately. `path_key` is the normalized path (`os.path.normcase`), so a case difference on Windows doesn't make a second file.
+- **Moved and renamed files:** `fingerprint` is the file size plus a hash of a few sampled chunks, computed when a file is first tagged. When a scan finds an unknown file the same size as a missing row, its fingerprint is checked, and exactly one match moves the tags to the new path. Tags of missing files stay until a Clean Up command removes them.
+- **Undo** is the Library's own session list of tagging actions (a bulk action is one step). Wall undo stores scene snapshots (section 47), and tags aren't part of the scene, so tagging never adds to wall undo.
+- **Export and import** (Library window menu): a JSON file, written atomically. **Export Everything** holds the tag tree and every tagged file's path, fingerprint, and tags, as a backup. **Export Tags Only** holds just the tree, to start another machine with the same tags. Import merges by tag name and never deletes. Imported file rows whose paths don't exist here are treated as missing, so the fingerprint check can reattach them.
+- Bulk changes run in one transaction. The schema version is kept in `PRAGMA user_version`. Python's `sqlite3` needs no new dependency, and Qt's `Sql` modules remain excluded from the installers.
+
+## 44.7 Layers
+
+- `core/library.py`: the database, tree rules, implied tags, ranking, queries, relinking, and export/import, all plain Python, unit-tested with a temporary or `:memory:` database (`tests/test_library.py`).
+- `bridge/library_model.py`: the file list, selection, and tag results for QML. `bridge/thumbnails.py`: the workers and cache.
+- `qml/LibraryWindow.qml` and its panes; commands go in `AppActions.qml` as usual. Check new QML imports (such as `TreeView`) against `UNUSED_QT`.
+
+## 44.8 Build order
+
+Each step ends with something testable, unit tests and `tests/app/check_library*.py` included.
+
+1. **Check the unknowns** below, on the dev VM (Windows and Mint).
+2. **Database:** `core/library.py` and its unit tests, including groups, parent tags, and export/import.
+3. **Library window:** folder tree, image grid with thumbnails, selection, search box, and tags pane with the tree. Tagging images works from here on.
+4. **GIFs, video, and audio:** their tiles, thumbnails, and hover playback.
+5. **Strip view.**
+6. **Find mode, Add to Wall, and drag to the wall.**
+7. **Browsing containers from a search.**
+8. **Relinking moved files** in the scan, and Clean Up.
+
+### To check first
+
+Nothing here has been tried against Qt yet (the plan was written on a checkout without a venv or sample media):
+
+- **Video frames:** the plan is `QMediaPlayer` with `QVideoSink`, which adds no dependency. Time it on a folder of a few hundred videos on both platforms. If it's too slow, the fallback is PyAV, at the cost of a larger install.
+- **Thumbnail workers:** `QImageReader` with a scaled size on a `QThreadPool`. Check that Python's global lock doesn't make scrolling stutter on a folder of thousands of large images.
+- **Dragging between windows:** a real file drag from the Library into a `DropArea` in the main window, on Windows and on Mint's window manager.
+- **`sqlite3` in the installers:** the `UNUSED_QT` filter drops paths containing `Sql`, which is case-sensitive and shouldn't match `sqlite3`. Confirm in a Windows and a Linux build, and that the app can create its database when installed.
 
 ---
 
@@ -2629,7 +2768,9 @@ Watching (2026-10-17):
 
 ### Next
 
-Nothing queued. Also done 2026-10-17: Speech, text to speech with Piper (section 14.6), and Continue Play replaces Loop in browsing containers (off = loop; next to Play and Mute), an A-B loop overrides it, and a locked container keeps playing on (section 6.4). The 2026-10-17 batch is done: a Size control for text (wrapped or not); colour emoji in text; the glow now follows arc and tilt changes; a fix for presets applying only partly (to confirm on Linux, above); a master volume for the window; Lock Container; a container background colour setting; favorites per browsing container with a Show Favorites Only filter; Show New Files First; and Fit as the default framing (sections 5.4, 6.4, 14.5, 25).
+- **Library and tags** (Phase 13): the design and build order are in section 44. Start with its "To check first" list on the dev VM, on branch `library`.
+
+Also done 2026-10-17: Speech, text to speech with Piper (section 14.6), and Continue Play replaces Loop in browsing containers (off = loop; next to Play and Mute), an A-B loop overrides it, and a locked container keeps playing on (section 6.4). The 2026-10-17 batch is done: a Size control for text (wrapped or not); colour emoji in text; the glow now follows arc and tilt changes; a fix for presets applying only partly (to confirm on Linux, above); a master volume for the window; Lock Container; a container background colour setting; favorites per browsing container with a Show Favorites Only filter; Show New Files First; and Fit as the default framing (sections 5.4, 6.4, 14.5, 25).
 
 The 2026-10-16 batch is done: an Add Text button on the toolbar; Wrap to box, arc, perspective tilt, and glow for text; typing on the canvas; a faster font list (type to find, three rows a wheel notch); Sort by for browsers and browsing containers; and Continue Play (sections 5.4, 6.4, 26). Arrow-key nudging was dropped.
 
@@ -2659,7 +2800,7 @@ Done since the review: browsing containers (section 6.4), layouts (section 17), 
 - Layers: visibility and locking.
 - Rotation snapping (e.g. 15° steps).
 - Resize modifiers (e.g. Alt to resize around the center).
-- Background folder scanning (scanning is fast enough so far; revisit if large folders or network drives freeze the app).
+- Background folder scanning for browsers and browsing containers (scanning is fast enough so far; revisit if large folders or network drives freeze the app). The Library needs it from the start (section 44.4), and they can share it then.
 - Duplicate videos playing in sync / sharing one decoder (each instance decodes separately today).
 - Pausing and releasing the decoders of off-screen or hidden videos, if the Media Memory window shows videos are what fills video memory (2026-10-29).
 - Frosted-glass (acrylic) browser background: blur the canvas behind a browser with `MultiEffect`, as an option in Settings, falling back to the plain translucent grey.
@@ -2816,7 +2957,7 @@ The following design decisions are currently established:
 - Layers/z-order are fundamental.
 - Missing media should produce a recoverable error state rather than breaking the project.
 - Animation is a future capability and the data model should leave room for it.
-- SQLite is a future optimization/library index, not a first requirement.
+- SQLite holds the tag library (section 44, planned), and nothing else needs it: projects and layouts stay JSON.
 - C++ is not required for the initial implementation.
 - GPU/QML/QtMultimedia should handle performance-sensitive work.
 - Development should proceed incrementally, testing a working application at every major stage.
@@ -2932,6 +3073,11 @@ The following design decisions are currently established:
 - **Container badges are in the top-left corner** (2026-11-01): the favorite star, the Locked badge, and the empty-folder note, since Full Screen and Present put their ✕ / ▶ / Save buttons in the window's top-right, where they covered a container there. The `⇅` browsing badge was dropped. **Animated Only became Animated and Videos** (everything that moves); the saved `media_filter` value stays "animated", so older projects keep working. The wheel over the Text tab's words field moves the cursor (3 letters a notch) rather than scrolling the text without it, so the spot reached is where typing goes.
 
 - **Renamed MediaWall to Mediawall** (2026-10-29, 0.9.12): everywhere the name appears, and in the internal names too. On Linux the settings move from `~/.config/MediaWall/MediaWall.conf` to `~/.config/Mediawall/Mediawall.conf`: when the new one is empty the old settings are copied over (`_open_settings`; the old file is left in place), and the installed app renames `~/.local/state/MediaWall` (the logs). Windows ignores case in the registry and in paths, so nothing moves there; the installer's `AppId` is unchanged, so 0.9.12 upgrades an older install. The file formats (`mediawall-project`, `.mediawall`) were already lower case.
+
+- **The Library is one separate window for tagging and finding** (2026-11-04; planned, section 44), rather than a mode of the main window, so the wall isn't disturbed. Tag and Find share one search box, so finding uses the same typing habit. Search lives in the Library rather than on containers, which only store a query. Add to Wall comes before dragging, because a window this large covers the wall on one monitor.
+- **The tag database is per machine, with export** (2026-11-04): media isn't shared between the Windows and Mint machines, so no path mapping is needed. Tags belong to a file path, so identical copies are tagged separately; a sampled fingerprint only serves to reattach tags after a move. Audio files are tagged too.
+- **Tags form one tree with groups and parent tags** (2026-11-04): a group (`Location`) only organizes the pane and can't be applied; a parent tag (`car` over `ferrari`) is implied by its children. Implied tags are worked out when read, not stored, so moving a tag takes effect everywhere and undo leaves nothing behind. One parent per tag for now.
+- **Nothing autoplays in the Library's grid** (2026-11-04): stills at rest, one muted file playing on hover, for the memory reasons in section 51.
 
 ### Open decisions
 
