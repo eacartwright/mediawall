@@ -2238,7 +2238,7 @@ These are deliberately later features.
 
 ---
 
-## Phase 13 — Library and tags — **In progress** (tagging pictures works; video and audio, Strip view, and finding are next; the design and build order are in section 44)
+## Phase 13 — Library and tags — **In progress** (tagging works for every kind of media; Strip view and finding are next; the design and build order are in section 44)
 
 Tag media quickly in a separate Library window, then find it by tag and put it on the wall.
 
@@ -2354,7 +2354,7 @@ Deleting a cache must never delete the user's original media.
 
 # 44. Media Library and Tags
 
-**Status: in progress** (agreed 2026-11-04; Phase 13). Steps 2 and 3 of the build order (44.8) are done: the database and the Library window, so pictures can be tagged, in all the ways described here. Step 1's checks are done on Windows, apart from the drag. What's left is marked in 44.8; the sections below describe the plan for those parts. The goal is to tag media manually as quickly as possible, one file or many, then use the tags to find media and put it on the wall.
+**Status: in progress** (agreed 2026-11-04; Phase 13). Steps 2 to 4 of the build order (44.8) are done: the database and the Library window, so any media can be tagged, in all the ways described here. Step 1's checks are done on Windows, apart from the drag. What's left is marked in 44.8; the sections below describe the plan for those parts. The goal is to tag media manually as quickly as possible, one file or many, then use the tags to find media and put it on the wall.
 
 The rest of the app keeps working directly from filesystem paths and never needs the library. There is no import step (section 41): a file gets a database row only when it is first tagged, and "untagged" is simply a folder scan minus the database.
 
@@ -2440,7 +2440,9 @@ The rules:
 | **Grid, hovered** | Same | Plays muted from the start, one at a time | No sound on hover (Ctrl+Space plays it) |
 | **Strip, current file** | Large image | Plays in full and loops, muted, with a sound toggle | Plays with sound |
 
-Nothing plays across the whole grid. Section 51 records 8 copies of one GIF reaching 833 MB and busy walls running out of video memory, and a grid of large tiles would hit the same limits. At most one file decodes at a time. `MediaView.qml` looks reusable for this, since it doesn't touch `sceneModel`.
+Nothing plays across the whole grid. Section 51 records 8 copies of one GIF reaching 833 MB and busy walls running out of video memory, and a grid of large tiles would hit the same limits. At most one file decodes at a time: the grid has a single `MediaView`, moved over whichever tile is playing, so a second can't happen. It shows in the Media Memory window as "library". Hovering waits a quarter of a second, so the pointer crossing tiles starts nothing, and scrolling stops it. Ctrl+Space plays the current file with sound; while it does, hovering leaves the player alone, and moving to another file stops it.
+
+A GIF or WebP's length comes from the frame timings in the file (`animation_duration_ms`), a video or audio file's from a `QMediaPlayer` with no output, on a thread of its own, one file at a time. Each length is saved beside the thumbnail, as a small text file, so a file isn't opened again to show it.
 
 Thumbnails are made by background workers and kept in a disk cache, keyed by path, size, and modification time: `%LOCALAPPDATA%/Mediawall/thumbnails` on Windows, `~/.cache/Mediawall/thumbnails` on Linux (`$XDG_CACHE_HOME` if set). QML shows them with an asynchronous `Image` and a placeholder until each is ready. Large folders need a background scan and a real list model (`QAbstractListModel`, `GridView` with `reuseItems`), not the UI-thread scan and JS array the browser uses (section 50).
 
@@ -2483,8 +2485,8 @@ Each step ends with something testable, unit tests and `tests/app/check_library*
 
 1. **Check the unknowns** below, on the dev VM (Windows and Mint). **Windows measured, except the drag; Mint to do.**
 2. **Database:** `core/library.py` and its unit tests, including groups, parent tags, and export/import. **Done** (2026-11-04). Relinking and Clean Up wait for step 8; `fingerprint` is already stored.
-3. **Library window:** folder tree, image grid with thumbnails, selection, search box, and tags pane with the tree. Tagging images works from here on. **Done** (2026-11-04), with export and import in the Library ▾ menu. Pictures only for now (GIFs show their first frame), and the Tag|Find and Grid|Strip switches and Ctrl+Space come with their steps. `tests/app/check_library.py`.
-4. **GIFs, video, and audio:** their tiles, thumbnails, and hover playback.
+3. **Library window:** folder tree, image grid with thumbnails, selection, search box, and tags pane with the tree. Tagging images works from here on. **Done** (2026-11-04), with export and import in the Library ▾ menu. The Tag|Find and Grid|Strip switches come with their steps. `tests/app/check_library.py`.
+4. **GIFs, video, and audio:** their tiles, thumbnails, and hover playback. **Done** (2026-11-04), with Ctrl+Space. `tests/app/check_library_media.py`.
 5. **Strip view.**
 6. **Find mode, Add to Wall, and drag to the wall.**
 7. **Browsing containers from a search.**
@@ -2494,7 +2496,7 @@ Each step ends with something testable, unit tests and `tests/app/check_library*
 
 `tools/library_probe.py` (delete it when this list is finished) takes these measurements on either platform: `images`, `video`, and `drag`. Results so far, on the Windows dev VM (6 threads, no working hardware video decoding, files already in the disk cache), 2026-11-04:
 
-- **Video frames: `QMediaPlayer` with `QVideoSink` is good enough, so no PyAV.** 300 videos at 12.7 a second, none failed, none blank (median 33 ms WebM, 62 ms MOV, 105 ms for a 268 MB MP4), and each frame at most 200 ms from the 10% point. A phone clip's rotation comes out right. **Run it on its own thread:** on the UI thread it stalled the UI for up to 129 ms (36 gaps over 33 ms), against 68 ms (8 gaps) on its own thread, at the same speed. **To do:** the same on Mint, with its hardware decoder.
+- **Video frames: `QMediaPlayer` with `QVideoSink` is good enough, so no PyAV.** 300 videos at 12.7 a second, none failed, none blank (median 33 ms WebM, 62 ms MOV, 105 ms for a 268 MB MP4), and each frame at most 200 ms from the 10% point. A phone clip's rotation comes out right. **Run it on its own thread:** on the UI thread it stalled the UI for up to 129 ms (36 gaps over 33 ms), against 68 ms (8 gaps) on its own thread, at the same speed. **To do:** the same on Mint, with its hardware decoder: the frame has to be read back from the graphics card there. If that's slow or fails, the thumbnail player may need to decode in software.
 - **Thumbnail workers: fine.** `QImageReader` with a scaled size on Qt's thread pool made 2000 thumbnails at 211 a second, including 24-megapixel JPEGs, and the UI thread's longest gap was 40 ms, so Python's global lock isn't a problem here. In the real window, on a folder of 3,000 of them: scanned and open in 0.5 s, and scrolling at about 2,500 px a second while thumbnails were being made never stalled the UI for more than 21 ms. **To do:** the same on Mint, and from a folder not already in the disk cache.
 - **GIF still frames:** `QImageReader` reached the frame at 10% of a 13 MB, 111-frame GIF in 63 ms, so these can use the same workers.
 - **Dragging between windows: to do by hand, on both platforms** (`library_probe.py drag`). The test windows open, but a real drag needs a person at the mouse.
@@ -2668,7 +2670,7 @@ The prototype currently provides:
 - per-video speed (0.5x to 3x by default; the range is a setting), Keep pitch, and A-B loop; a Playback tab in the Wall Features panel with every video's sound and playback settings, and a master volume for the window (not saved; section 14.5)
 - a Settings dialog (toolbar): the mouse-wheel zoom step, the speed range, the hold-to-step pace, the container background colour, and snapping; a Performance tab (hardware video decoding, largest still image size, the Media Memory window); a Speech tab (Piper and its voices); a Shortcuts tab listing every key; an About tab with the version (section 25)
 - audio tracks added from a browser (double-click or Add to Audio), controlled in the Playback tab; a track can step through its folder (◀ ▶), play through it (Continue Play), and pause before it loops or goes on (section 14.5)
-- the Library (section 44, in progress): a separate window for tagging pictures quickly from the keyboard, with a folder tree, a grid of thumbnails, tag groups and parent tags, tagging undo, and export/import
+- the Library (section 44, in progress): a separate window for tagging media quickly from the keyboard, with a folder tree, a grid of thumbnails (a video or GIF plays muted while hovered, and Ctrl+Space plays a file with sound), tag groups and parent tags, tagging undo, and export/import
 - single files added from a browser's **File…** button (pictures and videos to the canvas, audio to the Playback tab), without browsing a folder (section 26)
 - video as audio: Convert to Audio Track (right-click a video), or Add to Audio for a video in a browser (section 14.2)
 - browsing containers: viewer-style (qView) controls: pan, wheel zoom, back/forward buttons, double-click reset; moved by the border strip or middle-drag; also in Present (section 6.4); containers remember Fit/Fill
@@ -2775,7 +2777,7 @@ Watching (2026-10-17):
 
 ### Next
 
-- **Library and tags** (Phase 13, on branch `library`): the design and build order are in section 44. Tagging pictures works (steps 2 and 3). Next: try it on Mint with "To check first" (44.8), then GIFs, video, and audio (step 4). The thumbnail cache has no size limit or clean-up yet.
+- **Library and tags** (Phase 13, on branch `library`): the design and build order are in section 44. Tagging works for every kind of media (steps 2 to 4). Still to try on Mint: "To check first" (44.8). Next: Strip view (step 5). The thumbnail cache has no size limit or clean-up yet.
 
 Also done 2026-10-17: Speech, text to speech with Piper (section 14.6), and Continue Play replaces Loop in browsing containers (off = loop; next to Play and Mute), an A-B loop overrides it, and a locked container keeps playing on (section 6.4). The 2026-10-17 batch is done: a Size control for text (wrapped or not); colour emoji in text; the glow now follows arc and tilt changes; a fix for presets applying only partly (to confirm on Linux, above); a master volume for the window; Lock Container; a container background colour setting; favorites per browsing container with a Show Favorites Only filter; Show New Files First; and Fit as the default framing (sections 5.4, 6.4, 14.5, 25).
 

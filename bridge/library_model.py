@@ -20,11 +20,8 @@ from core.library import (
     FileSelection, Library, LibraryError, default_library_path, default_thumbnail_dir,
     normalized_name, path_key,
 )
-from core.media_browser import MediaBrowser
+from core.media_browser import MediaBrowser, format_duration
 
-
-# Pictures for now; video and audio are the next step (section 44.8).
-FILE_FILTER = "image"
 
 # How many search results to offer: more than this means keep typing.
 MAX_RESULTS = 12
@@ -47,6 +44,9 @@ class FilesModel(QAbstractListModel):
     SelectedRole = Qt.UserRole + 5
     CurrentRole = Qt.UserRole + 6
     TaggedRole = Qt.UserRole + 7
+    TypeRole = Qt.UserRole + 8
+    BadgeRole = Qt.UserRole + 9
+    MovesRole = Qt.UserRole + 10
 
     selectionChanged = Signal()
 
@@ -68,10 +68,32 @@ class FilesModel(QAbstractListModel):
             self.SelectedRole: b"selected",
             self.CurrentRole: b"current",
             self.TaggedRole: b"tagged",
+            self.TypeRole: b"mediaType",
+            self.BadgeRole: b"badge",
+            self.MovesRole: b"moves",
         }
 
     def rowCount(self, parent=QModelIndex()):
         return 0 if parent.isValid() else len(self._entries)
+
+    def _duration_ms(self, entry):
+        return self._thumbnails.duration_ms(entry["path"], entry["size"], entry["mtime"])
+
+    def _badge(self, entry):
+        """The type and length on a tile: "GIF 0:04", "1:30" (a video or audio), or nothing."""
+        length = format_duration(self._duration_ms(entry))
+        if entry["type"] == "image" and entry["animatable"] and length:
+            kind = "GIF" if entry["name"].lower().endswith(".gif") else "WEBP"
+            return f"{kind} {length}"
+        return "" if entry["type"] == "image" else length
+
+    def file_at(self, row):
+        """What a player needs to show this row."""
+        if not 0 <= row < len(self._entries):
+            return {}
+        entry = self._entries[row]
+        return {"url": entry["url"], "path": entry["path"], "name": entry["name"],
+                "type": entry["type"], "animatable": entry["animatable"]}
 
     def data(self, index, role=Qt.DisplayRole):
         if not index.isValid():
@@ -85,7 +107,8 @@ class FilesModel(QAbstractListModel):
         if role == self.ThumbRole:
             # Asked for only by tiles that exist, so thumbnails are made
             # as they come into view, not for the whole folder.
-            return self._thumbnails.url(entry["path"], entry["size"], entry["mtime"])
+            return self._thumbnails.url(entry["path"], entry["size"], entry["mtime"],
+                                        entry["type"], entry["animatable"])
         if role == self.FailedRole:
             return self._thumbnails.failed(entry["path"], entry["size"], entry["mtime"])
         if role == self.SelectedRole:
@@ -94,6 +117,13 @@ class FilesModel(QAbstractListModel):
             return row == self.selection.current
         if role == self.TaggedRole:
             return row in self._tagged
+        if role == self.TypeRole:
+            return entry["type"]
+        if role == self.BadgeRole:
+            return self._badge(entry)
+        if role == self.MovesRole:
+            # Plays on hover. Audio doesn't, and a still GIF has no length.
+            return entry["type"] == "video" or (entry["animatable"] and self._duration_ms(entry) > 0)
         return None
 
     def set_entries(self, entries, untagged):
@@ -150,7 +180,8 @@ class FilesModel(QAbstractListModel):
         row = self._rows.get(key[0])
         if row is not None:
             index = self.index(row)
-            self.dataChanged.emit(index, index, [self.ThumbRole, self.FailedRole])
+            self.dataChanged.emit(index, index, [self.ThumbRole, self.FailedRole,
+                                                 self.BadgeRole, self.MovesRole])
 
 
 class TagsModel(QAbstractListModel):
@@ -450,7 +481,7 @@ class TagLibrary(QObject):
         self.scanningChanged.emit()
 
         def work():
-            entries = MediaBrowser().scan_folder(folder, recursive, FILE_FILTER)
+            entries = MediaBrowser().scan_folder(folder, recursive)
             self._scanned.emit(generation, entries)
 
         threading.Thread(target=work, daemon=True).start()
@@ -508,6 +539,15 @@ class TagLibrary(QObject):
 
     # [{id, name, count, direct, via}]: the tags on the selection, most common first.
     selectionTags = Property(list, _get_selection_tags, notify=selectionChanged)
+
+    def _get_current_row(self):
+        return self._files.selection.current if self._files is not None else -1
+
+    currentRow = Property(int, _get_current_row, notify=currentRowChanged)
+
+    @Slot(int, result="QVariantMap")
+    def fileAt(self, row):
+        return self._files.file_at(row) if self._files is not None else {}
 
     @Slot(int, bool, bool)
     def clickFile(self, row, ctrl, shift):

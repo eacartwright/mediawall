@@ -9,7 +9,72 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from core.media_browser import MediaBrowser, file_patterns, is_animated, neighbour_file
+from core.media_browser import (
+    MediaBrowser, animation_duration_ms, file_patterns, format_duration, is_animated, neighbour_file,
+)
+
+
+def _gif_bytes(delays):
+    """A minimal GIF: a global color table, then one 1x1 frame per delay (in 1/100 s)."""
+    data = b"GIF89a" + (1).to_bytes(2, "little") * 2 + bytes([0x80, 0, 0]) + bytes(6)
+    data += bytes([0x21, 0xFF, 11]) + b"NETSCAPE2.0" + bytes([3, 1, 0, 0, 0])   # looping
+    for delay in delays:
+        data += bytes([0x21, 0xF9, 4, 0]) + delay.to_bytes(2, "little") + bytes([0, 0])
+        data += bytes([0x2C]) + bytes(4) + (1).to_bytes(2, "little") * 2 + bytes([0, 2, 2, 0x44, 1, 0])
+    return data + bytes([0x3B])
+
+
+def _webp_bytes(durations, odd_chunk=False):
+    """A minimal animated WebP's chunks: only what the duration needs."""
+    chunks = b"VP8X" + (10).to_bytes(4, "little") + bytes([0x02]) + bytes(9)
+    if odd_chunk:
+        chunks += b"EXIF" + (3).to_bytes(4, "little") + b"abc" + bytes(1)
+    for ms in durations:
+        payload = bytes(12) + ms.to_bytes(3, "little") + bytes(1) + b"frame!"
+        chunks += b"ANMF" + len(payload).to_bytes(4, "little") + payload
+    return b"RIFF" + (len(chunks) + 4).to_bytes(4, "little") + b"WEBP" + chunks
+
+
+class AnimationDurationTests(unittest.TestCase):
+
+    def setUp(self):
+        temp = tempfile.TemporaryDirectory()
+        self.addCleanup(temp.cleanup)
+        self.dir = Path(temp.name)
+
+    def duration(self, name, data):
+        path = self.dir / name
+        path.write_bytes(data)
+        return animation_duration_ms(path)
+
+    def test_gif_adds_up_its_frames(self):
+        self.assertEqual(self.duration("a.gif", _gif_bytes([10, 20, 5])), 350)
+
+    def test_gif_too_short_a_delay_counts_as_100_ms(self):
+        self.assertEqual(self.duration("a.gif", _gif_bytes([0, 1, 2])), 220)
+
+    def test_webp_adds_up_its_frames(self):
+        self.assertEqual(self.duration("a.webp", _webp_bytes([40, 60, 100])), 200)
+
+    def test_webp_with_an_odd_sized_chunk(self):
+        self.assertEqual(self.duration("a.webp", _webp_bytes([40], odd_chunk=True)), 40)
+
+    def test_not_animated_or_damaged_is_zero(self):
+        self.assertEqual(self.duration("a.gif", b"not a gif at all"), 0)
+        self.assertEqual(self.duration("a.webp", b"not a webp"), 0)
+        self.assertEqual(self.duration("a.jpg", _gif_bytes([10])), 0)
+        self.assertEqual(self.duration("cut.gif", _gif_bytes([10, 10])[:46]), 100)
+        self.assertEqual(animation_duration_ms(self.dir / "gone.gif"), 0)
+
+
+class FormatDurationTests(unittest.TestCase):
+
+    def test_formats(self):
+        self.assertEqual(format_duration(0), "")
+        self.assertEqual(format_duration(120), "0:01")
+        self.assertEqual(format_duration(4400), "0:04")
+        self.assertEqual(format_duration(90_000), "1:30")
+        self.assertEqual(format_duration(3_723_000), "1:02:03")
 
 
 class MediaBrowserTests(unittest.TestCase):

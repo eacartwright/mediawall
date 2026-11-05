@@ -93,6 +93,8 @@ ApplicationWindow {
                         tagLibrary.stepFile(1)
                     } else if (event.key === Qt.Key_Backspace && plain && empty) {
                         tagLibrary.removeLastApplied()
+                    } else if (event.key === Qt.Key_Space && (event.modifiers & Qt.ControlModifier)) {
+                        fileGrid.togglePlay()
                     } else if (event.key === Qt.Key_Escape) {
                         clear()
                     } else if (event.matches(StandardKey.SelectAll) && empty) {
@@ -230,6 +232,7 @@ ApplicationWindow {
         }
 
         LibraryGrid {
+            id: fileGrid
             SplitView.fillWidth: true
             SplitView.minimumWidth: 200
             files: libraryWindow.files

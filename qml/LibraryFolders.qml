@@ -100,9 +100,10 @@ Rectangle {
                 var row = rowAtIndex(index)
                 if (row >= 0)
                     positionViewAtRow(row, TableView.Contain)
-                // Across too, so the name itself is in view: rows start 30
-                // px in, past the arrow, plus their indentation.
-                contentX = Math.max(0, Math.min(depth(row) * rowIndent + 6, nameWidth - width))
+                // Across too, only if the name would run out of view: rows
+                // start 30 px in, past the arrow, plus their indentation.
+                var nameAt = depth(row) * rowIndent + 30
+                contentX = nameAt < width / 2 ? 0 : Math.min(nameAt - 24, nameWidth - width)
             }
 
             // Once it's been laid out, when the window opens.
