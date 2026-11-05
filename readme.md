@@ -1936,6 +1936,7 @@ mediawall/
 │   ├── history.py          undo/redo history (scene snapshots)
 │   ├── layout.py           layouts: containers only, saved for reuse
 │   ├── version.py          the app's version number
+│   ├── library.py          the tag database (section 44)
 │   └── media_browser.py    folder scanning, media type detection
 │
 ├── bridge/                 Qt glue between core and QML
@@ -1983,6 +1984,7 @@ mediawall/
 │
 ├── tools/
 │   ├── create_launchers.py shortcuts / menu entries for this machine
+│   ├── library_probe.py    measures the Library's unknowns (section 44.8; throwaway)
 │   └── run_debug.sh        Linux debug launcher (keeps the terminal open)
 │
 └── tests/
@@ -1995,6 +1997,7 @@ mediawall/
     ├── test_text.py
     ├── test_layout.py
     ├── test_video.py
+    ├── test_library.py
     └── app/                app checks: run.py, harness.py, check_*.py
 ```
 
@@ -2018,8 +2021,7 @@ Every folder of importable Python modules contains an `__init__.py`, normally em
 
 ```text
 core/
-├── collections.py
-└── library.py            # the tag database (section 44)
+└── collections.py
 
 bridge/
 ├── library_model.py      # the Library window's files, selection, and tags
@@ -2237,7 +2239,7 @@ These are deliberately later features.
 
 ---
 
-## Phase 13 — Library and tags — **Not started** (next; the design and build order are in section 44)
+## Phase 13 — Library and tags — **In progress** (the database is built, no window yet; the design and build order are in section 44)
 
 Tag media quickly in a separate Library window, then find it by tag and put it on the wall.
 
@@ -2353,7 +2355,7 @@ Deleting a cache must never delete the user's original media.
 
 # 44. Media Library and Tags
 
-**Status: planned, nothing built yet** (agreed 2026-11-04; Phase 13). The goal is to tag media manually as quickly as possible, one file or many, then use the tags to find media and put it on the wall.
+**Status: in progress** (agreed 2026-11-04; Phase 13). The database (`core/library.py`) is built and unit-tested; nothing in the app uses it yet, and the sections below describe the plan unless they say otherwise. The goal is to tag media manually as quickly as possible, one file or many, then use the tags to find media and put it on the wall.
 
 The rest of the app keeps working directly from filesystem paths and never needs the library. There is no import step (section 41): a file gets a database row only when it is first tagged, and "untagged" is simply a folder scan minus the database.
 
@@ -2427,7 +2429,7 @@ The rules:
 - **Implied tags are worked out when read, never stored.** So moving a tag in the tree updates every file straight away, and undoing or removing a tag leaves nothing behind.
 - **Removing:** an implied tag is shown dimmed in the pane ("from ferrari") and goes away when `ferrari` is removed. A file tagged both `ferrari` and `car` directly keeps `car`.
 - **Finding:** searching `car` finds files tagged `car` or anything under it.
-- **Names are unique** across all tags and groups, ignoring case, since typing must be unambiguous. A tag has one parent, so it has one place in the pane. Several parents can be added later if they are really needed; the database's version number allows the change.
+- **Names are unique** across all tags and groups, ignoring case in any alphabet, since typing must be unambiguous. Runs of spaces collapse to one, and a name can't start with `-`, which means "exclude" in Find. A tag has one parent, so it has one place in the pane. Several parents can be added later if they are really needed; the database's version number allows the change.
 - **What can hold what:** a group can hold groups and tags; a tag holds only tags. Otherwise a tag's implied parents could pass through a group. The core refuses this, and refuses loops.
 - **Editing** happens in the tags pane: drag a tag onto another or onto a group to move it, and right-click to New Group, Rename, Merge Into, Make Group / Make Tag, or Delete. Deleting a group moves its contents up a level and never deletes tags. Deleting a tag used by files asks first, showing how many. A tag can become a group only when no files use it directly. Siblings sort by name.
 
@@ -2458,15 +2460,16 @@ There are three ways from the Library to the wall:
 One SQLite file per machine, shared by all projects, and never on a shared drive: `%LOCALAPPDATA%/Mediawall/library.sqlite` on Windows, `~/.local/share/Mediawall/library.sqlite` on Linux (`$XDG_DATA_HOME` if set). `MEDIAWALL_LIBRARY` overrides the path, so app checks never touch the real library (like `MEDIAWALL_SETTINGS`).
 
 ```text
-tags       id, name (unique, ignoring case), parent_id, is_group, created_at, last_used
+tags       id, name, name_key (unique: the name ignoring case), parent_id, is_group, created_at, last_used
 files      id, path, path_key (unique), media_type, size, mtime, fingerprint
 file_tags  file_id, tag_id, added_at  (primary key: file_id + tag_id)
 ```
 
 - **Tags belong to a file path** (decided 2026-11-04). Two identical copies of a file are tagged separately. `path_key` is the normalized path (`os.path.normcase`), so a case difference on Windows doesn't make a second file.
 - **Moved and renamed files:** `fingerprint` is the file size plus a hash of a few sampled chunks, computed when a file is first tagged. When a scan finds an unknown file the same size as a missing row, its fingerprint is checked, and exactly one match moves the tags to the new path. Tags of missing files stay until a Clean Up command removes them.
-- **Undo** is the Library's own session list of tagging actions (a bulk action is one step). Wall undo stores scene snapshots (section 47), and tags aren't part of the scene, so tagging never adds to wall undo.
-- **Export and import** (Library window menu): a JSON file, written atomically. **Export Everything** holds the tag tree and every tagged file's path, fingerprint, and tags, as a backup. **Export Tags Only** holds just the tree, to start another machine with the same tags. Import merges by tag name and never deletes. Imported file rows whose paths don't exist here are treated as missing, so the fingerprint check can reattach them.
+- **Undo** is the Library's own session list of tagging actions (a bulk action is one step). Wall undo stores scene snapshots (section 47), and tags aren't part of the scene, so tagging never adds to wall undo. Undoing a Shift+Enter also removes the tag it created, unless that tag has since gained files or child tags. Editing the tree isn't undoable (deleting asks first): any edit clears redo, and deleting, merging, or making a group forgets the undo steps of the tags involved, so a step can never act on a tag that has gone or put a group on a file.
+- **A file's row stays when its last tag is removed**, which keeps its fingerprint and lets undo put the tags back. "Untagged" and Find go by `file_tags`, so such a row counts as untagged. Clean Up (step 8) can remove these too.
+- **Export and import** (Library window menu): a JSON file, written atomically. **Export Everything** holds the tag tree and every tagged file's path, fingerprint, and tags, as a backup. **Export Tags Only** holds just the tree, to start another machine with the same tags. Import merges by tag name and never deletes: a tag that already exists keeps its place and kind. Bad entries become warnings, as when opening a project, and only an unreadable file fails. Imported file rows whose paths don't exist here are treated as missing, so the fingerprint check can reattach them.
 - Bulk changes run in one transaction. The schema version is kept in `PRAGMA user_version`. Python's `sqlite3` needs no new dependency, and Qt's `Sql` modules remain excluded from the installers.
 
 ## 44.7 Layers
@@ -2479,8 +2482,8 @@ file_tags  file_id, tag_id, added_at  (primary key: file_id + tag_id)
 
 Each step ends with something testable, unit tests and `tests/app/check_library*.py` included.
 
-1. **Check the unknowns** below, on the dev VM (Windows and Mint).
-2. **Database:** `core/library.py` and its unit tests, including groups, parent tags, and export/import.
+1. **Check the unknowns** below, on the dev VM (Windows and Mint). **Windows measured, except the drag; Mint to do.**
+2. **Database:** `core/library.py` and its unit tests, including groups, parent tags, and export/import. **Done** (2026-11-04). Relinking and Clean Up wait for step 8; `fingerprint` is already stored.
 3. **Library window:** folder tree, image grid with thumbnails, selection, search box, and tags pane with the tree. Tagging images works from here on.
 4. **GIFs, video, and audio:** their tiles, thumbnails, and hover playback.
 5. **Strip view.**
@@ -2490,12 +2493,15 @@ Each step ends with something testable, unit tests and `tests/app/check_library*
 
 ### To check first
 
-Nothing here has been tried against Qt yet (the plan was written on a checkout without a venv or sample media):
+`tools/library_probe.py` (delete it when this list is finished) takes these measurements on either platform: `images`, `video`, and `drag`. Results so far, on the Windows dev VM (6 threads, no working hardware video decoding, files already in the disk cache), 2026-11-04:
 
-- **Video frames:** the plan is `QMediaPlayer` with `QVideoSink`, which adds no dependency. Time it on a folder of a few hundred videos on both platforms. If it's too slow, the fallback is PyAV, at the cost of a larger install.
-- **Thumbnail workers:** `QImageReader` with a scaled size on a `QThreadPool`. Check that Python's global lock doesn't make scrolling stutter on a folder of thousands of large images.
-- **Dragging between windows:** a real file drag from the Library into a `DropArea` in the main window, on Windows and on Mint's window manager.
-- **`sqlite3` in the installers:** the `UNUSED_QT` filter drops paths containing `Sql`, which is case-sensitive and shouldn't match `sqlite3`. Confirm in a Windows and a Linux build, and that the app can create its database when installed.
+- **Video frames: `QMediaPlayer` with `QVideoSink` is good enough, so no PyAV.** 300 videos at 12.7 a second, none failed, none blank (median 33 ms WebM, 62 ms MOV, 105 ms for a 268 MB MP4), and each frame at most 200 ms from the 10% point. A phone clip's rotation comes out right. **Run it on its own thread:** on the UI thread it stalled the UI for up to 129 ms (36 gaps over 33 ms), against 68 ms (8 gaps) on its own thread, at the same speed. **To do:** the same on Mint, with its hardware decoder.
+- **Thumbnail workers: fine.** `QImageReader` with a scaled size on Qt's thread pool made 2000 thumbnails at 211 a second, including 24-megapixel JPEGs, and the UI thread's longest gap was 40 ms, so Python's global lock isn't a problem here. **To do:** the same on Mint, and from a folder not already in the disk cache.
+- **GIF still frames:** `QImageReader` reached the frame at 10% of a 13 MB, 111-frame GIF in 63 ms, so these can use the same workers.
+- **Dragging between windows: to do by hand, on both platforms** (`library_probe.py drag`). The test windows open, but a real drag needs a person at the mouse.
+- **`sqlite3` in the installers:** `UNUSED_QT` doesn't match its file names (checked against the list). The real test has to wait until the app imports `core/library.py` (step 3), since PyInstaller doesn't collect it until then: then confirm in a Windows and a Linux build, and that the installed app can create its database.
+
+`core/library.py`, measured on a generous library (5,000 tags, 100,000 files, about 400,000 tag links): a search on a key press 2 to 19 ms, Find about 150 to 330 ms, applying a tag to 2,000 known files 29 ms, the tags of a 2,000-file selection 63 ms. Two costs to design around in step 3: **every tag's count takes about 770 ms** at this size, so the pane should update counts as tags change rather than ask again each time; and **first-time tagging reads each file for its fingerprint**, about 1 s per 2,000 files already in the disk cache and more from a slow drive, so large first-time selections may need to run in the background.
 
 ---
 
@@ -2768,7 +2774,7 @@ Watching (2026-10-17):
 
 ### Next
 
-- **Library and tags** (Phase 13): the design and build order are in section 44. Start with its "To check first" list on the dev VM, on branch `library`.
+- **Library and tags** (Phase 13, on branch `library`): the design and build order are in section 44. The database is done (step 2); next, finish "To check first" (44.8: Mint, and the drag by hand), then build the Library window (step 3).
 
 Also done 2026-10-17: Speech, text to speech with Piper (section 14.6), and Continue Play replaces Loop in browsing containers (off = loop; next to Play and Mute), an A-B loop overrides it, and a locked container keeps playing on (section 6.4). The 2026-10-17 batch is done: a Size control for text (wrapped or not); colour emoji in text; the glow now follows arc and tilt changes; a fix for presets applying only partly (to confirm on Linux, above); a master volume for the window; Lock Container; a container background colour setting; favorites per browsing container with a Show Favorites Only filter; Show New Files First; and Fit as the default framing (sections 5.4, 6.4, 14.5, 25).
 
@@ -3078,6 +3084,7 @@ The following design decisions are currently established:
 - **The tag database is per machine, with export** (2026-11-04): media isn't shared between the Windows and Mint machines, so no path mapping is needed. Tags belong to a file path, so identical copies are tagged separately; a sampled fingerprint only serves to reattach tags after a move. Audio files are tagged too.
 - **Tags form one tree with groups and parent tags** (2026-11-04): a group (`Location`) only organizes the pane and can't be applied; a parent tag (`car` over `ferrari`) is implied by its children. Implied tags are worked out when read, not stored, so moving a tag takes effect everywhere and undo leaves nothing behind. One parent per tag for now.
 - **Nothing autoplays in the Library's grid** (2026-11-04): stills at rest, one muted file playing on hover, for the memory reasons in section 51.
+- **Tree edits aren't undone; tagging is** (2026-11-04, building `core/library.py`): the Library's undo covers tagging only, as planned. A tree edit clears redo and forgets the steps of a tag it removes, rather than growing undo into a second system of snapshots. A tag's name can't start with `-`, which Find uses to exclude; case is ignored through a stored `name_key`, because SQLite's `NOCASE` covers only ASCII.
 
 ### Open decisions
 
