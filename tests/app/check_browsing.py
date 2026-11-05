@@ -122,6 +122,9 @@ def step_hold_tilt():
 
 
 def step_pan_and_move():
+    # A still picture, whichever file the steps above stopped on: double-clicking
+    # one resets its framing, while on a GIF it restarts the animation instead.
+    c.sm.showInContainer(box.id, media(PHOTO), "image")
     b0, c0 = geo(c.scene.get(box.id)), geo(content())
     c.drag((360, 290), (420, 330))
     c.check("left-drag pans the picture, container stays",

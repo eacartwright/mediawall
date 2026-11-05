@@ -5,7 +5,7 @@ from pathlib import Path
 
 
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".webp"}
-VIDEO_EXTENSIONS = {".mp4", ".avi", ".mkv", ".mov", ".wmv", ".3gp"}
+VIDEO_EXTENSIONS = {".mp4", ".avi", ".mkv", ".mov", ".wmv", ".3gp", ".webm"}
 AUDIO_EXTENSIONS = {".mp3", ".m4a", ".wav"}
 
 # Image formats that may contain animation. Displayed with an animated

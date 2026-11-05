@@ -10,7 +10,8 @@ import unittest
 from pathlib import Path
 
 from core.media_browser import (
-    MediaBrowser, animation_duration_ms, file_patterns, format_duration, is_animated, neighbour_file,
+    MediaBrowser, animation_duration_ms, file_patterns, format_duration, is_animated, media_type_for,
+    neighbour_file,
 )
 
 
@@ -33,6 +34,14 @@ def _webp_bytes(durations, odd_chunk=False):
         payload = bytes(12) + ms.to_bytes(3, "little") + bytes(1) + b"frame!"
         chunks += b"ANMF" + len(payload).to_bytes(4, "little") + payload
     return b"RIFF" + (len(chunks) + 4).to_bytes(4, "little") + b"WEBP" + chunks
+
+
+class MediaTypeTests(unittest.TestCase):
+
+    def test_webm_is_a_video(self):
+        self.assertEqual(media_type_for("clip.webm"), "video")
+        self.assertEqual(media_type_for("CLIP.WEBM"), "video")
+        self.assertIn("*.webm", file_patterns("video"))
 
 
 class AnimationDurationTests(unittest.TestCase):

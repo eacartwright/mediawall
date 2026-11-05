@@ -278,6 +278,7 @@ Initial target formats:
 - MOV
 - WMV
 - 3GP
+- WebM
 
 Playback is delegated to QtMultimedia (Qt's own player, using its FFmpeg backend) rather than implemented in Python. See the decision log.
 
@@ -3091,7 +3092,7 @@ The following design decisions are currently established:
 - **Tags form one tree with groups and parent tags** (2026-11-04): a group (`Location`) only organizes the pane and can't be applied; a parent tag (`car` over `ferrari`) is implied by its children. Implied tags are worked out when read, not stored, so moving a tag takes effect everywhere and undo leaves nothing behind. One parent per tag for now.
 - **Nothing autoplays in the Library's grid** (2026-11-04): stills at rest, one muted file playing on hover, for the memory reasons in section 51.
 - **The Library can go behind the wall** (2026-11-04, building it): unlike the Log and Media Memory windows, it isn't kept in front of the main window. The main window hides and destroys it on closing, before Qt decides whether any window is left, or the app would keep running with nothing on screen.
-- **`.webm` isn't a supported video type** (noticed 2026-11-04, building the Library): section 3.2's list doesn't have it, so the Library, like browsers, doesn't list WebM files, although the player can play them. To decide: add it to `VIDEO_EXTENSIONS`.
+- **`.webm` is a supported video type** (2026-11-04): it was missing from the list, so the Library and browsers didn't show WebM files, although the player can play them.
 - **Tree edits aren't undone; tagging is** (2026-11-04, building `core/library.py`): the Library's undo covers tagging only, as planned. A tree edit clears redo and forgets the steps of a tag it removes, rather than growing undo into a second system of snapshots. A tag's name can't start with `-`, which Find uses to exclude; case is ignored through a stored `name_key`, because SQLite's `NOCASE` covers only ASCII.
 
 ### Open decisions
