@@ -20,6 +20,11 @@ Rectangle {
 
     signal focusReturned()
     signal openStrip()
+    signal dragStarted(int row)
+
+    // What MouseAreas drag: never shown. LibraryWindow.qml starts the real
+    // drag; this just gives a tile's MouseArea something to move.
+    required property Item dragProxy
 
     // Hidden for the Strip view, which has its own player.
     onVisibleChanged: if (!visible) tilePlayer.stop()
@@ -34,7 +39,7 @@ Rectangle {
             return
         }
         var file = tagLibrary.fileAt(row)
-        if (file.type === "image" && !file.animatable)
+        if (file.missing || (file.type === "image" && !file.animatable))
             return
         grid.positionViewAtIndex(row, GridView.Contain)
         tilePlayer.start(row, true)
@@ -71,6 +76,7 @@ Rectangle {
             required property string thumb
             required property string badge
             required property bool moves
+            required property bool missing
             required property bool failed
             required property bool selected
             required property bool current
@@ -103,15 +109,15 @@ Rectangle {
                 // What's in the picture's place until there is one.
                 Text {
                     anchors.centerIn: picture
-                    visible: !tile.isAudio && picture.status !== Image.Ready
-                    text: tile.failed ? "Can't display file" : "…"
-                    color: "#888888"
+                    visible: tile.missing || (!tile.isAudio && picture.status !== Image.Ready)
+                    text: tile.missing ? "Missing file" : tile.failed ? "Can't display file" : "…"
+                    color: tile.missing ? "#e07070" : "#888888"
                 }
 
                 // Audio has no picture.
                 Text {
                     anchors.centerIn: picture
-                    visible: tile.isAudio
+                    visible: tile.isAudio && !tile.missing
                     text: "♪"
                     color: "#9fb4d8"
                     font.pixelSize: 40
@@ -168,6 +174,13 @@ Rectangle {
             MouseArea {
                 anchors.fill: parent
                 hoverEnabled: true
+                preventStealing: true            // a drag here is a file drag, not a scroll
+                drag.target: tile.missing ? null : pane.dragProxy
+                drag.threshold: 12
+                drag.onActiveChanged: {
+                    if (drag.active)
+                        pane.dragStarted(tile.index)
+                }
                 onContainsMouseChanged: {
                     if (containsMouse && tile.moves)
                         tilePlayer.hoverStarted(tile.index)
@@ -209,6 +222,7 @@ Rectangle {
             visible: grid.count === 0
             color: "#888888"
             text: tagLibrary.scanning ? "Scanning…"
+                  : tagLibrary.findMode ? "No files match"
                   : tagLibrary.folder === "" ? "Choose a folder on the left"
                   : tagLibrary.untaggedOnly ? "Nothing untagged here"
                   : "No media in this folder"

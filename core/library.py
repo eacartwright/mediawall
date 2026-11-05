@@ -30,7 +30,7 @@ import time
 from dataclasses import dataclass, field, replace
 from pathlib import Path
 
-from core.media_browser import media_type_for, natural_key
+from core.media_browser import is_animatable, media_type_for, natural_key
 from core.project import write_json_atomic
 
 
@@ -182,6 +182,38 @@ def _match_rank(name_key, query):
             return 2
         at = name_key.find(query, at + 1)
     return 3
+
+
+def found_entries(rows):
+    """
+    Library.find's rows as a file list like a folder scan's, plus "id" and
+    "missing": what's on disk now, for a file still there. Asks the disk
+    about each one, so call this off the UI thread.
+    """
+    entries = []
+    for row in rows:
+        path = Path(row["path"])
+        entry = {
+            "id": row["id"],
+            "path": row["path"],
+            "url": "",
+            "name": path.name,
+            "relpath": path.name,
+            "type": row["type"],
+            "animatable": is_animatable(path),
+            "mtime": row["mtime"],
+            "size": row["size"],
+            "missing": True,
+        }
+        try:
+            st = path.stat()
+            if stat.S_ISREG(st.st_mode):
+                # (A path from another system isn't absolute here: as_uri refuses it.)
+                entry.update(url=path.as_uri(), mtime=st.st_mtime, size=st.st_size, missing=False)
+        except (OSError, ValueError):
+            pass
+        entries.append(entry)
+    return entries
 
 
 class FileSelection:

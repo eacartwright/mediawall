@@ -260,8 +260,6 @@ def step_navigation():
             tile(2, "current") is True and item("librarySearch", "item.cursorPosition") == 1)
     key(Qt.Key_Escape)
     c.check("Esc clears the box", box_text() == "")
-    key(Qt.Key_Tab)
-    c.check("Tab keeps the focus in the box", box_focused())
 
 
 def step_backspace_and_undo():

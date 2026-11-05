@@ -18,7 +18,7 @@ from PySide6.QtWidgets import QFileDialog, QFileSystemModel
 from bridge.thumbnails import ThumbnailMaker
 from core.library import (
     FileSelection, Library, LibraryError, default_library_path, default_thumbnail_dir,
-    normalized_name, path_key,
+    found_entries, normalized_name, path_key,
 )
 from core.media_browser import MediaBrowser, format_duration
 
@@ -47,6 +47,7 @@ class FilesModel(QAbstractListModel):
     TypeRole = Qt.UserRole + 8
     BadgeRole = Qt.UserRole + 9
     MovesRole = Qt.UserRole + 10
+    MissingRole = Qt.UserRole + 11
 
     selectionChanged = Signal()
 
@@ -71,6 +72,7 @@ class FilesModel(QAbstractListModel):
             self.TypeRole: b"mediaType",
             self.BadgeRole: b"badge",
             self.MovesRole: b"moves",
+            self.MissingRole: b"missing",
         }
 
     def rowCount(self, parent=QModelIndex()):
@@ -92,16 +94,26 @@ class FilesModel(QAbstractListModel):
         if not 0 <= row < len(self._entries):
             return {}
         entry = self._entries[row]
-        thumb = self._thumbnails.url(entry["path"], entry["size"], entry["mtime"],
-                                     entry["type"], entry["animatable"])
+        missing = entry.get("missing", False)
+        thumb = "" if missing else self._thumbnails.url(entry["path"], entry["size"], entry["mtime"],
+                                                        entry["type"], entry["animatable"])
         return {"url": entry["url"], "path": entry["path"], "name": entry["name"],
-                "type": entry["type"], "animatable": entry["animatable"], "thumb": thumb}
+                "type": entry["type"], "animatable": entry["animatable"], "thumb": thumb,
+                "missing": missing}
+
+    def selected_entries(self):
+        return [self._entries[row] for row in sorted(self.selection.selected)]
 
     def data(self, index, role=Qt.DisplayRole):
         if not index.isValid():
             return None
         row = index.row()
         entry = self._entries[row]
+        if role == self.MissingRole:
+            return entry.get("missing", False)
+        if entry.get("missing", False) and role in (self.ThumbRole, self.BadgeRole, self.MovesRole,
+                                                    self.FailedRole):
+            return False if role in (self.MovesRole, self.FailedRole) else ""
         if role == self.PathRole:
             return entry["path"]
         if role == self.NameRole:
@@ -207,6 +219,7 @@ class TagsModel(QAbstractListModel):
         self._collapsed = set()
         self._counts = {}
         self._on_selection = {}          # tag id -> selection_tags row
+        self._only = None                # finding: only these tags, and what holds them
 
     def roleNames(self):
         return {
@@ -263,6 +276,8 @@ class TagsModel(QAbstractListModel):
         self._rows = []
         hidden_below = None
         for tag, depth in self._library.tree():
+            if self._only is not None and tag.id not in self._only:
+                continue
             if hidden_below is not None and depth > hidden_below:
                 continue
             hidden_below = depth if tag.id in self._collapsed else None
@@ -284,6 +299,18 @@ class TagsModel(QAbstractListModel):
         self._counts = counts
         self._changed_all([self.CountRole])
 
+    def set_only(self, tag_ids):
+        """Finding: show only these tags and what holds them. None: all of them."""
+        only = None
+        if tag_ids is not None:
+            only = set()
+            for tag_id in tag_ids:
+                only.add(tag_id)
+                only.update(tag.id for tag in self._library.ancestors(tag_id))
+        if only != self._only:
+            self._only = only
+            self.rebuild()
+
     def set_on_selection(self, rows):
         self._on_selection = {row["tag"].id: row for row in rows}
         self._changed_all([self.OnSelectionRole, self.DirectRole])
@@ -298,6 +325,8 @@ class TagLibrary(QObject):
     folderChanged = Signal()
     scanningChanged = Signal()
     untaggedOnlyChanged = Signal()
+    findModeChanged = Signal()
+    filtersChanged = Signal()
     selectionChanged = Signal()
     resultsChanged = Signal()
     historyChanged = Signal()
@@ -315,6 +344,9 @@ class TagLibrary(QObject):
         self._folder = ""
         self._scanning = False
         self._untagged_only = False
+        self._find_mode = False
+        self._filters = []               # finding: [{id, name, exclude}]
+        self._find_folder = ""           # finding: limited to this folder
         self._scan_generation = 0
         self._results = []
         self._highlight = 0
@@ -423,14 +455,22 @@ class TagLibrary(QObject):
         return self._get_folder_model().index(path) if path else QModelIndex()
 
     def _get_folder(self):
-        return self._folder
+        return self._find_folder if self._find_mode else self._folder
 
+    # What the folder tree shows as chosen. When finding, nothing means the whole library.
     folder = Property(str, _get_folder, notify=folderChanged)
 
     @Slot(str)
     def setFolder(self, path):
         # As the folder tree writes it (with "/"), so it can show which is current.
         path = QDir.fromNativeSeparators(path)
+        if self._find_mode:
+            if path != self._find_folder:
+                self._find_folder = path
+                self.folderChanged.emit()
+                self.filtersChanged.emit()
+                self._scan()
+            return
         if path == self._folder:
             return
         self._folder = path
@@ -472,19 +512,31 @@ class TagLibrary(QObject):
 
     def _scan(self):
         """
+        Fill the file list: a folder's files, or when finding, the search's.
         On a thread of its own: a big tree or a slow drive can take a long
         time, and can't be interrupted, so it's left behind if another
         scan starts or the app closes (hence the generation, and daemon).
         """
         self._scan_generation += 1
         generation = self._scan_generation
-        folder, recursive = self._folder, self._settings.librarySubfolders
+        recursive = self._settings.librarySubfolders
         self._scanning = True
         self.scanningChanged.emit()
 
-        def work():
-            entries = MediaBrowser().scan_folder(folder, recursive)
-            self._scanned.emit(generation, entries)
+        if self._find_mode:
+            # The database belongs to this thread; only the disk is asked there.
+            rows = self._library.find(
+                [f["id"] for f in self._filters if not f["exclude"]],
+                [f["id"] for f in self._filters if f["exclude"]],
+                self._find_folder or None, recursive)
+
+            def work():
+                self._scanned.emit(generation, found_entries(rows))
+        else:
+            folder = self._folder
+
+            def work():
+                self._scanned.emit(generation, MediaBrowser().scan_folder(folder, recursive))
 
         threading.Thread(target=work, daemon=True).start()
 
@@ -493,8 +545,13 @@ class TagLibrary(QObject):
             return
         self._scanning = False
         self.scanningChanged.emit()
+        if self._find_mode:
+            # What's left to narrow by: the tags in these results.
+            self._found_counts = self._library.tag_counts([e["id"] for e in entries])
+            self._tags.set_counts(self._found_counts)
+            self._tags.set_only(self._found_counts.keys())
         untagged = self._library.untagged([e["path"] for e in entries])
-        if self._untagged_only:
+        if self._untagged_only and not self._find_mode:
             left = {path_key(p) for p in untagged}
             entries = [e for e in entries if path_key(e["path"]) in left]
         self._files.set_entries(entries, untagged)
@@ -523,6 +580,10 @@ class TagLibrary(QObject):
 
     def _refresh_selection_tags(self):
         rows = self._library.selection_tags(self._selected_paths())
+        if self._find_mode:
+            self._selection_rows = []
+            self._tags.set_on_selection([])
+            return
         self._selection_rows = [{
             "id": row["tag"].id,
             "name": row["tag"].name,
@@ -531,6 +592,12 @@ class TagLibrary(QObject):
             "via": ", ".join(row["via"]),
         } for row in rows]
         self._tags.set_on_selection(rows)
+
+    def _get_file_count(self):
+        return self._files.rowCount() if self._files is not None else 0
+
+    # How many files are listed.
+    fileCount = Property(int, _get_file_count, notify=selectionChanged)
 
     def _get_selected_count(self):
         return len(self._files.selection.selected) if self._files is not None else 0
@@ -570,6 +637,95 @@ class TagLibrary(QObject):
             self._files.change_selection(lambda s: s.select_all())
 
     # -------------------------------------------------
+    # To the wall (section 44.5)
+    # -------------------------------------------------
+
+    @Slot(result=list)
+    def selectedForWall(self):
+        """[{path, type}]: the selected files that are still there."""
+        if self._files is None:
+            return []
+        return [{"path": e["path"], "type": e["type"]}
+                for e in self._files.selected_entries() if not e.get("missing", False)]
+
+    @Slot(int)
+    def reportAdded(self, added):
+        """Say what Add to Wall did, with anything left out."""
+        left_out = self._get_selected_count() - added
+        text = f"Added {added} to the wall." if added else "Nothing added."
+        if left_out:
+            text += f" {left_out} missing or left out."
+        self._say(text)
+
+    @Slot(str)
+    def say(self, text):
+        self._say(text)
+
+    @Slot(int, result=str)
+    def dragUrls(self, row):
+        """
+        What dragging this tile carries, as a text/uri-list: the selection
+        if it's among it, otherwise it alone (which it then selects).
+        """
+        if self._files is None:
+            return ""
+        if row not in self._files.selection.selected:
+            self.clickFile(row, False, False)
+        return "\r\n".join(e["url"] for e in self._files.selected_entries() if e["url"])
+
+    # -------------------------------------------------
+    # Finding (section 44.5)
+    # -------------------------------------------------
+
+    def _get_find_mode(self):
+        return self._find_mode
+
+    def _set_find_mode(self, value):
+        if value == self._find_mode or self._library is None:
+            return
+        self._find_mode = value
+        self.findModeChanged.emit()
+        self.folderChanged.emit()
+        self.setQuery("")
+        if value:
+            self._tags.set_on_selection([])
+        else:
+            self._tags.set_only(None)
+            self._refresh_counts()
+        self._scan()
+
+    # Tab: the box builds a search rather than tagging.
+    findMode = Property(bool, _get_find_mode, _set_find_mode, notify=findModeChanged)
+
+    def _get_filters(self):
+        return self._filters
+
+    # [{id, name, exclude}], combined as AND.
+    filters = Property(list, _get_filters, notify=filtersChanged)
+
+    def _add_filter(self, tag_id, exclude=False):
+        tag = self._library.tag(tag_id)
+        if tag is None:
+            return
+        self._filters = [f for f in self._filters if f["id"] != tag_id]
+        self._filters.append({"id": tag_id, "name": tag.name, "exclude": exclude})
+        self.filtersChanged.emit()
+        self._scan()
+
+    @Slot(int)
+    def removeFilter(self, tag_id):
+        self._filters = [f for f in self._filters if f["id"] != tag_id]
+        self.filtersChanged.emit()
+        self._scan()
+
+    def _forget_gone_filters(self):
+        kept = [f for f in self._filters if self._library.tag(f["id"]) is not None]
+        for f in kept:
+            f["name"] = self._library.tag(f["id"]).name
+        self._filters = kept
+        self.filtersChanged.emit()
+
+    # -------------------------------------------------
     # The search box
     # -------------------------------------------------
 
@@ -594,11 +750,19 @@ class TagLibrary(QObject):
     def _results_for(self, text):
         if self._library is None:
             return []
+        if self._find_mode:
+            words = " ".join(text.split())
+            exclude = words.startswith("-")
+            tags = self._library.search(words[1:] if exclude else words, include_groups=True,
+                                        limit=MAX_RESULTS)
+            return [{"id": t.id, "name": t.name, "where": self._library.where(t.id),
+                     "create": False, "exclude": exclude} for t in tags]
         tags = self._library.search(text, limit=MAX_RESULTS)
-        rows = [{"id": t.id, "name": t.name, "where": self._library.where(t.id), "create": False}
-                for t in tags]
+        rows = [{"id": t.id, "name": t.name, "where": self._library.where(t.id), "create": False,
+                 "exclude": False} for t in tags]
         if not rows and text.strip():
-            rows = [{"id": -1, "name": " ".join(text.split()), "where": "", "create": True}]
+            rows = [{"id": -1, "name": " ".join(text.split()), "where": "", "create": True,
+                     "exclude": False}]
         return rows
 
     @Slot(int)
@@ -618,6 +782,9 @@ class TagLibrary(QObject):
             self._highlight = 0
             self.resultsChanged.emit()
         chosen = results[self._highlight]
+        if self._find_mode:
+            self._add_filter(chosen["id"], chosen["exclude"])
+            return True
         if chosen["create"]:
             return self.createAndApply(text)
         return self._apply(chosen["id"])
@@ -625,6 +792,8 @@ class TagLibrary(QObject):
     @Slot(str, result=bool)
     def createAndApply(self, text):
         """Shift+Enter: a tag of exactly what was typed."""
+        if self._find_mode:
+            return False
         paths = self._selected_paths()
         if not paths:
             self._say("Select a file to tag first.")
@@ -650,7 +819,11 @@ class TagLibrary(QObject):
 
     @Slot()
     def removeLastApplied(self):
-        """Backspace in an empty box: take the last tag applied off the selection."""
+        """Backspace in an empty box: take the last tag applied off the selection (or filter off the search)."""
+        if self._find_mode:
+            if self._filters:
+                self.removeFilter(self._filters[-1]["id"])
+            return
         while self._applied:
             tag_id = self._applied.pop()
             if self._library.tag(tag_id) is not None:
@@ -663,7 +836,10 @@ class TagLibrary(QObject):
 
     @Slot(int)
     def toggleTag(self, tag_id):
-        """A click in the tags pane: on every selected file, or else off them all."""
+        """A click in the tags pane: on every selected file, or else off them all. Finding: narrow by it."""
+        if self._find_mode:
+            self._add_filter(tag_id)
+            return
         count = len(self._selected_paths())
         if not count:
             self._say("Select a file to tag first.")
@@ -681,10 +857,14 @@ class TagLibrary(QObject):
         self.selectionChanged.emit()
         self.historyChanged.emit()
         self.setQuery("")
-        self._counts_timer.start()
+        if self._find_mode:
+            self._forget_gone_filters()
+            self._scan()                 # the results may have changed
+        else:
+            self._counts_timer.start()
 
     def _refresh_counts(self):
-        if self._library is not None:
+        if self._library is not None and not self._find_mode:
             self._tags.set_counts(self._library.tag_counts())
 
     # -------------------------------------------------

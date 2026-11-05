@@ -15,6 +15,9 @@ Rectangle {
     required property var files
 
     signal focusReturned()
+    signal dragStarted(int row)
+
+    required property Item dragProxy
 
     // The current file, at once. Its thumbnail shows straight away, and the
     // real thing a moment later, so holding an arrow key through a folder
@@ -28,13 +31,14 @@ Rectangle {
     readonly property var view: viewLoader.item
     readonly property bool isAudio: file.type === "audio"
     readonly property bool isStill: file.type === "image" && !file.animatable
+    readonly property bool isMissing: file.missing === true
 
     function showCurrent() {
         openFile = null
         fileReady = false
         paused = false
         file = visible ? tagLibrary.fileAt(tagLibrary.currentRow) : {}
-        if (file.url)
+        if (file.path)
             openDelay.restart()
         else
             openDelay.stop()
@@ -44,7 +48,7 @@ Rectangle {
 
     // Ctrl+Space: the first press brings up the sound, the next pause and resume.
     function togglePlay() {
-        if (isStill || !openFile)
+        if (isStill || isMissing || !openFile)
             return
         var hasSound = file.type === "video"
         if (hasSound && !soundOn && !paused)
@@ -98,6 +102,7 @@ Rectangle {
 
             sourceComponent: MediaView {
                 url: strip.openFile.url
+                missing: strip.openFile.missing === true
                 type: strip.openFile.type
                 animatable: strip.openFile.animatable
                 name: strip.openFile.name
@@ -130,9 +135,11 @@ Rectangle {
 
         Text {
             anchors.centerIn: parent
-            visible: strip.file.url === undefined
+            visible: strip.file.path === undefined
             color: "#888888"
-            text: tagLibrary.scanning ? "Scanning…" : "No media in this folder"
+            text: tagLibrary.scanning ? "Scanning…"
+                  : tagLibrary.findMode ? "No files match"
+                  : "No media in this folder"
         }
     }
 
@@ -173,6 +180,7 @@ Rectangle {
                 required property bool selected
                 required property bool current
                 required property bool tagged
+                required property bool missing
 
                 width: 130
                 height: ListView.view.height
@@ -193,10 +201,11 @@ Rectangle {
                 Text {
                     anchors.centerIn: parent
                     anchors.verticalCenterOffset: -7
-                    visible: cell.mediaType === "audio" || cell.failed
-                    text: cell.failed ? "Can't display" : "♪"
-                    color: cell.failed ? "#888888" : "#9fb4d8"
-                    font.pixelSize: cell.failed ? 11 : 28
+                    readonly property bool sayingWhy: cell.missing || cell.failed
+                    visible: cell.mediaType === "audio" || sayingWhy
+                    text: cell.missing ? "Missing file" : cell.failed ? "Can't display" : "♪"
+                    color: cell.missing ? "#e07070" : cell.failed ? "#888888" : "#9fb4d8"
+                    font.pixelSize: sayingWhy ? 11 : 28
                 }
 
                 Text {
@@ -225,6 +234,13 @@ Rectangle {
 
                 MouseArea {
                     anchors.fill: parent
+                    preventStealing: true        // a drag here is a file drag, not a scroll
+                    drag.target: cell.missing ? null : strip.dragProxy
+                    drag.threshold: 12
+                    drag.onActiveChanged: {
+                        if (drag.active)
+                            strip.dragStarted(cell.index)
+                    }
                     onClicked: function(mouse) {
                         strip.focusReturned()
                         tagLibrary.clickFile(cell.index,

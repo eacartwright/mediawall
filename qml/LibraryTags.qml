@@ -33,6 +33,7 @@ Rectangle {
         spacing: 4
 
         Label {
+            visible: !tagLibrary.findMode
             text: "On selection"
             font.bold: true
         }
@@ -41,6 +42,7 @@ Rectangle {
             id: selectionList
             objectName: "librarySelectionTags"           // found by tests/app
 
+            visible: !tagLibrary.findMode
             Layout.fillWidth: true
             Layout.preferredHeight: Math.min(contentHeight, pane.height * 0.3)
             Layout.minimumHeight: 22
@@ -96,13 +98,14 @@ Rectangle {
         }
 
         Rectangle {
+            visible: !tagLibrary.findMode
             Layout.fillWidth: true
             Layout.preferredHeight: 1
             color: "#444444"
         }
 
         Label {
-            text: "All tags"
+            text: tagLibrary.findMode ? "In these results" : "All tags"
             font.bold: true
         }
 
@@ -262,7 +265,8 @@ Rectangle {
                 visible: tree.count === 0
                 wrapMode: Text.WordWrap
                 horizontalAlignment: Text.AlignHCenter
-                text: "No tags yet. Select a file, type a name, and press Enter."
+                text: tagLibrary.findMode ? "No tags in these results"
+                                          : "No tags yet. Select a file, type a name, and press Enter."
                 color: "#777777"
             }
 

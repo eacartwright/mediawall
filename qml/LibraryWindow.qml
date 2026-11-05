@@ -27,8 +27,62 @@ ApplicationWindow {
     // The middle pane: the grid, or one large file above a row of the others.
     property bool stripView: false
 
+    // The main window, set when it opens this one: where Add to Wall goes.
+    property var wall: null
+
+    // Add to Wall: the selection, a little way in from the corner.
+    function addToWall(inContainers) {
+        var files = tagLibrary.selectedForWall()
+        if (files.length === 0 || !wall)
+            return
+        if (wall.presenting) {
+            tagLibrary.say("Leave Present first to add to the wall.")
+            return
+        }
+        tagLibrary.reportAdded(wall.addFilesToWall(files, 100 + Math.random() * 100,
+                                                   100 + Math.random() * 100, inContainers))
+    }
+
+    // A file drag, of what a tile says. A real one, so it reaches the wall
+    // or anything else that takes files, and only ends with a real mouse.
+    function dragFiles(row) {
+        dragSource.urls = tagLibrary.dragUrls(row)
+        if (dragSource.urls !== "")
+            dragSource.Drag.active = true
+    }
+
+    Item {
+        id: dragSource
+        objectName: "libraryDragSource"                  // found by tests/app
+
+        property string urls: ""
+
+        width: 1
+        height: 1
+        Drag.dragType: Drag.Automatic
+        Drag.supportedActions: Qt.CopyAction
+        Drag.mimeData: ({ "text/uri-list": urls })
+        Drag.onDragFinished: function(action) {
+            Drag.active = false
+            libraryWindow.refocus()
+        }
+    }
+
     function refocus() {
         searchBox.forceActiveFocus()
+    }
+
+    function setFindMode(on) {
+        searchBox.clear()
+        tagLibrary.findMode = on
+        refocus()
+    }
+
+    // What a tile's MouseArea moves when a drag starts. Never shown.
+    Item {
+        id: dragProxyItem
+        width: 1
+        height: 1
     }
 
     Component.onCompleted: {
@@ -38,6 +92,9 @@ ApplicationWindow {
 
     readonly property string selectionText: {
         var n = tagLibrary.selectedCount
+        if (tagLibrary.findMode)
+            return "Found " + tagLibrary.fileCount + (tagLibrary.fileCount === 1 ? " file" : " files")
+                   + (n > 1 ? ", " + n + " selected" : "")
         return n === 0 ? "No files selected"
              : n === 1 ? "Tagging 1 file"
              : "Tagging " + n + " files"
@@ -51,22 +108,51 @@ ApplicationWindow {
         anchors.top: parent.top
         anchors.left: parent.left
         anchors.right: parent.right
-        height: 50
-        color: "#303030"
+        height: tagLibrary.findMode ? 86 : 50
+        // Clearly different, so a search can't be mistaken for tagging.
+        color: tagLibrary.findMode ? "#17484a" : "#303030"
         z: 2                             // its results lie over the panes
 
         RowLayout {
-            anchors.fill: parent
+            id: topRow
+
+            anchors.top: parent.top
+            anchors.left: parent.left
+            anchors.right: parent.right
+            height: 50
             anchors.leftMargin: 10
             anchors.rightMargin: 10
             spacing: 10
+
+            Row {
+                spacing: 1
+
+                Button {
+                    objectName: "libraryTagButton"       // found by tests/app
+                    text: "Tag"
+                    width: 56
+                    focusPolicy: Qt.NoFocus
+                    highlighted: !tagLibrary.findMode
+                    onClicked: libraryWindow.setFindMode(false)
+                }
+
+                Button {
+                    objectName: "libraryFindButton"      // found by tests/app
+                    text: "Find"
+                    width: 56
+                    focusPolicy: Qt.NoFocus
+                    highlighted: tagLibrary.findMode
+                    onClicked: libraryWindow.setFindMode(true)
+                }
+            }
 
             TextField {
                 id: searchBox
                 objectName: "librarySearch"              // found by tests/app
 
-                Layout.preferredWidth: 340
-                placeholderText: "Type a tag, then Enter"
+                Layout.preferredWidth: 300
+                placeholderText: tagLibrary.findMode ? "Find a tag, then Enter (-tag excludes it)"
+                                                     : "Type a tag, then Enter"
                 activeFocusOnTab: false
 
                 onTextChanged: tagLibrary.setQuery(text)
@@ -79,7 +165,10 @@ ApplicationWindow {
                 Keys.onPressed: function(event) {
                     var empty = text === ""
                     var plain = !(event.modifiers & (Qt.ControlModifier | Qt.AltModifier))
-                    if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+                    if ((event.key === Qt.Key_Return || event.key === Qt.Key_Enter)
+                            && (event.modifiers & Qt.ControlModifier)) {
+                        libraryWindow.addToWall(false)
+                    } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
                         if (event.modifiers & Qt.ShiftModifier)
                             applied(!empty && tagLibrary.createAndApply(text))
                         else if (empty)
@@ -118,9 +207,15 @@ ApplicationWindow {
                     }
                     event.accepted = true
                 }
-                // Keep focus here (Tab will switch to Find, section 44.2).
-                Keys.onTabPressed: function(event) { event.accepted = true }
-                Keys.onBacktabPressed: function(event) { event.accepted = true }
+                // Tab switches between Tag and Find, and focus stays here.
+                Keys.onTabPressed: function(event) {
+                    libraryWindow.setFindMode(!tagLibrary.findMode)
+                    event.accepted = true
+                }
+                Keys.onBacktabPressed: function(event) {
+                    libraryWindow.setFindMode(!tagLibrary.findMode)
+                    event.accepted = true
+                }
             }
 
             Label {
@@ -131,6 +226,39 @@ ApplicationWindow {
             }
 
             Item { Layout.fillWidth: true }
+
+            Row {
+                spacing: 1
+
+                Button {
+                    objectName: "libraryAddToWall"       // found by tests/app
+                    text: "Add to Wall"
+                    focusPolicy: Qt.NoFocus
+                    enabled: tagLibrary.selectedCount > 0
+                    onClicked: libraryWindow.addToWall(false)
+
+                    ToolTip.visible: hovered
+                    ToolTip.delay: 600
+                    ToolTip.text: "Pictures and videos on the canvas, audio in the Playback tab (Ctrl+Enter)"
+                }
+
+                Button {
+                    id: addMenuButton
+                    width: 22
+                    text: "▾"
+                    focusPolicy: Qt.NoFocus
+                    enabled: tagLibrary.selectedCount > 0
+                    onClicked: addMenu.popup(addMenuButton, 0, addMenuButton.height)
+
+                    Menu {
+                        id: addMenu
+                        width: 220
+                        onClosed: libraryWindow.refocus()
+
+                        MenuItem { text: "In New Containers"; onTriggered: libraryWindow.addToWall(true) }
+                    }
+                }
+            }
 
             Row {
                 spacing: 1
@@ -185,6 +313,99 @@ ApplicationWindow {
             }
         }
 
+        // Finding: the search so far, each filter as a chip to take off.
+        Row {
+            objectName: "libraryChips"                   // found by tests/app
+
+            anchors.top: topRow.bottom
+            anchors.left: parent.left
+            anchors.leftMargin: 10
+            height: 28
+            spacing: 6
+            visible: tagLibrary.findMode
+
+            Text {
+                anchors.verticalCenter: parent.verticalCenter
+                visible: tagLibrary.filters.length === 0 && tagLibrary.folder === ""
+                text: "Everything tagged"
+                color: "#a8c8c8"
+            }
+
+            Repeater {
+                model: tagLibrary.filters
+
+                Rectangle {
+                    required property var modelData
+
+                    height: 24
+                    width: chipText.implicitWidth + 36
+                    radius: 12
+                    color: modelData.exclude ? "#6b3030" : "#26767a"
+
+                    Text {
+                        id: chipText
+                        anchors.left: parent.left
+                        anchors.leftMargin: 10
+                        anchors.verticalCenter: parent.verticalCenter
+                        text: (parent.modelData.exclude ? "not " : "") + parent.modelData.name
+                        color: "#ffffff"
+                    }
+
+                    Text {
+                        anchors.right: parent.right
+                        anchors.rightMargin: 8
+                        anchors.verticalCenter: parent.verticalCenter
+                        text: "✕"
+                        color: "#ffffff"
+                    }
+
+                    MouseArea {
+                        anchors.fill: parent
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: {
+                            libraryWindow.refocus()
+                            tagLibrary.removeFilter(parent.modelData.id)
+                        }
+                    }
+                }
+            }
+
+            // Limited to a folder, as another chip.
+            Rectangle {
+                visible: tagLibrary.folder !== ""
+                height: 24
+                width: folderChip.implicitWidth + 36
+                radius: 12
+                color: "#4a5a7a"
+
+                Text {
+                    id: folderChip
+                    anchors.left: parent.left
+                    anchors.leftMargin: 10
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: "in " + tagLibrary.folder.replace(/^.*[\\/]/, "")
+                    color: "#ffffff"
+                }
+
+                Text {
+                    anchors.right: parent.right
+                    anchors.rightMargin: 8
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: "✕"
+                    color: "#ffffff"
+                }
+
+                MouseArea {
+                    anchors.fill: parent
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: {
+                        libraryWindow.refocus()
+                        tagLibrary.setFolder("")
+                    }
+                }
+            }
+        }
+
         // Results, below the box. Not a popup, which would take the focus.
         Rectangle {
             id: resultsPanel
@@ -225,7 +446,9 @@ ApplicationWindow {
 
                             Text {
                                 Layout.maximumWidth: parent.width * 0.65
-                                text: modelData.create ? 'Create "' + modelData.name + '"' : modelData.name
+                                text: modelData.create ? 'Create "' + modelData.name + '"'
+                                      : modelData.exclude ? "not " + modelData.name
+                                      : modelData.name
                                 color: "#ffffff"
                                 font.italic: modelData.create
                                 elide: Text.ElideRight
@@ -269,8 +492,10 @@ ApplicationWindow {
                 anchors.fill: parent
                 visible: !libraryWindow.stripView
                 files: libraryWindow.files
+                dragProxy: dragProxyItem
                 onFocusReturned: libraryWindow.refocus()
                 onOpenStrip: libraryWindow.stripView = true
+                onDragStarted: function(row) { libraryWindow.dragFiles(row) }
             }
 
             LibraryStrip {
@@ -278,7 +503,9 @@ ApplicationWindow {
                 anchors.fill: parent
                 visible: libraryWindow.stripView
                 files: libraryWindow.files
+                dragProxy: dragProxyItem
                 onFocusReturned: libraryWindow.refocus()
+                onDragStarted: function(row) { libraryWindow.dragFiles(row) }
             }
         }
 

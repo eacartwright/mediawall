@@ -148,9 +148,47 @@ ApplicationWindow {
         libraryLoader.active = true
         var library = libraryLoader.item
         library.palette = window.palette
+        library.wall = window
         library.show()
         library.raise()
         library.requestActivate()
+    }
+
+    // Files from the Library or dropped on the wall ([{path, type}]), as one
+    // undo step: pictures and videos on the canvas, each a little further
+    // along, and audio in the Playback tab. Returns how many were added.
+    function addFilesToWall(files, x, y, inContainers) {
+        if (presenting)
+            return 0
+        var key = "addFiles:" + Date.now()
+        var placed = 0
+        for (var i = 0; i < files.length; i++) {
+            var f = files[i]
+            sceneModel.setMergeKey(key)
+            if (f.type === "audio") {
+                sceneModel.addAudioTrack(f.path, f.type)
+                continue
+            }
+            var px = x + (placed % 10) * 30
+            var py = y + (placed % 10) * 30
+            if (inContainers)
+                sceneModel.addMediaInNewContainer(f.path, f.type, px, py)
+            else
+                sceneModel.addMedia(f.path, f.type, px, py)
+            placed++
+        }
+        return files.length
+    }
+
+    // A file dropped on an empty container goes in it; otherwise on the
+    // canvas, from where it was dropped.
+    function dropFiles(files, x, y) {
+        if (files.length === 1 && files[0].type !== "audio") {
+            var container = sceneModel.containerAt(x, y, "")
+            if (container !== "" && sceneModel.addMediaToContainer(files[0].path, files[0].type, container) !== "")
+                return
+        }
+        addFilesToWall(files, x, y, false)
     }
 
     SettingsDialog {
@@ -410,6 +448,29 @@ ApplicationWindow {
                 Button { action: appActions.fullScreen }
                 Button { action: appActions.present }
                 Button { action: appActions.settings; objectName: "toolbarSettings" }
+            }
+        }
+
+
+        // A real file drag, from the Library or a file manager (readme
+        // section 44.5).
+        DropArea {
+            id: fileDrop
+            objectName: "wallDrop"                     // found by tests/app
+
+            anchors.fill: parent
+            keys: ["text/uri-list"]
+            enabled: !window.presenting
+
+            onDropped: function(drop) {
+                var urls = []
+                for (var i = 0; i < drop.urls.length; i++)
+                    urls.push(drop.urls[i].toString())
+                var files = browserBackend.droppedFiles(urls)
+                if (files.length === 0)
+                    return
+                window.dropFiles(files, drop.x, drop.y)
+                drop.accept(Qt.CopyAction)
             }
         }
 

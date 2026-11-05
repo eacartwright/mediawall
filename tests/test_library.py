@@ -8,7 +8,7 @@ from unittest import mock
 
 from core.library import (
     FileSelection, Library, LibraryError, SCHEMA_VERSION, default_library_path,
-    default_thumbnail_dir, file_fingerprint, normalized_name, thumbnail_file,
+    default_thumbnail_dir, file_fingerprint, found_entries, normalized_name, thumbnail_file,
 )
 
 
@@ -456,6 +456,26 @@ class FindTests(LibraryTestCase):
         self.assertEqual(self.found([self.red.id]), [])
         self.lib.remove_tag(self.ferrari.id, [self.b])
         self.assertNotIn("b.jpg", self.found())
+
+    def test_found_entries_look_like_a_folder_scan(self):
+        entries = found_entries(self.lib.find([self.red.id]))
+        by_name = {e["name"]: e for e in entries}
+        self.assertEqual(set(by_name), {"a.jpg", "c.mp4"})
+        self.assertFalse(by_name["a.jpg"]["missing"])
+        self.assertEqual(by_name["a.jpg"]["url"], Path(self.a).as_uri())
+        self.assertEqual(by_name["c.mp4"]["type"], "video")
+        self.assertEqual(by_name["a.jpg"]["size"], os.path.getsize(self.a))
+
+    def test_found_entries_mark_what_has_gone(self):
+        os.unlink(self.a)
+        entry = next(e for e in found_entries(self.lib.find()) if e["name"] == "a.jpg")
+        self.assertTrue(entry["missing"])
+        self.assertEqual(entry["url"], "")
+        self.assertEqual(entry["path"], self.a)
+
+    def test_found_entries_tell_gif_from_other_pictures(self):
+        rows = [{"id": 1, "path": str(self.dir / "x.gif"), "type": "image", "size": 0, "mtime": 0.0}]
+        self.assertTrue(found_entries(rows)[0]["animatable"])
 
     def test_row_contents(self):
         row = next(r for r in self.lib.find() if r["path"] == self.c)

@@ -23,7 +23,7 @@ Rectangle {
 
             Label {
                 Layout.fillWidth: true
-                text: "Folders"
+                text: tagLibrary.findMode ? "Limit to a folder" : "Folders"
                 font.bold: true
             }
 
@@ -132,6 +132,7 @@ Rectangle {
 
         CheckBox {
             objectName: "libraryUntaggedOnly"            // found by tests/app
+            visible: !tagLibrary.findMode
             text: "Untagged only"
             focusPolicy: Qt.NoFocus
             checked: tagLibrary.untaggedOnly
