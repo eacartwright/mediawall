@@ -2695,7 +2695,7 @@ The prototype currently provides:
 - Speech: text to speech with Piper (installed by the user, set up in Settings), added as speech tracks that keep only their words and settings (clips are made when needed and deleted when the app closes), so they can be edited; the tab's contents are saved with the project (section 14.6)
 - new container content framed with Fit (the whole picture) by default
 - unit tests for `core/`, and app checks that drive the real app (section 37)
-- installers: a Windows `Setup.exe` and a Linux `.deb`, built by `packaging/build.py` (section 37); 0.9.14 is the current version (build the Linux `.deb` on Linux; the Windows installer is built on Windows)
+- installers: a Windows `Setup.exe` and a Linux `.deb`, built by `packaging/build.py` (section 37); 0.9.14 is the latest release, and 0.10.0, with the Library, is being tried on branch `library` (build the Linux `.deb` on Linux; the Windows installer is built on Windows)
 
 ### How interactions reach the model
 
