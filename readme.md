@@ -2239,7 +2239,7 @@ These are deliberately later features.
 
 ---
 
-## Phase 13 — Library and tags — **In progress** (tagging, finding, the wall, and browsing containers from a search work; relinking moved files is next; the design and build order are in section 44)
+## Phase 13 — Library and tags — **Built** (all of section 44's build order; still to try on Mint, and a real drag by hand: 44.8)
 
 Tag media quickly in a separate Library window, then find it by tag and put it on the wall.
 
@@ -2355,7 +2355,7 @@ Deleting a cache must never delete the user's original media.
 
 # 44. Media Library and Tags
 
-**Status: in progress** (agreed 2026-11-04; Phase 13). Steps 2 to 7 of the build order (44.8) are done: the database and the Library window, so any media can be tagged, found, and added to the wall, in all the ways described here. (Dragging to the wall hasn't been tried with a real mouse yet: see 44.8.) Step 1's checks are done on Windows, apart from the drag. What's left is marked in 44.8; the sections below describe the plan for those parts. The goal is to tag media manually as quickly as possible, one file or many, then use the tags to find media and put it on the wall.
+**Status: built, not yet tried on Mint** (agreed 2026-11-04; Phase 13). Everything below is in the app, tested on Windows. Still to do are the checks in 44.8: the same on Mint, a real drag by hand on both, and opening the Library in an installed copy. The goal is to tag media manually as quickly as possible, one file or many, then use the tags to find media and put it on the wall.
 
 The rest of the app keeps working directly from filesystem paths and never needs the library. There is no import step (section 41): a file gets a database row only when it is first tagged, and "untagged" is simply a folder scan minus the database.
 
@@ -2469,7 +2469,7 @@ file_tags  file_id, tag_id, added_at  (primary key: file_id + tag_id)
 ```
 
 - **Tags belong to a file path** (decided 2026-11-04). Two identical copies of a file are tagged separately. `path_key` is the normalized path (`os.path.normcase`), so a case difference on Windows doesn't make a second file.
-- **Moved and renamed files:** `fingerprint` is the file size plus a hash of a few sampled chunks, computed when a file is first tagged. When a scan finds an unknown file the same size as a missing row, its fingerprint is checked, and exactly one match moves the tags to the new path. Tags of missing files stay until a Clean Up command removes them.
+- **Moved and renamed files:** `fingerprint` is the file size plus a hash of a few sampled chunks, computed when a file is first tagged. When a scan finds an unknown file the same size as a missing row, its fingerprint is checked, and exactly one match each way moves the tags to the new path (identical copies leave it alone, rather than guess), with a line in the Log. So a moved file gets its tags back when its new folder is opened in the Library. Tags of missing files stay until Clean Up (Library ▾) removes them. It can't be undone, and a drive that isn't connected looks just like missing files, so it counts them first, off the UI thread, and asks, saying how many and where.
 - **Undo** is the Library's own session list of tagging actions (a bulk action is one step). Wall undo stores scene snapshots (section 47), and tags aren't part of the scene, so tagging never adds to wall undo. Undoing a Shift+Enter also removes the tag it created, unless that tag has since gained files or child tags. Editing the tree isn't undoable (deleting asks first): any edit clears redo, and deleting, merging, or making a group forgets the undo steps of the tags involved, so a step can never act on a tag that has gone or put a group on a file.
 - **A file's row stays when its last tag is removed**, which keeps its fingerprint and lets undo put the tags back. "Untagged" and Find go by `file_tags`, so such a row counts as untagged. Clean Up (step 8) can remove these too.
 - **Export and import** (Library window menu): a JSON file, written atomically. **Export Everything** holds the tag tree and every tagged file's path, fingerprint, and tags, as a backup. **Export Tags Only** holds just the tree, to start another machine with the same tags. Import merges by tag name and never deletes: a tag that already exists keeps its place and kind. Bad entries become warnings, as when opening a project, and only an unreadable file fails. Imported file rows whose paths don't exist here are treated as missing, so the fingerprint check can reattach them.
@@ -2486,13 +2486,13 @@ file_tags  file_id, tag_id, added_at  (primary key: file_id + tag_id)
 Each step ends with something testable, unit tests and `tests/app/check_library*.py` included.
 
 1. **Check the unknowns** below, on the dev VM (Windows and Mint). **Windows measured, except the drag; Mint to do.**
-2. **Database:** `core/library.py` and its unit tests, including groups, parent tags, and export/import. **Done** (2026-11-04). Relinking and Clean Up wait for step 8; `fingerprint` is already stored.
+2. **Database:** `core/library.py` and its unit tests, including groups, parent tags, and export/import. **Done** (2026-11-04). 
 3. **Library window:** folder tree, image grid with thumbnails, selection, search box, and tags pane with the tree. Tagging images works from here on. **Done** (2026-11-04), with export and import in the Library ▾ menu. `tests/app/check_library.py`.
 4. **GIFs, video, and audio:** their tiles, thumbnails, and hover playback. **Done** (2026-11-04), with Ctrl+Space. `tests/app/check_library_media.py`.
 5. **Strip view.** **Done** (2026-11-04). `tests/app/check_library_strip.py`.
 6. **Find mode, Add to Wall, and drag to the wall.** **Done** (2026-11-04), apart from trying a real drag by hand (above). `tests/app/check_library_find.py`.
 7. **Browsing containers from a search.** **Done** (2026-11-04). `tests/app/check_library_search.py`.
-8. **Relinking moved files** in the scan, and Clean Up.
+8. **Relinking moved files** in the scan, and Clean Up. **Done** (2026-11-04). `tests/app/check_library_relink.py`.
 
 ### To check first
 
@@ -2780,7 +2780,7 @@ Watching (2026-10-17):
 
 ### Next
 
-- **Library and tags** (Phase 13, on branch `library`): the design and build order are in section 44. Tagging and finding work, in a grid or Strip view, and files reach the wall (steps 2 to 6). Still to try: "To check first" (44.8: Mint, and a real drag on both). Next: relinking moved files, and Clean Up (step 8). The thumbnail cache has no size limit or clean-up yet.
+- **Library and tags** (Phase 13, on branch `library`): the design and build order are in section 44. It all works on Windows. Still to try: "To check first" (44.8: Mint, a real drag on both, and an installed copy). The build order is finished (steps 2 to 8). The thumbnail cache has no size limit or clean-up yet.
 
 Also done 2026-10-17: Speech, text to speech with Piper (section 14.6), and Continue Play replaces Loop in browsing containers (off = loop; next to Play and Mute), an A-B loop overrides it, and a locked container keeps playing on (section 6.4). The 2026-10-17 batch is done: a Size control for text (wrapped or not); colour emoji in text; the glow now follows arc and tilt changes; a fix for presets applying only partly (to confirm on Linux, above); a master volume for the window; Lock Container; a container background colour setting; favorites per browsing container with a Show Favorites Only filter; Show New Files First; and Fit as the default framing (sections 5.4, 6.4, 14.5, 25).
 

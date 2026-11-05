@@ -7,6 +7,7 @@ Nothing is opened until the window first needs it (open()), so the
 library costs nothing while it isn't used.
 """
 
+import os
 import sqlite3
 import threading
 
@@ -18,7 +19,7 @@ from PySide6.QtWidgets import QFileDialog, QFileSystemModel
 from bridge.thumbnails import ThumbnailMaker
 from core.library import (
     FileSelection, Library, LibraryError, default_library_path, default_thumbnail_dir,
-    found_entries, normalized_name, path_key,
+    found_entries, missing_summary, normalized_name, path_key,
 )
 from core.media_browser import MediaBrowser, format_duration
 
@@ -333,9 +334,12 @@ class TagLibrary(QObject):
     treeChanged = Signal()
     # Tagging has paused: browsing containers with a saved search look again.
     searchesChanged = Signal()
+    # Clean Up has counted what's missing: (how many, where), to ask first.
+    cleanUpReady = Signal(int, str)
     currentRowChanged = Signal(int)
 
     _scanned = Signal(int, object)
+    _missing_counted = Signal(object)
 
     def __init__(self, app_settings, parent=None):
         super().__init__(parent)
@@ -367,6 +371,8 @@ class TagLibrary(QObject):
         self._message_timer.setInterval(MESSAGE_MS)
         self._message_timer.timeout.connect(lambda: self._say(""))
         self._scanned.connect(self._scan_finished)
+        self._missing_counted.connect(self._clean_up_counted)
+        self._clean_up_ids = []
 
     # -------------------------------------------------
     # Opening and closing
@@ -560,12 +566,22 @@ class TagLibrary(QObject):
             self._found_counts = self._library.tag_counts([e["id"] for e in entries])
             self._tags.set_counts(self._found_counts)
             self._tags.set_only(self._found_counts.keys())
+        else:
+            self._reattach_moved(entries)
         untagged = self._library.untagged([e["path"] for e in entries])
         if self._untagged_only and not self._find_mode:
             left = {path_key(p) for p in untagged}
             entries = [e for e in entries if path_key(e["path"]) in left]
         self._files.set_entries(entries, untagged)
         self.currentRowChanged.emit(self._files.selection.current)
+
+    def _reattach_moved(self, entries):
+        moved = []
+        if self._attempt(lambda: moved.extend(self._library.relink(entries))) and moved:
+            for old, new in moved:
+                print(f"Library: tags moved from {old} to {new}", flush=True)  # the Log window
+            self._say(f'Kept the tags of {len(moved)} moved {"file" if len(moved) == 1 else "files"}.')
+            self._counts_timer.start()
 
     def _get_scanning(self):
         return self._scanning
@@ -1006,6 +1022,38 @@ class TagLibrary(QObject):
         except LibraryError as e:
             return str(e)
         return ""
+
+    # -------------------------------------------------
+    # Clean Up (section 44.6)
+    # -------------------------------------------------
+
+    @Slot()
+    def startCleanUp(self):
+        """Look for what's missing, off the UI thread: a slow drive can take a while."""
+        if self._library is None:
+            return
+        self._say("Looking for missing files…")
+        rows = self._library.file_rows()
+
+        def work():
+            self._missing_counted.emit([row for row in rows if not os.path.exists(row[1])])
+
+        threading.Thread(target=work, daemon=True).start()
+
+    def _clean_up_counted(self, missing):
+        self._clean_up_ids = [file_id for file_id, _ in missing]
+        if not missing:
+            self._say("No files are missing.")
+            return
+        self._say("")
+        self.cleanUpReady.emit(len(missing), missing_summary([path for _, path in missing]))
+
+    @Slot()
+    def confirmCleanUp(self):
+        count = []
+        ids, self._clean_up_ids = self._clean_up_ids, []
+        if self._tree_edited(lambda: count.append(self._library.clean_up(ids))):
+            self._say(f'Forgot the tags of {count[0]} missing {"file" if count[0] == 1 else "files"}.')
 
     # -------------------------------------------------
     # Export and import (section 44.6)

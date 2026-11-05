@@ -27,6 +27,8 @@ ApplicationWindow {
     // The middle pane: the grid, or one large file above a row of the others.
     property bool stripView: false
 
+    property alias cleanUp: cleanUpDialog     // found by tests/app
+
     // The main window, set when it opens this one: where Add to Wall goes.
     property var wall: null
 
@@ -330,6 +332,8 @@ ApplicationWindow {
                     MenuItem { text: "Export Tags Only…"; onTriggered: tagLibrary.chooseExport(false) }
                     MenuSeparator {}
                     MenuItem { text: "Import…"; onTriggered: tagLibrary.chooseImport() }
+                    MenuSeparator {}
+                    MenuItem { text: "Clean Up…"; onTriggered: tagLibrary.startCleanUp() }
                 }
             }
         }
@@ -535,6 +539,44 @@ ApplicationWindow {
             SplitView.minimumWidth: 180
             onFocusReturned: libraryWindow.refocus()
         }
+    }
+
+    // ---- Clean Up: it can't be undone, so it says what it will do ----
+
+    Dialog {
+        id: cleanUpDialog
+
+        parent: Overlay.overlay
+        anchors.centerIn: parent
+        modal: true
+        width: 480
+        title: "Clean Up"
+        standardButtons: Dialog.Ok | Dialog.Cancel
+
+        property int count: 0
+        property string where: ""
+
+        Connections {
+            target: tagLibrary
+            function onCleanUpReady(count, where) {
+                cleanUpDialog.count = count
+                cleanUpDialog.where = where
+                cleanUpDialog.open()
+            }
+        }
+
+        Label {
+            width: parent.width
+            wrapMode: Text.WrapAtWordBoundaryOrAnywhere
+            text: "Forget the tags of " + cleanUpDialog.count
+                  + (cleanUpDialog.count === 1 ? " missing file?" : " missing files?")
+                  + "\n\nThey were in: " + cleanUpDialog.where
+                  + "\n\nIf a drive isn't connected, its files count as missing: connect it first. "
+                  + "This can't be undone. (A moved file keeps its tags when its new folder is opened here.)"
+        }
+
+        onAccepted: tagLibrary.confirmCleanUp()
+        onClosed: libraryWindow.refocus()
     }
 
     // ---- Status bar ----

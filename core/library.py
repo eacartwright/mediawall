@@ -218,6 +218,19 @@ def found_entries(rows):
     return entries
 
 
+def missing_summary(paths, limit=5):
+    """Where missing files were, for asking before Clean Up: "/drive/cars (3), /old (1)"."""
+    folders = {}
+    for path in paths:
+        folder = os.path.dirname(path)
+        folders[folder] = folders.get(folder, 0) + 1
+    ordered = sorted(folders.items(), key=lambda item: (-item[1], item[0]))
+    text = ", ".join(f"{folder} ({count})" for folder, count in ordered[:limit])
+    if len(ordered) > limit:
+        text += f", and {len(ordered) - limit} more"
+    return text
+
+
 class FileSelection:
     """
     Which rows of a file list are selected (44.1): click, Ctrl+click,
@@ -792,6 +805,89 @@ class Library:
         entries = [e for e in found_entries(rows)
                    if not e["missing"] and matches_filter(e, media_filter, favorites)]
         return sort_entries(entries, sort_by, descending, seed)
+
+    # ---- Moved and missing files (44.6) ----
+
+    def relink(self, entries):
+        """
+        A folder scan's entries may include files that were moved: unknown
+        here, the same size as a tagged file that has gone, and the same
+        fingerprint. Exactly one match each way moves the tags to the new
+        path. Otherwise (identical copies, say) nothing moves, as guessing
+        could put tags on the wrong file. Returns [(old path, new path)].
+        """
+        by_key = {path_key(e["path"]): e for e in entries if e["size"] > 0}
+        known = set()
+        for chunk in _chunks(by_key):
+            known.update(key for (key,) in self._db.execute(
+                f"SELECT path_key FROM files WHERE path_key IN ({_marks(chunk)})", chunk))
+        unknown = [e for key, e in by_key.items() if key not in known]
+        if not unknown:
+            return []
+
+        # The disk is only asked about files that could match.
+        gone = {}                        # fingerprint -> [(file id, path)]
+        for chunk in _chunks({e["size"] for e in unknown}):
+            rows = self._db.execute(
+                f"""SELECT id, path, fingerprint FROM files
+                    WHERE size IN ({_marks(chunk)}) AND fingerprint IS NOT NULL
+                    AND id IN (SELECT file_id FROM file_tags)""", chunk)
+            for file_id, path, fingerprint in rows.fetchall():
+                if not os.path.exists(path):
+                    gone.setdefault(fingerprint, []).append((file_id, path))
+        if not gone:
+            return []
+
+        sizes = {int(fingerprint.split(":")[0]) for fingerprint in gone}
+        arrived = {}                     # fingerprint -> [entries]
+        for entry in unknown:
+            if entry["size"] in sizes:
+                fingerprint = file_fingerprint(entry["path"])
+                if fingerprint in gone:
+                    arrived.setdefault(fingerprint, []).append(entry)
+
+        moved = []
+        with self._db:
+            for fingerprint, entries_here in arrived.items():
+                if len(entries_here) != 1 or len(gone[fingerprint]) != 1:
+                    continue
+                entry = entries_here[0]
+                file_id, old_path = gone[fingerprint][0]
+                self._db.execute(
+                    "UPDATE files SET path = ?, path_key = ?, media_type = ?, mtime = ? WHERE id = ?",
+                    (entry["path"], path_key(entry["path"]), media_type_for(entry["path"]),
+                     entry["mtime"], file_id))
+                moved.append((old_path, entry["path"]))
+        return moved
+
+    def file_rows(self):
+        """[(file id, path)]: everything with a row, to check against the disk."""
+        return self._db.execute("SELECT id, path FROM files").fetchall()
+
+    def clean_up(self, missing_ids):
+        """
+        Clean Up: forget these missing files and their tags, and any row
+        with no tags left. Can't be undone (it asks first), so undo steps
+        for those files go too. Returns how many had tags.
+        """
+        missing_ids = list(missing_ids)
+        had_tags = set()
+        for chunk in _chunks(missing_ids):
+            had_tags.update(file_id for (file_id,) in self._db.execute(
+                f"SELECT DISTINCT file_id FROM file_tags WHERE file_id IN ({_marks(chunk)})", chunk))
+        with self._db:
+            for chunk in _chunks(missing_ids):
+                self._db.execute(f"DELETE FROM files WHERE id IN ({_marks(chunk)})", chunk)
+            untagged = "FROM files WHERE id NOT IN (SELECT file_id FROM file_tags)"
+            gone = set(missing_ids) | {file_id for (file_id,) in self._db.execute(f"SELECT id {untagged}")}
+            self._db.execute(f"DELETE {untagged}")
+        self._load_tags()
+        for steps in (self._undo, self._redo):
+            for step in steps:
+                step.added = [link for link in step.added if link[0] not in gone]
+                step.removed = [link for link in step.removed if link[0] not in gone]
+            steps[:] = [step for step in steps if step.added or step.removed or step.created]
+        return len(had_tags)
 
     # ---- Export and import (44.6) ----
 

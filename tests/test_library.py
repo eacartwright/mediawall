@@ -8,8 +8,10 @@ from unittest import mock
 
 from core.library import (
     FileSelection, Library, LibraryError, SCHEMA_VERSION, default_library_path,
-    default_thumbnail_dir, file_fingerprint, found_entries, normalized_name, thumbnail_file,
+    default_thumbnail_dir, file_fingerprint, found_entries, missing_summary, normalized_name,
+    thumbnail_file,
 )
+from core.media_browser import MediaBrowser
 
 
 class LibraryTestCase(unittest.TestCase):
@@ -365,6 +367,137 @@ class SearchFilesTests(LibraryTestCase):
     def test_an_entry_can_go_in_a_container(self):
         entry = self.lib.search_files(["car"])[0]
         self.assertEqual((entry["path"], entry["type"]), (self.a, "image"))
+
+
+class RelinkTests(LibraryTestCase):
+
+    def scan(self, folder=None):
+        return MediaBrowser().scan_folder(str(folder or self.dir), True)
+
+    def test_a_moved_file_keeps_its_tags(self):
+        path = self.file("a.jpg", b"unique contents")
+        tag = self.lib.create_tag("t")
+        self.lib.apply_tag(tag.id, [path])
+        moved = self.dir / "new" / "renamed.jpg"
+        moved.parent.mkdir()
+        os.rename(path, moved)
+        self.assertEqual(self.lib.relink(self.scan()), [(path, str(moved))])
+        self.assertEqual(self.lib.untagged([str(moved)]), [])
+        self.assertEqual([e["path"] for e in self.lib.find([tag.id])], [str(moved)])
+
+    def test_undo_still_works_afterwards(self):
+        path = self.file("a.jpg")
+        tag = self.lib.create_tag("t")
+        self.lib.apply_tag(tag.id, [path])
+        moved = self.dir / "b.jpg"
+        os.rename(path, moved)
+        self.lib.relink(self.scan())
+        self.lib.undo()
+        self.assertEqual(self.lib.untagged([str(moved)]), [str(moved)])
+
+    def test_nothing_moves_while_the_old_file_is_there(self):
+        path = self.file("a.jpg", b"same")
+        (self.dir / "copy.jpg").write_bytes(Path(path).read_bytes())
+        self.lib.apply_tag(self.lib.create_tag("t").id, [path])
+        self.assertEqual(self.lib.relink(self.scan()), [])
+
+    def test_two_files_arriving_with_the_contents_is_too_uncertain(self):
+        path = self.file("a.jpg", b"same")
+        contents = Path(path).read_bytes()
+        self.lib.apply_tag(self.lib.create_tag("t").id, [path])
+        os.unlink(path)
+        (self.dir / "b.jpg").write_bytes(contents)
+        (self.dir / "c.jpg").write_bytes(contents)
+        self.assertEqual(self.lib.relink(self.scan()), [])
+
+    def test_two_gone_with_the_same_contents_is_too_uncertain(self):
+        a = self.dir / "a.jpg"
+        b = self.dir / "b.jpg"
+        a.write_bytes(b"same")
+        b.write_bytes(b"same")
+        self.lib.apply_tag(self.lib.create_tag("t").id, [str(a), str(b)])
+        a.unlink()
+        b.unlink()
+        (self.dir / "c.jpg").write_bytes(b"same")
+        self.assertEqual(self.lib.relink(self.scan()), [])
+
+    def test_the_same_size_with_other_contents_doesnt_match(self):
+        path = self.file("a.jpg", b"aaaa")
+        size = os.path.getsize(path)
+        self.lib.apply_tag(self.lib.create_tag("t").id, [path])
+        os.unlink(path)
+        (self.dir / "other.jpg").write_bytes(b"b" * size)
+        self.assertEqual(self.lib.relink(self.scan()), [])
+
+    def test_a_file_with_no_tags_left_isnt_looked_for(self):
+        path = self.file("a.jpg")
+        tag = self.lib.create_tag("t")
+        self.lib.apply_tag(tag.id, [path])
+        self.lib.remove_tag(tag.id, [path])
+        os.rename(path, self.dir / "b.jpg")
+        self.assertEqual(self.lib.relink(self.scan()), [])
+
+    def test_an_export_can_reattach_on_another_machine(self):
+        path = self.file("a.jpg", b"unique contents")
+        self.lib.apply_tag(self.lib.create_tag("t").id, [path])
+        export = self.dir / "export.json"
+        self.lib.export_json(export)
+        other = Library()
+        self.addCleanup(other.close)
+        moved = self.dir / "there" / "a.jpg"
+        moved.parent.mkdir()
+        os.rename(path, moved)
+        other.import_json(export)
+        self.assertEqual(other.relink(self.scan(moved.parent)), [(path, str(moved))])
+        self.assertEqual(other.tag_by_name("t").used, 1)
+
+
+class CleanUpTests(LibraryTestCase):
+
+    def test_forgets_missing_files_and_their_tags(self):
+        a, b = self.files("a.jpg", "b.jpg")
+        tag = self.lib.create_tag("t")
+        self.lib.apply_tag(tag.id, [a, b])
+        os.unlink(a)
+        missing = [file_id for file_id, path in self.lib.file_rows() if not os.path.exists(path)]
+        self.assertEqual(self.lib.clean_up(missing), 1)
+        self.assertEqual([e["path"] for e in self.lib.find()], [b])
+        self.assertEqual(self.lib.tag(tag.id).used, 1)
+        self.assertIsNotNone(self.lib.tag(tag.id))     # tags are kept
+
+    def test_rows_with_no_tags_go_too(self):
+        path = self.file("a.jpg")
+        tag = self.lib.create_tag("t")
+        self.lib.apply_tag(tag.id, [path])
+        self.lib.remove_tag(tag.id, [path])
+        self.assertEqual(self.lib.clean_up([]), 0)
+        self.assertEqual(self.lib.file_rows(), [])
+
+    def test_undo_forgets_only_the_files_gone(self):
+        a, b = self.files("a.jpg", "b.jpg")
+        tag = self.lib.create_tag("t")
+        self.lib.apply_tag(tag.id, [a, b])
+        os.unlink(a)
+        missing = [file_id for file_id, path in self.lib.file_rows() if not os.path.exists(path)]
+        self.lib.clean_up(missing)
+        self.assertTrue(self.lib.undo())
+        self.assertEqual(self.lib.untagged([b]), [b])
+        self.assertTrue(self.lib.redo())
+        self.assertEqual(self.lib.untagged([b]), [])
+
+    def test_an_undo_step_with_nothing_left_goes(self):
+        path = self.file("a.jpg")
+        self.lib.apply_tag(self.lib.create_tag("t").id, [path])
+        os.unlink(path)
+        missing = [file_id for file_id, _ in self.lib.file_rows()]
+        self.lib.clean_up(missing)
+        self.assertFalse(self.lib.can_undo())
+
+    def test_summary_says_where_most_first(self):
+        paths = [os.path.join("x", "a"), os.path.join("x", "b"), os.path.join("y", "c")]
+        self.assertEqual(missing_summary(paths), "x (2), y (1)")
+        many = [os.path.join(f"f{i}", "a") for i in range(7)]
+        self.assertTrue(missing_summary(many, limit=2).endswith(", and 5 more"))
 
 
 class FileSelectionTests(unittest.TestCase):
