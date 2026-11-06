@@ -65,6 +65,28 @@ def view(expression):
     return item("libraryStripView", "(function() { var view = item.item; return (%s) })()" % expression)
 
 
+def click(where):
+    QTest.mouseClick(window(), Qt.LeftButton, Qt.NoModifier, where)
+
+
+def wheel(where, delta, dx=0):
+    c.wheel(where.x(), where.y(), delta, dx=dx, window=window())
+
+
+def stage_point():
+    """The middle of the large file's place, clear of its controls."""
+    return point("libraryStripStage", "item")
+
+
+def stage_width():
+    return item("libraryStripStage", "item.width")
+
+
+def zoomed_point(where):
+    """Where the window point `where` falls across the zoomed file, as a fraction of its width."""
+    return item("libraryStripZoomed", "(%d - item.mapToItem(null, 0, 0).x) / item.width" % where.x())
+
+
 def strip_shown():
     return item("libraryCarousel", "item.visible") is True
 
@@ -98,6 +120,8 @@ def step_strip_photo():
     c.check("the box still has the focus", item("librarySearch", "item.activeFocus") is True)
     c.check("a picture has no player controls", item("libraryStripControls", "item.visible") is False)
     window().grabWindow().save(str(OUT / "library-strip.png"))
+    click(stage_point())                # nothing to pause: it just shouldn't fail
+    c.check("a click on a picture leaves it", view("view.name") == "a_photo.jpg" and view("view.playing") is True)
     key(Qt.Key_Right)
     c.check("the thumbnail shows at once, before the file opens", view("view === null") is True)
 
@@ -110,13 +134,62 @@ def step_strip_gif():
     c.check("Ctrl+Space pauses it", view("view.playing") is False)
     key(Qt.Key_Space, Qt.ControlModifier)
     c.check("...and resumes", view("view.playing") is True)
+
+    # By mouse: a click plays and pauses, and leaves the box its focus.
+    spot = stage_point()
+    click(spot)
+    c.check("a click on the large file pauses it", view("view.playing") is False)
+    c.check("...and the box keeps the focus", item("librarySearch", "item.activeFocus") is True)
+    click(spot)
+    c.check("...and another resumes it", view("view.playing") is True)
+    QTest.mouseDClick(window(), Qt.LeftButton, Qt.NoModifier, spot)
+    c.check("a double-click leaves it playing", view("view.playing") is True)
+
+    # The wheel zooms around the pointer, and a drag then pans.
+    corner = QPoint(spot.x() - 100, spot.y() - 50)
+    before = zoomed_point(corner)
+    wheel(corner, 120)
+    c.check("the wheel zooms in", item("libraryStripZoomed", "item.width") > stage_width(),
+            str(item("libraryStripZoomed", "item.width")))
+    after = zoomed_point(corner)
+    c.check("...around the pointer", abs(before - after) < 0.01, f"{before} -> {after}")
+    wheel(corner, -120)
+    c.check("...and back out, no further than the whole file",
+            abs(item("libraryStripZoomed", "item.width") - stage_width()) < 0.5)
+    wheel(corner, -120)
+    c.check("...which it stops at", abs(item("libraryStripZoomed", "item.width") - stage_width()) < 0.5)
+    wheel(corner, 240)
+    x = item("libraryStripZoomed", "item.x")
+    QTest.mousePress(window(), Qt.LeftButton, Qt.NoModifier, spot)
+    QTest.mouseMove(window(), QPoint(spot.x() + 40, spot.y()))
+    QTest.mouseMove(window(), QPoint(spot.x() + 80, spot.y()))
+    QTest.mouseRelease(window(), Qt.LeftButton, Qt.NoModifier, QPoint(spot.x() + 80, spot.y()))
+    c.check("a drag pans", abs(item("libraryStripZoomed", "item.x") - x - 80) < 1,
+            str(item("libraryStripZoomed", "item.x") - x))
+    c.check("...and isn't a click", view("view.playing") is True)
+    QTest.mouseDClick(window(), Qt.LeftButton, Qt.NoModifier, spot)
+    c.check("a double-click resets the zoom", abs(item("libraryStripZoomed", "item.width") - stage_width()) < 0.5)
+    wheel(corner, 240)
     key(Qt.Key_Right)
+    c.check("each file starts unzoomed", abs(item("libraryStripZoomed", "item.width") - stage_width()) < 0.5)
 
 
 def step_strip_video():
     c.check("a video plays, in full", view("view.name") == "c_clip.mov" and view("view.player.playbackState === 1") is True)
     c.check("...muted", view("view.muted") is True)
     c.check("...and it has controls", item("libraryStripControls", "item.visible") is True)
+    c.check("...with no Pause button: a click does that",
+            item("libraryStripControls", "item.togglePlay === undefined") is True)
+    click(stage_point())
+    c.check("a click pauses a video", view("view.player.playbackState === 2") is True)
+    click(stage_point())
+    c.check("...and plays it", view("view.player.playbackState === 1") is True)
+    # A tilt skips, and the file stays; a tilt over the row still steps (below).
+    c.position = view("view.position")
+    wheel(stage_point(), 0, dx=-120)
+    c.check("a tilt right over the large video skips forward",
+            view("view.player.position") > c.position and c.js("tagLibrary.currentRow") == MOV_ROW,
+            f'{c.position} -> {view("view.player.position")}')
     rows = library_rows()
     c.check("one file decoding, in the Media Memory window", len(rows) == 1, str(rows))
     window().grabWindow().save(str(OUT / "library-strip-video.png"))
@@ -124,7 +197,6 @@ def step_strip_video():
     c.check("Ctrl+Space brings up the sound", view("view.muted") is False and view("view.playing") is True)
     key(Qt.Key_Space, Qt.ControlModifier)
     c.check("...then pauses", view("view.playing") is False)
-    c.check("the controls say so", item("libraryStripControls", "item.playing") is False)
     key(Qt.Key_Space, Qt.ControlModifier)
     c.check("...then resumes, still with sound", view("view.playing") is True and view("view.muted") is False)
     key(Qt.Key_Right)
@@ -182,11 +254,71 @@ def step_button():
     c.check("...and the box keeps the focus", item("librarySearch", "item.activeFocus") is True)
     item("libraryGridButton", "item.clicked()")
     c.check("the Grid button goes back", grid_shown())
+
+    # The tile size follows the wheel, while over the slider.
+    size = c.js("appSettings.libraryTileSize")
+    wheel(point("libraryTileSize", "item"), 120)
+    c.check("the wheel over Tile size makes tiles larger", c.js("appSettings.libraryTileSize") == size + 10,
+            f'{size} -> {c.js("appSettings.libraryTileSize")}')
+    wheel(point("libraryTileSize", "item"), -120)
+    c.check("...and smaller", c.js("appSettings.libraryTileSize") == size)
+    item("libraryStripButton", "item.clicked()")
+    c.js("tagLibrary.clickFile(%d, false, false)" % GIF_ROW)
+
+
+def step_mouse_stepping():
+    spot = stage_point()
+    QTest.mouseClick(window(), Qt.ForwardButton, Qt.NoModifier, spot)
+    c.check("the forward thumb button goes to the next file", c.js("tagLibrary.currentRow") == MOV_ROW,
+            str(c.js("tagLibrary.currentRow")))
+    QTest.mouseClick(window(), Qt.BackButton, Qt.NoModifier, spot)
+    c.check("...the back one to the one before", c.js("tagLibrary.currentRow") == GIF_ROW)
+    row = point("libraryCarousel", "item")
+    QTest.mouseClick(window(), Qt.ForwardButton, Qt.NoModifier, row)
+    c.check("...and over the row too", c.js("tagLibrary.currentRow") == MOV_ROW)
+    QTest.mouseClick(window(), Qt.BackButton, Qt.NoModifier, row)
+    wheel(spot, 0, dx=-120)
+    c.check("tilting the wheel right, over a GIF, goes to the next file", c.js("tagLibrary.currentRow") == MOV_ROW)
+    # (A second tilt straight after would count as holding it, which waits.)
+    wheel(row, 0, dx=120)
+    c.check("...tilting left, over the row, to the one before", c.js("tagLibrary.currentRow") == GIF_ROW)
+    window().setWidth(800)                # so the row can't show every file
+
+
+def step_row_wheel():
+    row = point("libraryCarousel", "item")
+    c.js("tagLibrary.clickFile(%d, false, false)" % PHOTO_ROW)
+    item("libraryCarousel", "item.contentX = 0")
+    wheel(row, -120)
+    x = item("libraryCarousel", "item.contentX")
+    c.check("the wheel over the row scrolls it", x > 0, str(x))
+    c.check("...without changing the file", c.js("tagLibrary.currentRow") == PHOTO_ROW)
+    for _ in range(10):
+        wheel(row, -120)
+    end = item("libraryCarousel", "item.contentX")
+    c.check("...up to its end", end == item("libraryCarousel", "item.contentWidth - item.width"), str(end))
+    for _ in range(10):
+        wheel(row, 120)
+    c.check("...and back to its start", item("libraryCarousel", "item.contentX") == 0)
+    window().setWidth(100)
+    window().setHeight(100)
+
+
+def step_smallest():
+    c.check("the window can't be made tiny",
+            window().width() == window().minimumWidth() > 500 and window().height() == window().minimumHeight() > 300,
+            f"{window().width()} x {window().height()}")
+    window().grabWindow().save(str(OUT / "library-smallest.png"))
+    box = item("librarySearch", "[item.mapToItem(null, 0, 0).x, item.mapToItem(null, item.width, 0).x]")
+    right = item("libraryAddToWall", "item.mapToItem(null, 0, 0).x")
+    c.check("...and at its smallest the search clears what's beside it", box[1] < right, f"{box} {right}")
+    window().setWidth(1280)
     c.finish()
 
 
 c.run(Scene(), [
     (800, step_open), (3000, step_grid_first), (700, step_strip_photo), (1500, step_strip_gif),
     (1000, step_strip_video), (800, step_strip_audio), (800, step_sound_kept), (800, step_held_key),
-    (700, step_carousel), (500, step_back_on_grid), (400, step_button),
+    (700, step_carousel), (500, step_back_on_grid), (400, step_button), (900, step_mouse_stepping),
+    (500, step_row_wheel), (500, step_smallest),
 ])

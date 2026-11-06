@@ -10,6 +10,9 @@ ApplicationWindow {
     visible: true
     width: 1280
     height: 800
+    // Never so small that the toolbar is cut off, whatever the system's font.
+    minimumWidth: toolbarRow.implicitWidth + 20
+    minimumHeight: 500
     title: projectController.title
 
     color: "#181818"
@@ -38,6 +41,12 @@ ApplicationWindow {
     palette.disabled.buttonText: "#9d9d9d"
     palette.disabled.windowText: "#9d9d9d"
     palette.disabled.text: "#9d9d9d"
+
+    // As wide as its label needs (the style's default of 80 is wider than most
+    // of them), so the whole toolbar fits a window that shares a screen.
+    component ToolbarButton: Button {
+        implicitWidth: Math.max(48, implicitContentWidth + 16)
+    }
 
     // Ask about unsaved changes before closing.
     onClosing: function(close) {
@@ -336,18 +345,31 @@ ApplicationWindow {
             }
 
             RowLayout {
+                id: toolbarRow
+
                 anchors.fill: parent
                 anchors.leftMargin: 10
                 anchors.rightMargin: 10
 
                 spacing: 5
 
-                Button { action: appActions.newWall }
+                ToolbarButton { action: appActions.settings; objectName: "toolbarSettings" }
+
+                // Divider
+                Rectangle {
+                    Layout.preferredWidth: 1
+                    Layout.preferredHeight: 28
+                    Layout.leftMargin: 4
+                    Layout.rightMargin: 4
+                    color: "#555555"
+                }
+
+                ToolbarButton { action: appActions.newWall }
                 // Open, with Open Recent on the ▾ beside it.
                 Row {
                     spacing: 1
 
-                    Button { action: appActions.open }
+                    ToolbarButton { action: appActions.open }
 
                     Button {
                         id: recentButton
@@ -406,11 +428,34 @@ ApplicationWindow {
                         }
                     }
                 }
-                Button { action: appActions.save }
-                Button { action: appActions.saveAs }
+
+                // Save, with Save As on the ▾ beside it.
+                Row {
+                    spacing: 1
+
+                    ToolbarButton { action: appActions.save }
+
+                    Button {
+                        id: saveMenuButton
+                        objectName: "saveMenuButton"   // found by tests/app
+                        width: 22
+                        text: "▾"
+                        onClicked: saveMenu.popup(saveMenuButton, 0, saveMenuButton.height)
+
+                        ToolTip.visible: hovered && !saveMenu.visible
+                        ToolTip.delay: 600
+                        ToolTip.text: "Save As"
+
+                        Menu {
+                            id: saveMenu
+
+                            MenuItem { action: appActions.saveAs }
+                        }
+                    }
+                }
 
                 // Layouts: a wall's containers only, saved for reuse.
-                Button {
+                ToolbarButton {
                     id: layoutButton
                     text: "Layout ▾"
                     onClicked: layoutMenu.popup(layoutButton, 0, layoutButton.height)
@@ -433,8 +478,12 @@ ApplicationWindow {
                     color: "#555555"
                 }
 
-                Button { action: appActions.undo }
-                Button { action: appActions.redo }
+                Row {
+                    spacing: 1
+
+                    ToolbarButton { action: appActions.undo }
+                    ToolbarButton { action: appActions.redo }
+                }
 
                 // Divider
                 Rectangle {
@@ -445,18 +494,17 @@ ApplicationWindow {
                     color: "#555555"
                 }
 
-                Button { action: appActions.addBrowser }
-                Button { action: appActions.addContainer }
-                Button { action: appActions.addText; objectName: "toolbarAddText" }
+                ToolbarButton { action: appActions.addBrowser }
+                ToolbarButton { action: appActions.addContainer }
+                ToolbarButton { action: appActions.addText; objectName: "toolbarAddText" }
+                ToolbarButton { action: appActions.library; objectName: "toolbarLibrary" }
 
                 Item {
                     Layout.fillWidth: true
                 }
 
-                Button { action: appActions.library; objectName: "toolbarLibrary" }
-                Button { action: appActions.fullScreen }
-                Button { action: appActions.present }
-                Button { action: appActions.settings; objectName: "toolbarSettings" }
+                ToolbarButton { action: appActions.fullScreen }
+                ToolbarButton { action: appActions.present; objectName: "toolbarPresent" }
             }
         }
 

@@ -233,12 +233,15 @@ Rectangle {
 
     // Worked out from the row, not from a delegate, which scrolling may
     // reuse or destroy. In the grid's content, so it scrolls with the tiles.
+    // Above them (they are z 1 too, and later in the list, so a tie is lost).
+    // originY: a new tile size or pane width moves the grid's origin, and so
+    // every tile, away from 0. Exactly over the tile's picture, to line up.
     Item {
         id: tilePlayer
         objectName: "libraryPlayer"                      // found by tests/app
 
         parent: grid.contentItem
-        z: 1
+        z: 2
 
         property int row: -1
         property bool withSound: false
@@ -248,9 +251,9 @@ Rectangle {
         readonly property var view: loader.item
         visible: row >= 0
         x: (row % grid.columns) * grid.cellWidth + 7
-        y: Math.floor(row / grid.columns) * grid.cellHeight + 7
+        y: Math.floor(row / grid.columns) * grid.cellHeight + grid.originY + 7
         width: grid.cellWidth - 14
-        height: grid.cellHeight - 36
+        height: grid.cellHeight - 32
 
         function start(newRow, sound) {
             hoverDelay.stop()

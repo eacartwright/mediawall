@@ -18,6 +18,7 @@ tag library and its thumbnails get scratch places too.
 import os
 import sys
 import tempfile
+import time
 from pathlib import Path
 
 APP_DIR = Path(__file__).resolve().parents[2]
@@ -212,12 +213,16 @@ class Check:
     def release(self, x, y, button=Qt.LeftButton):
         QTest.mouseRelease(self.win, button, Qt.NoModifier, QPoint(round(x), round(y)))
 
-    def wheel(self, x, y, delta, buttons=Qt.NoButton, dx=0):
-        """A wheel event: delta is vertical, dx horizontal (tilt)."""
+    def wheel(self, x, y, delta, buttons=Qt.NoButton, dx=0, window=None):
+        """A wheel event: delta is vertical, dx horizontal (tilt). In the main window by default."""
+        window = window or self.win
         pos = QPointF(x, y)
-        QGuiApplication.sendEvent(self.win, QWheelEvent(
-            pos, self.win.mapToGlobal(pos), QPoint(), QPoint(dx, delta),
-            buttons, Qt.NoModifier, Qt.NoScrollPhase, False))
+        event = QWheelEvent(pos, window.mapToGlobal(pos), QPoint(), QPoint(dx, delta),
+                            buttons, Qt.NoModifier, Qt.NoScrollPhase, False)
+        # As a real one has: lists and trees scroll by the time between events,
+        # and ignore a wheel that seems to come before the last input.
+        event.setTimestamp(int(time.monotonic() * 1000))
+        QGuiApplication.sendEvent(window, event)
 
     def open_sidebar(self, tab="layersTab"):
         """Open the left-edge flyout (if closed) and choose a tab."""

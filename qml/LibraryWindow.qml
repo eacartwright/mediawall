@@ -20,6 +20,8 @@ ApplicationWindow {
 
     width: 1280
     height: 800
+    minimumWidth: 800
+    minimumHeight: 500
     color: "#1e1e1e"
 
     readonly property var files: tagLibrary.opened ? tagLibrary.files : null
@@ -127,7 +129,8 @@ ApplicationWindow {
         color: tagLibrary.findMode ? "#17484a" : "#303030"
         z: 2                             // its results lie over the panes
 
-        RowLayout {
+        // The search in the middle of the window, whatever is either side of it.
+        Item {
             id: topRow
 
             anchors.top: parent.top
@@ -136,204 +139,252 @@ ApplicationWindow {
             height: 50
             anchors.leftMargin: 10
             anchors.rightMargin: 10
-            spacing: 10
+
+            // ---- Left: the Library menu, Undo and Redo ----
 
             Row {
-                spacing: 1
+                id: topLeft
+
+                anchors.left: parent.left
+                anchors.verticalCenter: parent.verticalCenter
+                spacing: 10
 
                 Button {
-                    objectName: "libraryTagButton"       // found by tests/app
-                    text: "Tag"
-                    width: 56
+                    id: libraryMenuButton
+                    text: "Library ▾"
                     focusPolicy: Qt.NoFocus
-                    highlighted: !tagLibrary.findMode
-                    onClicked: libraryWindow.setFindMode(false)
-                }
+                    onClicked: libraryMenu.popup(libraryMenuButton, 0, libraryMenuButton.height)
 
-                Button {
-                    objectName: "libraryFindButton"      // found by tests/app
-                    text: "Find"
-                    width: 56
-                    focusPolicy: Qt.NoFocus
-                    highlighted: tagLibrary.findMode
-                    onClicked: libraryWindow.setFindMode(true)
-                }
-            }
+                    Menu {
+                        id: libraryMenu
+                        width: 220
+                        onClosed: libraryWindow.refocus()
 
-            TextField {
-                id: searchBox
-                objectName: "librarySearch"              // found by tests/app
-
-                Layout.preferredWidth: 300
-                placeholderText: tagLibrary.findMode ? "Find a tag, then Enter (-tag excludes it)"
-                                                     : "Type a tag, then Enter"
-                activeFocusOnTab: false
-
-                onTextChanged: tagLibrary.setQuery(text)
-
-                function applied(ok) {
-                    if (ok)
-                        clear()
-                }
-
-                Keys.onPressed: function(event) {
-                    var empty = text === ""
-                    var plain = !(event.modifiers & (Qt.ControlModifier | Qt.AltModifier))
-                    if ((event.key === Qt.Key_Return || event.key === Qt.Key_Enter)
-                            && (event.modifiers & Qt.ControlModifier)) {
-                        libraryWindow.addToWall(false)
-                    } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
-                        if (event.modifiers & Qt.ShiftModifier)
-                            applied(!empty && tagLibrary.createAndApply(text))
-                        else if (empty)
-                            tagLibrary.stepFile(1)
-                        else
-                            applied(tagLibrary.applyResult(text))
-                    } else if (event.key === Qt.Key_Up && plain) {
-                        tagLibrary.moveHighlight(-1)
-                    } else if (event.key === Qt.Key_Down && plain) {
-                        tagLibrary.moveHighlight(1)
-                    } else if (event.key === Qt.Key_Left && plain && empty) {
-                        tagLibrary.stepFile(-1)
-                    } else if (event.key === Qt.Key_Right && plain && empty) {
-                        tagLibrary.stepFile(1)
-                    } else if (event.key === Qt.Key_Backspace && plain && empty) {
-                        tagLibrary.removeLastApplied()
-                    } else if (event.key === Qt.Key_Space && (event.modifiers & Qt.ControlModifier)) {
-                        if (libraryWindow.stripView)
-                            fileStrip.togglePlay()
-                        else
-                            fileGrid.togglePlay()
-                    } else if (event.key === Qt.Key_Escape) {
-                        if (empty)
-                            libraryWindow.stripView = false
-                        else
-                            clear()
-                    } else if (event.matches(StandardKey.SelectAll) && empty) {
-                        tagLibrary.selectAll()
-                    } else if (event.matches(StandardKey.Undo)) {
-                        tagLibrary.undo()         // not the field's own undo
-                    } else if (event.matches(StandardKey.Redo) || event.matches(StandardKey.Back)
-                               || (event.key === Qt.Key_Y && (event.modifiers & Qt.ControlModifier))) {
-                        tagLibrary.redo()
-                    } else {
-                        return
+                        MenuItem { text: "Export Everything…"; onTriggered: tagLibrary.chooseExport(true) }
+                        MenuItem { text: "Export Tags Only…"; onTriggered: tagLibrary.chooseExport(false) }
+                        MenuSeparator {}
+                        MenuItem { text: "Import…"; onTriggered: tagLibrary.chooseImport() }
+                        MenuSeparator {}
+                        MenuItem { text: "Clean Up…"; onTriggered: tagLibrary.startCleanUp() }
                     }
-                    event.accepted = true
                 }
-                // Tab switches between Tag and Find, and focus stays here.
-                Keys.onTabPressed: function(event) {
-                    libraryWindow.setFindMode(!tagLibrary.findMode)
-                    event.accepted = true
-                }
-                Keys.onBacktabPressed: function(event) {
-                    libraryWindow.setFindMode(!tagLibrary.findMode)
-                    event.accepted = true
+
+                Row {
+                    spacing: 1
+
+                    Button {
+                        text: "Undo"
+                        width: 56
+                        focusPolicy: Qt.NoFocus
+                        enabled: tagLibrary.canUndo
+                        onClicked: tagLibrary.undo()
+                    }
+
+                    Button {
+                        text: "Redo"
+                        width: 56
+                        focusPolicy: Qt.NoFocus
+                        enabled: tagLibrary.canRedo
+                        onClicked: tagLibrary.redo()
+                    }
                 }
             }
 
+            // ---- Middle: Tag or Find, and the search box ----
+
+            Row {
+                id: topCenter
+
+                anchors.horizontalCenter: parent.horizontalCenter
+                anchors.verticalCenter: parent.verticalCenter
+                spacing: 10
+
+                Row {
+                    id: tagFind
+                    spacing: 1
+
+                    Button {
+                        objectName: "libraryTagButton"   // found by tests/app
+                        text: "Tag"
+                        width: 56
+                        focusPolicy: Qt.NoFocus
+                        highlighted: !tagLibrary.findMode
+                        onClicked: libraryWindow.setFindMode(false)
+                    }
+
+                    Button {
+                        objectName: "libraryFindButton"  // found by tests/app
+                        text: "Find"
+                        width: 56
+                        focusPolicy: Qt.NoFocus
+                        highlighted: tagLibrary.findMode
+                        onClicked: libraryWindow.setFindMode(true)
+                    }
+                }
+
+                TextField {
+                    id: searchBox
+                    objectName: "librarySearch"              // found by tests/app
+
+                    // 300, less whatever a narrow window can't spare beside the sides.
+                    width: Math.max(160, Math.min(300,
+                        topRow.width - 2 * Math.max(topLeft.width, topRight.width) - 40
+                        - tagFind.width - topCenter.spacing))
+                    placeholderText: tagLibrary.findMode ? "Find a tag, then Enter (-tag excludes it)"
+                                                         : "Type a tag, then Enter"
+                    activeFocusOnTab: false
+
+                    onTextChanged: tagLibrary.setQuery(text)
+
+                    function applied(ok) {
+                        if (ok)
+                            clear()
+                    }
+
+                    Keys.onPressed: function(event) {
+                        var empty = text === ""
+                        var plain = !(event.modifiers & (Qt.ControlModifier | Qt.AltModifier))
+                        if ((event.key === Qt.Key_Return || event.key === Qt.Key_Enter)
+                                && (event.modifiers & Qt.ControlModifier)) {
+                            libraryWindow.addToWall(false)
+                        } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+                            if (event.modifiers & Qt.ShiftModifier)
+                                applied(!empty && tagLibrary.createAndApply(text))
+                            else if (empty)
+                                tagLibrary.stepFile(1)
+                            else
+                                applied(tagLibrary.applyResult(text))
+                        } else if (event.key === Qt.Key_Up && plain) {
+                            tagLibrary.moveHighlight(-1)
+                        } else if (event.key === Qt.Key_Down && plain) {
+                            tagLibrary.moveHighlight(1)
+                        } else if (event.key === Qt.Key_Left && plain && empty) {
+                            tagLibrary.stepFile(-1)
+                        } else if (event.key === Qt.Key_Right && plain && empty) {
+                            tagLibrary.stepFile(1)
+                        } else if (event.key === Qt.Key_Backspace && plain && empty) {
+                            tagLibrary.removeLastApplied()
+                        } else if (event.key === Qt.Key_Space && (event.modifiers & Qt.ControlModifier)) {
+                            if (libraryWindow.stripView)
+                                fileStrip.togglePlay()
+                            else
+                                fileGrid.togglePlay()
+                        } else if (event.key === Qt.Key_Escape) {
+                            if (empty)
+                                libraryWindow.stripView = false
+                            else
+                                clear()
+                        } else if (event.matches(StandardKey.SelectAll) && empty) {
+                            tagLibrary.selectAll()
+                        } else if (event.matches(StandardKey.Undo)) {
+                            tagLibrary.undo()         // not the field's own undo
+                        } else if (event.matches(StandardKey.Redo) || event.matches(StandardKey.Back)
+                                   || (event.key === Qt.Key_Y && (event.modifiers & Qt.ControlModifier))) {
+                            tagLibrary.redo()
+                        } else {
+                            return
+                        }
+                        event.accepted = true
+                    }
+                    // Tab switches between Tag and Find, and focus stays here.
+                    Keys.onTabPressed: function(event) {
+                        libraryWindow.setFindMode(!tagLibrary.findMode)
+                        event.accepted = true
+                    }
+                    Keys.onBacktabPressed: function(event) {
+                        libraryWindow.setFindMode(!tagLibrary.findMode)
+                        event.accepted = true
+                    }
+                }
+            }
+
+            // Beside the search, not part of it: its length changes, and that
+            // mustn't move the box. Gone if a narrow window has no room for it.
             Label {
                 objectName: "librarySelection"           // found by tests/app
+                anchors.left: topCenter.right
+                anchors.right: topRight.left
+                anchors.leftMargin: 10
+                anchors.rightMargin: 10
+                anchors.verticalCenter: parent.verticalCenter
+                visible: width >= 60
+                elide: Text.ElideRight
                 text: libraryWindow.selectionText
                 color: tagLibrary.selectedCount > 0 ? "#ffffff" : "#999999"
                 font.bold: true
             }
 
-            Item { Layout.fillWidth: true }
+            // ---- Right: what to do with the files, and how to show them ----
 
             Row {
-                spacing: 1
+                id: topRight
 
-                Button {
-                    objectName: "libraryAddToWall"       // found by tests/app
-                    text: "Add to Wall"
-                    focusPolicy: Qt.NoFocus
-                    enabled: tagLibrary.selectedCount > 0
-                    onClicked: libraryWindow.addToWall(false)
+                anchors.right: parent.right
+                anchors.verticalCenter: parent.verticalCenter
+                spacing: 10
 
-                    ToolTip.visible: hovered
-                    ToolTip.delay: 600
-                    ToolTip.text: "Pictures and videos on the canvas, audio in the Playback tab (Ctrl+Enter)"
-                }
+                Row {
+                    spacing: 1
 
-                Button {
-                    id: addMenuButton
-                    width: 22
-                    text: "▾"
-                    focusPolicy: Qt.NoFocus
-                    onClicked: addMenu.popup(addMenuButton, 0, addMenuButton.height)
+                    Button {
+                        objectName: "libraryAddToWall"       // found by tests/app
+                        text: "Add to Wall"
+                        focusPolicy: Qt.NoFocus
+                        enabled: tagLibrary.selectedCount > 0
+                        onClicked: libraryWindow.addToWall(false)
 
-                    Menu {
-                        id: addMenu
-                        width: 300
-                        onClosed: libraryWindow.refocus()
+                        ToolTip.visible: hovered
+                        ToolTip.delay: 600
+                        ToolTip.text: "Pictures and videos on the canvas, audio in the Playback tab (Ctrl+Enter)"
+                    }
 
-                        MenuItem {
-                            text: "In New Containers"
-                            enabled: tagLibrary.selectedCount > 0
-                            onTriggered: libraryWindow.addToWall(true)
-                        }
-                        MenuItem {
-                            objectName: "libraryNewSearchContainer"   // found by tests/app
-                            text: "New Browsing Container from This Search"
-                            enabled: tagLibrary.findMode && tagLibrary.filters.length > 0
-                            onTriggered: libraryWindow.addSearchContainer()
+                    Button {
+                        id: addMenuButton
+                        width: 22
+                        text: "▾"
+                        focusPolicy: Qt.NoFocus
+                        onClicked: addMenu.popup(addMenuButton, 0, addMenuButton.height)
+
+                        Menu {
+                            id: addMenu
+                            width: 300
+                            onClosed: libraryWindow.refocus()
+
+                            MenuItem {
+                                text: "In New Containers"
+                                enabled: tagLibrary.selectedCount > 0
+                                onTriggered: libraryWindow.addToWall(true)
+                            }
+                            MenuItem {
+                                objectName: "libraryNewSearchContainer"   // found by tests/app
+                                text: "New Browsing Container from This Search"
+                                enabled: tagLibrary.findMode && tagLibrary.filters.length > 0
+                                onTriggered: libraryWindow.addSearchContainer()
+                            }
                         }
                     }
                 }
-            }
 
-            Row {
-                spacing: 1
+                Row {
+                    spacing: 1
 
-                Button {
-                    objectName: "libraryGridButton"      // found by tests/app
-                    text: "Grid"
-                    focusPolicy: Qt.NoFocus
-                    highlighted: !libraryWindow.stripView
-                    onClicked: libraryWindow.stripView = false
-                }
+                    Button {
+                        objectName: "libraryGridButton"      // found by tests/app
+                        text: "Grid"
+                        width: 56
+                        focusPolicy: Qt.NoFocus
+                        highlighted: !libraryWindow.stripView
+                        onClicked: libraryWindow.stripView = false
+                    }
 
-                Button {
-                    objectName: "libraryStripButton"     // found by tests/app
-                    text: "Strip"
-                    focusPolicy: Qt.NoFocus
-                    highlighted: libraryWindow.stripView
-                    onClicked: libraryWindow.stripView = true
-                }
-            }
-
-            Button {
-                text: "Undo"
-                focusPolicy: Qt.NoFocus
-                enabled: tagLibrary.canUndo
-                onClicked: tagLibrary.undo()
-            }
-
-            Button {
-                text: "Redo"
-                focusPolicy: Qt.NoFocus
-                enabled: tagLibrary.canRedo
-                onClicked: tagLibrary.redo()
-            }
-
-            Button {
-                id: libraryMenuButton
-                text: "Library ▾"
-                focusPolicy: Qt.NoFocus
-                onClicked: libraryMenu.popup(libraryMenuButton, 0, libraryMenuButton.height)
-
-                Menu {
-                    id: libraryMenu
-                    width: 220
-                    onClosed: libraryWindow.refocus()
-
-                    MenuItem { text: "Export Everything…"; onTriggered: tagLibrary.chooseExport(true) }
-                    MenuItem { text: "Export Tags Only…"; onTriggered: tagLibrary.chooseExport(false) }
-                    MenuSeparator {}
-                    MenuItem { text: "Import…"; onTriggered: tagLibrary.chooseImport() }
-                    MenuSeparator {}
-                    MenuItem { text: "Clean Up…"; onTriggered: tagLibrary.startCleanUp() }
+                    Button {
+                        objectName: "libraryStripButton"     // found by tests/app
+                        text: "Strip"
+                        width: 56
+                        focusPolicy: Qt.NoFocus
+                        highlighted: libraryWindow.stripView
+                        onClicked: libraryWindow.stripView = true
+                    }
                 }
             }
         }
@@ -437,7 +488,8 @@ ApplicationWindow {
             objectName: "libraryResults"                 // found by tests/app
 
             anchors.top: parent.bottom
-            x: searchBox.x + 10
+            // Under the box, kept inside the window when that's narrow.
+            x: Math.min(topRow.x + topCenter.x + searchBox.x, parent.width - width)
             width: 420
             height: resultsColumn.implicitHeight + 8
             visible: tagLibrary.results.length > 0
@@ -535,8 +587,8 @@ ApplicationWindow {
         }
 
         LibraryTags {
-            SplitView.preferredWidth: 300
-            SplitView.minimumWidth: 180
+            SplitView.preferredWidth: 200
+            SplitView.minimumWidth: 140
             onFocusReturned: libraryWindow.refocus()
         }
     }
@@ -613,6 +665,7 @@ ApplicationWindow {
                 from: 100
                 to: 320
                 stepSize: 10
+                wheelEnabled: true               // the wheel changes it, while over it
                 value: appSettings.libraryTileSize
                 onMoved: appSettings.libraryTileSize = value
             }

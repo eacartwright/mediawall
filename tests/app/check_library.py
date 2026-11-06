@@ -156,7 +156,7 @@ def message():
 def step_closed():
     c.check("the Library isn't created until it's opened", c.js("libraryLoader.item === null") is True)
     c.check("...nor is the database", not os.path.exists(os.environ["MEDIAWALL_LIBRARY"]))
-    last = c.center_of("toolbarSettings")
+    last = c.center_of("toolbarPresent")
     c.check("the whole toolbar fits at the window's normal width (a smaller screen can't tell)",
             c.win.width() < 1280 or last[0] + last[2] / 2 <= c.win.width(), str(last))
     c.grab("toolbar.png")
@@ -481,12 +481,9 @@ def step_reopened():
         var row = item.rowAtIndex(tagLibrary.folderIndex(tagLibrary.folder))
         var cell = item.itemAtCell(Qt.point(0, row))
         if (!cell) return null
-        var label = cell.contentItem
-        var at = label.mapToItem(item, 0, 0)
-        return [cell.highlighted, label.text, label.width, at.x, item.width] })()""")
-    c.check("...highlighted, with its whole name in view, however deep it is",
-            shown is not None and shown[0] is True and shown[1] == "pictures"
-            and shown[2] > 0 and 0 <= shown[3] <= 40, str(shown))
+        return [cell.highlighted, cell.contentItem.text, item.contentX] })()""")
+    c.check("...highlighted, and not scrolled sideways, however deep it is",
+            shown is not None and shown[0] is True and shown[1] == "pictures" and shown[2] == 0, str(shown))
     window().grabWindow().save(str(OUT / "library-reopened.png"))
 
 

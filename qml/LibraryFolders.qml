@@ -71,14 +71,24 @@ Rectangle {
                     verticalAlignment: Text.AlignVCenter
                 }
 
-                TapHandler {
-                    // Beside the arrow, which opens and closes the folder.
-                    acceptedButtons: Qt.LeftButton
-                    onTapped: function(point) {
-                        if (point.position.x >= row.leftMargin) {
+                // The tree's own pointer navigation is off (it would take the
+                // search box's focus), and the arrow goes with it. So all of it
+                // is here: the arrow opens and closes, a click on the name
+                // chooses, and a double-click also opens and closes.
+                MouseArea {
+                    anchors.fill: parent
+
+                    onClicked: function(mouse) {
+                        if (mouse.x < row.leftMargin)
+                            tree.toggleExpanded(row.row)
+                        else
                             tagLibrary.setFolder(row.folderPath)
-                            pane.focusReturned()
-                        }
+                        pane.focusReturned()
+                    }
+
+                    onDoubleClicked: {
+                        tree.toggleExpanded(row.row)
+                        pane.focusReturned()
                     }
                 }
             }
@@ -100,10 +110,8 @@ Rectangle {
                 var row = rowAtIndex(index)
                 if (row >= 0)
                     positionViewAtRow(row, TableView.Contain)
-                // Across too, only if the name would run out of view: rows
-                // start 30 px in, past the arrow, plus their indentation.
-                var nameAt = depth(row) * rowIndent + 30
-                contentX = nameAt < width / 2 ? 0 : Math.min(nameAt - 24, nameWidth - width)
+                // Up and down only: going across would hide the rows above, and
+                // their arrows. That's left to the scroll bar or a wheel tilt.
             }
 
             // Once it's been laid out, when the window opens.

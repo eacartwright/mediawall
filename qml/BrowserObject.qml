@@ -669,12 +669,22 @@ Rectangle {
             property point startMouse
             property point startPan
 
+            // A click pauses what was already selected; the click that selects
+            // it doesn't. Nothing is selected in Present, so there any click does.
+            property bool wasSelected: false
+            property bool moved: false
+
+            // What the first click of a double-click did, for it to take back.
+            property var playingBeforeClick: null
+
             onPressed: function(mouse) {
                 if (mouse.button === Qt.BackButton || mouse.button === Qt.ForwardButton) {
                     fileStepper.begin(mouse.button === Qt.BackButton ? -1 : 1)
                     return
                 }
 
+                wasSelected = root.selected || root.presenting
+                moved = false
                 sceneModel.select(root.objectId)
 
                 if (mouse.button === Qt.RightButton) {
@@ -688,7 +698,13 @@ Rectangle {
             }
 
             onPositionChanged: function(mouse) {
-                if (!(pressedButtons & Qt.LeftButton) || root.previewZoom === 1)
+                if (!(pressedButtons & Qt.LeftButton))
+                    return
+
+                if (Math.abs(mouse.x - startMouse.x) + Math.abs(mouse.y - startMouse.y) >= 6)
+                    moved = true
+
+                if (root.previewZoom === 1)
                     return
 
                 root.panX = startPan.x + (mouse.x - startMouse.x)
@@ -698,13 +714,28 @@ Rectangle {
             onReleased: fileStepper.end()
             onCanceled: fileStepper.end()
 
+            onClicked: function(mouse) {
+                playingBeforeClick = null
+                if (mouse.button !== Qt.LeftButton || moved || !wasSelected || !previewView.canPause)
+                    return
+                playingBeforeClick = root.previewPlaying
+                root.previewPlaying = !root.previewPlaying
+            }
+
             onDoubleClicked: function(mouse) {
-                if (mouse.button === Qt.LeftButton)
-                    root.addCurrentToCanvas()
+                if (mouse.button !== Qt.LeftButton)
+                    return
+                if (playingBeforeClick !== null) {
+                    root.previewPlaying = playingBeforeClick
+                    playingBeforeClick = null
+                }
+                root.addCurrentToCanvas()
             }
 
             // Audio has nothing to zoom or pan: it stays centered.
             onWheel: function(wheel) {
+                if (previewView.skipWheel(wheel.angleDelta))
+                    return
                 if (fileStepper.wheel(wheel.angleDelta))
                     return
                 if (wheel.angleDelta.y !== 0 && !root.currentIsAudio)
@@ -727,15 +758,15 @@ Rectangle {
             spacing: 4
 
             VideoControls {
+                objectName: "browserControls"    // found by tests/app
+
                 width: parent.width
 
                 visible: root.currentIsPlayer
 
                 view: previewView
-                playing: root.previewPlaying
                 muted: root.currentMuted
 
-                onTogglePlay: root.previewPlaying = !root.previewPlaying
                 onToggleMute: root.toggleMute()
             }
 

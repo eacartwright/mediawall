@@ -1,11 +1,18 @@
 import QtQuick
 import QtQuick.Controls
+import "Zoom.js" as Zoom
 
 // The Library's Strip view (readme section 44.1): one large file above a
 // single row of the others. It shares the file list and selection with the
 // grid. Only the large file plays (section 44.4), and it's in a player of
 // its own, gone when this view is hidden: so with the grid's, there is
 // still at most one file decoding.
+//
+// By mouse: thumb buttons step through the files, anywhere in this view. Over the
+// large file a click plays or pauses, the wheel zooms around the pointer, a drag
+// pans, a double-click resets the zoom, and a tilt skips 10% of a video or audio
+// file (of anything else, it steps). Over the row, the wheel scrolls it and a tilt
+// steps.
 
 Rectangle {
     id: strip
@@ -33,10 +40,44 @@ Rectangle {
     readonly property bool isStill: file.type === "image" && !file.animatable
     readonly property bool isMissing: file.missing === true
 
+    // The large file's zoom, from 1 (all of it, fitted) up. Each file starts at 1.
+    property real zoom: 1
+    property real panX: 0
+    property real panY: 0
+    readonly property real maxZoom: 20
+
+    function resetZoom() {
+        zoom = 1
+        panX = 0
+        panY = 0
+    }
+
+    // Zoom by factor f around (px, py) on the stage: the point under the
+    // pointer stays there (as in a browser's preview).
+    function zoomAt(px, py, f) {
+        var newZoom = Math.max(1, Math.min(maxZoom, zoom * f))
+        if (newZoom === 1) {
+            resetZoom()
+            return
+        }
+        var k = newZoom / zoom
+        var baseX = stage.width / 2
+        var baseY = stage.height / 2
+        panX = px + (baseX + panX - px) * k - baseX
+        panY = py + (baseY + panY - py) * k - baseY
+        zoom = newZoom
+    }
+
+    FileStepper {
+        id: fileStepper
+        step: function(delta) { tagLibrary.stepFile(delta) }
+    }
+
     function showCurrent() {
         openFile = null
         fileReady = false
         paused = false
+        resetZoom()
         file = visible ? tagLibrary.fileAt(tagLibrary.currentRow) : {}
         if (file.path)
             openDelay.restart()
@@ -73,6 +114,17 @@ Rectangle {
         onTriggered: strip.openFile = strip.file
     }
 
+    // Thumb buttons, anywhere in this view: what lies above takes only the left.
+    MouseArea {
+        anchors.fill: parent
+        acceptedButtons: Qt.BackButton | Qt.ForwardButton
+        onPressed: function(mouse) {
+            fileStepper.begin(mouse.button === Qt.BackButton ? -1 : 1)
+        }
+        onReleased: fileStepper.end()
+        onCanceled: fileStepper.end()
+    }
+
     // ---- The large file ----
 
     Item {
@@ -85,37 +137,106 @@ Rectangle {
         anchors.margins: 6
         clip: true
 
-        Image {
-            anchors.fill: parent
-            visible: !strip.fileReady && !strip.isAudio
-            source: strip.file.thumb || ""
-            asynchronous: true
-            fillMode: Image.PreserveAspectFit
-        }
+        // What zooms: the stage's size times the zoom, its center moved by the pan.
+        Item {
+            objectName: "libraryStripZoomed"             // found by tests/app
 
-        Loader {
-            id: viewLoader
-            objectName: "libraryStripView"               // found by tests/app
+            width: stage.width * strip.zoom
+            height: stage.height * strip.zoom
+            x: stage.width / 2 + strip.panX - width / 2
+            y: stage.height / 2 + strip.panY - height / 2
 
-            anchors.fill: parent
-            active: strip.openFile !== null
+            Image {
+                anchors.fill: parent
+                visible: !strip.fileReady && !strip.isAudio
+                source: strip.file.thumb || ""
+                asynchronous: true
+                fillMode: Image.PreserveAspectFit
+            }
 
-            sourceComponent: MediaView {
-                url: strip.openFile.url
-                missing: strip.openFile.missing === true
-                type: strip.openFile.type
-                animatable: strip.openFile.animatable
-                name: strip.openFile.name
-                path: strip.openFile.path
-                playing: !strip.paused
-                muted: type !== "audio" && !strip.soundOn
-                loop: true
-                memoryPlace: "library"
-                onReady: strip.fileReady = true
+            Loader {
+                id: viewLoader
+                objectName: "libraryStripView"           // found by tests/app
+
+                anchors.fill: parent
+                active: strip.openFile !== null
+
+                sourceComponent: MediaView {
+                    url: strip.openFile.url
+                    missing: strip.openFile.missing === true
+                    type: strip.openFile.type
+                    animatable: strip.openFile.animatable
+                    name: strip.openFile.name
+                    path: strip.openFile.path
+                    playing: !strip.paused
+                    muted: type !== "audio" && !strip.soundOn
+                    loop: true
+                    memoryPlace: "library"
+                    onReady: strip.fileReady = true
+                }
             }
         }
 
-        // Play, seek, and sound, for a video or audio.
+        MouseArea {
+            objectName: "libraryStripStage"              // found by tests/app
+
+            anchors.fill: parent
+
+            property point startMouse
+            property point startPan
+            property bool moved: false
+
+            // What the first click of a double-click did, for it to take back.
+            property var pausedBeforeClick: null
+
+            onPressed: function(mouse) {
+                startMouse = Qt.point(mouse.x, mouse.y)
+                startPan = Qt.point(strip.panX, strip.panY)
+                moved = false
+            }
+
+            onPositionChanged: function(mouse) {
+                if (!pressed)
+                    return
+                if (Math.abs(mouse.x - startMouse.x) + Math.abs(mouse.y - startMouse.y) >= 6)
+                    moved = true
+                if (moved && strip.zoom !== 1) {
+                    strip.panX = startPan.x + (mouse.x - startMouse.x)
+                    strip.panY = startPan.y + (mouse.y - startMouse.y)
+                }
+            }
+
+            onClicked: {
+                pausedBeforeClick = null
+                strip.focusReturned()
+                if (moved || !strip.view || !strip.view.canPause)
+                    return
+                pausedBeforeClick = strip.paused
+                strip.paused = !strip.paused
+            }
+
+            onDoubleClicked: {
+                if (pausedBeforeClick !== null) {
+                    strip.paused = pausedBeforeClick
+                    pausedBeforeClick = null
+                }
+                strip.resetZoom()
+                strip.focusReturned()
+            }
+
+            // Audio has nothing to zoom: it stays as it is.
+            onWheel: function(wheel) {
+                if (strip.view && strip.view.skipWheel(wheel.angleDelta))
+                    return
+                if (fileStepper.wheel(wheel.angleDelta))
+                    return
+                if (wheel.angleDelta.y !== 0 && !strip.isAudio && strip.file.path !== undefined)
+                    strip.zoomAt(wheel.x, wheel.y,
+                                 Zoom.wheelFactor(wheel.angleDelta.y, appSettings.zoomStep))
+            }
+        }
+
+        // Seek and sound, for a video or audio.
         VideoControls {
             objectName: "libraryStripControls"           // found by tests/app
 
@@ -127,9 +248,7 @@ Rectangle {
 
             visible: strip.view !== null && strip.view.isPlayer
             view: strip.view
-            playing: !strip.paused
             muted: !strip.isAudio && !strip.soundOn
-            onTogglePlay: strip.paused = !strip.paused
             onToggleMute: if (!strip.isAudio) strip.soundOn = !strip.soundOn
         }
 
@@ -251,6 +370,22 @@ Rectangle {
             }
 
             ScrollBar.horizontal: ScrollBar {}
+        }
+
+        // The wheel moves the row, which by itself takes only a sideways wheel;
+        // a sideways one here steps through the files, even if a video is showing.
+        MouseArea {
+            anchors.fill: carousel
+            acceptedButtons: Qt.NoButton
+            onWheel: function(wheel) {
+                if (fileStepper.wheel(wheel.angleDelta))
+                    return
+                var furthest = Math.max(carousel.originX,
+                                        carousel.originX + carousel.contentWidth - carousel.width)
+                // Two files to a notch.
+                carousel.contentX = Math.max(carousel.originX, Math.min(furthest,
+                    carousel.contentX - wheel.angleDelta.y / 120 * 2 * (130 + carousel.spacing)))
+            }
         }
     }
 }

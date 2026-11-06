@@ -732,6 +732,28 @@ Item {
         property point startMouse
         property point startPos
 
+        // A click pauses what was already selected; the click that selects it
+        // doesn't. A pan of a few pixels is still a click.
+        property bool wasSelected: false
+        property point pressPoint
+        property bool moved: false
+
+        // What the first click of a double-click did, for it to take back.
+        property var playingBeforeClick: null
+
+        // A click on the picture, once selected: play or pause, or replay
+        // what has ended. Not on the border strip, or while adjusting.
+        function togglePlayback() {
+            sceneModel.setMergeKey("play:" + root.contentId)
+            if (contentView.ended) {
+                if (!root.contentPlaying)
+                    sceneModel.setPlaying(root.contentId, true)
+                contentView.replay()
+            } else {
+                sceneModel.setPlaying(root.contentId, !root.contentPlaying)
+            }
+        }
+
         function startMove(mouse) {
             mode = "move"
             startMouse = area.mapToItem(root.sceneItem, mouse.x, mouse.y)
@@ -756,6 +778,10 @@ Item {
                     mouse.accepted = false
                 return
             }
+
+            wasSelected = root.selected
+            pressPoint = Qt.point(mouse.x, mouse.y)
+            moved = false
 
             if (!root.presenting)
                 sceneModel.select(root.objectId)
@@ -787,6 +813,9 @@ Item {
             if (!pressed)
                 return
 
+            if (Math.abs(mouse.x - pressPoint.x) + Math.abs(mouse.y - pressPoint.y) >= 6)
+                moved = true
+
             if (mode === "move") {
                 var p = area.mapToItem(root.sceneItem, mouse.x, mouse.y)
                 // Snap to the wall's edges and other objects (Ctrl: don't).
@@ -815,12 +844,27 @@ Item {
             mode = ""
         }
 
+        onClicked: function(mouse) {
+            playingBeforeClick = null
+            if (mouse.button !== Qt.LeftButton || root.presenting || moved || !wasSelected
+                    || root.adjusting || !root.hasContent || !contentView.canPause
+                    || movesAt(mouse.x, mouse.y))
+                return
+            playingBeforeClick = root.contentPlaying
+            togglePlayback()
+        }
+
         // Reset the zoom (the container's Fit/Fill framing); on an
         // animated image, start the animation over instead. Empty (and
         // not yet browsing a folder): choose one to browse.
         onDoubleClicked: function(mouse) {
             if (mouse.button !== Qt.LeftButton)
                 return
+            if (playingBeforeClick !== null) {
+                sceneModel.setMergeKey("play:" + root.contentId)
+                sceneModel.setPlaying(root.contentId, playingBeforeClick)
+                playingBeforeClick = null
+            }
             if (!root.hasContent) {
                 if (!root.presenting && !root.locked
                         && !(root.browseMode && (root.browseFolder !== "" || root.browsesSearch)))
@@ -842,6 +886,8 @@ Item {
         // an empty container), scale the whole container like a free
         // image.
         onWheel: function(wheel) {
+            if (contentView.skipWheel(wheel.angleDelta))
+                return
             if (root.locked)
                 return                      // taken, so nothing underneath zooms
             if (root.browseMode && fileStepper.wheel(wheel.angleDelta))
@@ -961,15 +1007,13 @@ Item {
 
         z: 25
 
-        // Play/pause and mute are in the right-click menu.
-        showButtons: false
+        // Clicking the video plays and pauses it; mute is in the right-click menu.
+        showMute: false
 
         view: contentView
         mediaId: root.contentId
-        playing: root.contentPlaying
         muted: root.contentMuted
 
-        onTogglePlay: sceneModel.setPlaying(root.contentId, !root.contentPlaying)
         onToggleMute: sceneModel.setMuted(root.contentId, !root.contentMuted)
     }
 

@@ -2,11 +2,10 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 
-// Play/pause, seek, time, and mute for a MediaView that plays video or audio.
-// Editor UI: shown on selected objects and in browser previews.
-// Canvas objects show only the seek bar, time, and A-B button
-// (showButtons: false); their play/pause and mute are in the
-// right-click menu.
+// Seek, time, and mute for a MediaView that plays video or audio. Editor UI:
+// shown on selected objects and in browser previews. Clicking the media itself
+// plays and pauses it. Canvas objects show only the seek bar, time, and A-B
+// button (showMute: false); their mute is in the right-click menu.
 
 Rectangle {
     id: bar
@@ -15,15 +14,14 @@ Rectangle {
     property var view
 
     // Current state, as the owner stores it.
-    property bool playing: true
     property bool muted: true
 
     // Whether clicking a control takes the keyboard focus. The Library's
     // search box keeps it (Qt.NoFocus).
     property int controlsFocusPolicy: Qt.StrongFocus
 
-    // Show the Play/Pause and Mute buttons.
-    property bool showButtons: true
+    // Show the Mute button.
+    property bool showMute: true
 
     // The media instance whose A-B loop the A-B button sets; empty
     // (e.g. a browser preview) hides the button.
@@ -42,7 +40,6 @@ Rectangle {
             sceneModel.clearLoop(mediaId)
     }
 
-    signal togglePlay()
     signal toggleMute()
 
     height: 34
@@ -59,7 +56,11 @@ Rectangle {
     // Absorb clicks between the controls so they don't drag the object.
     MouseArea {
         anchors.fill: parent
-        onWheel: function(wheel) { wheel.accepted = true }
+        onWheel: function(wheel) {
+            if (bar.view)
+                bar.view.skipWheel(wheel.angleDelta)     // as over the video behind
+            wheel.accepted = true
+        }
     }
 
     RowLayout {
@@ -68,26 +69,6 @@ Rectangle {
         anchors.rightMargin: 4
 
         spacing: 4
-
-        Button {
-            focusPolicy: bar.controlsFocusPolicy
-            Layout.preferredHeight: 26
-
-            visible: bar.showButtons
-
-            text: bar.view && bar.view.ended ? "Replay"
-                  : bar.playing ? "Pause" : "Play"
-
-            onClicked: {
-                if (bar.view && bar.view.ended) {
-                    if (!bar.playing)
-                        bar.togglePlay()
-                    bar.view.replay()
-                } else {
-                    bar.togglePlay()
-                }
-            }
-        }
 
         Slider {
             focusPolicy: bar.controlsFocusPolicy
@@ -198,7 +179,7 @@ Rectangle {
             focusPolicy: bar.controlsFocusPolicy
             Layout.preferredHeight: 26
 
-            visible: bar.showButtons
+            visible: bar.showMute
 
             text: bar.muted ? "Unmute" : "Mute"
 

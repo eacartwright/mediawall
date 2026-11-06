@@ -8,7 +8,7 @@ made, which run.py's time limit would catch if it hung.
 import os
 import shutil
 
-from PySide6.QtCore import QPoint
+from PySide6.QtCore import QPoint, QTimer
 from PySide6.QtTest import QTest
 
 from harness import AUDIO, GIF, MOV, OUT, PHOTO, VIDEO, Check, Qt, media
@@ -35,6 +35,12 @@ for name, source in [("a_photo.jpg", PHOTO), ("b_moving.gif", GIF), ("c_clip.mov
     b"GIF89a" + (1).to_bytes(2, "little") * 2 + bytes([0x80, 0, 0]) + bytes(6)
     + bytes([0x2C]) + bytes(4) + (1).to_bytes(2, "little") * 2 + bytes([0, 2, 2, 0x44, 1, 0, 0x3B]))
 PHOTO_ROW, GIF_ROW, MOV_ROW, MP4_ROW, AUDIO_ROW, STILL_ROW = range(6)
+
+# Enough to scroll, for the grid's origin to move.
+GIFS = OUT / "gifs"
+GIFS.mkdir(exist_ok=True)
+for i in range(30):
+    link(media(GIF), GIFS / f"{i:03}.gif")
 
 # For the last step: enough videos that some are still waiting when the app quits.
 MANY = OUT / "many"
@@ -74,8 +80,30 @@ def tile_point(row):
     return QPoint(round(found[0]), round(found[1]))
 
 
+def over_its_tile(row, when):
+    """The player lies exactly over the tile's picture, and is drawn above the tile."""
+    found = item("libraryGrid", """(function() {
+        var tile = item.itemAtIndex(%d)
+        var kids = item.contentItem.children
+        var player = null
+        for (var i = 0; i < kids.length; i++)
+            if (kids[i].objectName === "libraryPlayer") player = kids[i]
+        return [player.x - tile.x, player.y - tile.y, player.z - tile.z,
+                tile.width - player.width, tile.height - player.height] })()""" % row)
+    c.check(f"the player lies over its tile, after {when}", found[:2] == [7, 7], str(found))
+    c.check("...above it", found[2] > 0, str(found))
+    c.check("...and is the size of its picture", found[3:] == [14, 32], str(found))
+
+
 def hover(row):
     QTest.mouseMove(window(), tile_point(row))
+
+
+def middle_of_grid():
+    found = item("libraryGrid", """(function() {
+        var p = item.mapToItem(null, item.width / 2, item.height / 2)
+        return [p.x, p.y] })()""")
+    return QPoint(round(found[0]), round(found[1]))
 
 
 def hover_nothing():
@@ -149,6 +177,7 @@ def step_hover_video():
     c.check("the next hovered file takes over the one player", player("player.row") == MOV_ROW)
     c.check("...a video, playing", player("player.view.player.playbackState === 1") is True)
     c.check("...muted", player("player.view.muted") is True)
+    over_its_tile(MOV_ROW, "a fresh grid")
     c.position = player("player.view.position")
     c.js("mediaMemory.refresh()")
     rows = [r for r in c.js("mediaMemory.rows") if r["place"] == "library"]
@@ -217,11 +246,49 @@ def step_play_video():
     c.js("tagLibrary.setQuery('')")
     c.check("tagging a video works", c.js("tagLibrary.createAndApply('clips')") is True)
     c.check("...and leaves it playing", player("player.row") == MOV_ROW)
-    c.js("tagLibrary.setFolder(%r)" % str(MANY))
+    c.js("tagLibrary.setFolder(%r)" % str(GIFS))
 
 
 def step_list_changed():
     c.check("another folder stops it", player("player.row") == -1)
+    hover_nothing()
+    c.js("appSettings.libraryTileSize = 320")
+
+
+# A new tile size while scrolled moves the grid's origin, and every tile, away from 0.
+def step_scroll_large_tiles():
+    item("libraryGrid", "item.contentY = 1500")
+
+
+def step_smaller_tiles():
+    c.js("appSettings.libraryTileSize = 200")
+
+
+def step_hover_resized_start():
+    QTest.mouseMove(window(), middle_of_grid())
+
+
+def step_hover_resized(tries=8):
+    # The grid may still be settling, and any scrolling cancels a hover (as it
+    # should): so hover again until it holds.
+    row = player("player.row")
+    if row < 0 and tries > 0:
+        hover_nothing()
+        QTimer.singleShot(50, step_hover_resized_start)
+        QTimer.singleShot(600, lambda: step_hover_resized(tries - 1))
+        return
+    c.check("a new tile size has moved the grid's origin", item("libraryGrid", "item.originY") != 0,
+            str(item("libraryGrid", "item.originY")))
+    c.check("...and what's hovered still plays", row >= 0, str(row))
+    if row >= 0:
+        over_its_tile(row, "a new tile size")
+    window().grabWindow().save(str(OUT / "library-hover-resized.png"))
+    hover_nothing()
+    c.js("tagLibrary.setFolder(%r)" % str(MANY))
+    QTimer.singleShot(600, step_last_folder)
+
+
+def step_last_folder():
     c.check("the videos are coming", c.js("tagLibrary.files.rowCount()") == 40)
     # Quit with thumbnails still being made: the app must end, cleanly.
     print(f"{sum(c.results)}/{len(c.results)} passed", flush=True)
@@ -233,5 +300,6 @@ c.run(Scene(), [
     (500, step_hover_video), (800, step_hover_advances), (500, step_hover_still),
     (500, step_hover_still_gif), (500, step_hover_audio), (800, step_play_audio),
     (400, step_paused), (500, step_hover_while_playing), (400, step_resumed), (400, step_moved_on),
-    (800, step_play_video), (600, step_list_changed),
+    (800, step_play_video), (800, step_list_changed), (300, step_scroll_large_tiles),
+    (300, step_smaller_tiles), (300, step_hover_resized_start), (900, step_hover_resized),
 ])
