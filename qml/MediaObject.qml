@@ -84,6 +84,18 @@ Item {
         rebind()
     }
 
+    // A click on it, once selected: play or pause, or replay what has ended.
+    function togglePlayback() {
+        sceneModel.setMergeKey("play:" + objectId)
+        if (view.ended) {
+            if (!objPlaying)
+                sceneModel.setPlaying(objectId, true)
+            view.replay()
+        } else {
+            sceneModel.setPlaying(objectId, !objPlaying)
+        }
+    }
+
     // Double-click on an animated image: start it over (and play it if
     // paused).
     function restartAnimation() {
@@ -164,15 +176,13 @@ Item {
 
         z: 25
 
-        // Play/pause and mute are in the right-click menu.
-        showButtons: false
+        // Clicking the video plays and pauses it; mute is in the right-click menu.
+        showMute: false
 
         view: view
         mediaId: root.objectId
-        playing: root.objPlaying
         muted: root.objMuted
 
-        onTogglePlay: sceneModel.setPlaying(root.objectId, !root.objPlaying)
         onToggleMute: sceneModel.setMuted(root.objectId, !root.objMuted)
     }
 
@@ -220,6 +230,13 @@ Item {
         property point startMouse
         property point startPos
 
+        // A click pauses what was already selected; the click that selects it
+        // doesn't, so choosing a video to move it doesn't stop it.
+        property bool wasSelected: false
+
+        // What the first click of a double-click did, for it to take back.
+        property var playingBeforeClick: null
+
         onPressed: function(mouse) {
             if (root.presenting) {              // only double-click applies
                 dragging = false
@@ -237,6 +254,7 @@ Item {
             dragging = true
             moved = false
 
+            wasSelected = root.selected
             sceneModel.select(root.objectId)
 
             startMouse = moveArea.mapToItem(root.sceneItem, mouse.x, mouse.y)
@@ -269,8 +287,24 @@ Item {
             )
         }
 
+        onClicked: function(mouse) {
+            playingBeforeClick = null
+            if (mouse.button !== Qt.LeftButton || root.presenting || moved
+                    || !wasSelected || !view.canPause)
+                return
+            playingBeforeClick = root.objPlaying
+            root.togglePlayback()
+        }
+
         onDoubleClicked: function(mouse) {
-            if (mouse.button === Qt.LeftButton && root.isAnimated)
+            if (mouse.button !== Qt.LeftButton)
+                return
+            if (playingBeforeClick !== null) {
+                sceneModel.setMergeKey("play:" + root.objectId)
+                sceneModel.setPlaying(root.objectId, playingBeforeClick)
+                playingBeforeClick = null
+            }
+            if (root.isAnimated)
                 root.restartAnimation()
         }
 
@@ -301,6 +335,9 @@ Item {
         // Mouse wheel over a selected image scales it around the pointer.
         // (Same as the resize handle, just quicker.)
         onWheel: function(wheel) {
+            if (!root.presenting && view.skipWheel(wheel.angleDelta))
+                return
+
             if (!root.selected || wheel.angleDelta.y === 0) {
                 wheel.accepted = false
                 return

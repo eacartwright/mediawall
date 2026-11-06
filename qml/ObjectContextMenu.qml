@@ -527,6 +527,15 @@ Menu {
         onTriggered: sceneModel.startBrowsing(menu.targetId)
     }
 
+    // What a saved search looks for (it's changed in the Library, by
+    // making another).
+    MenuItem {
+        text: "Search: " + (menu.isContainer ? menu.target.searchText : "")
+        enabled: false
+        visible: menu.isContainer && menu.target.browsesSearch === true
+        height: visible ? implicitHeight : 0
+    }
+
     // Any container, filled or not: pick a folder to browse.
     MenuItem {
         text: "Browse Folder…"
@@ -550,7 +559,7 @@ Menu {
         enabled: !menu.targetLocked
         checkable: true
         checked: menu.isContainer && menu.target.browseSubfolders === true
-        visible: menu.isContainer && menu.target.browseMode === true
+        visible: menu.isContainer && menu.target.browseMode === true && !menu.target.browsesSearch
         height: visible ? implicitHeight : 0
         onTriggered: {
             sceneModel.setContainerBrowseSubfolders(menu.targetId, !menu.target.browseSubfolders)

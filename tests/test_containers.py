@@ -9,8 +9,75 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from core.layout import layout_to_dict
 from core.project import load_project, save_project, scene_from_dict, scene_to_dict, FORMAT
-from core.scene import FIT_CONTAIN, FIT_COVER, Scene, fitted_size
+from core.scene import FIT_CONTAIN, FIT_COVER, Scene, fitted_size, normalized_browse_query
+
+
+class SearchContainerTests(unittest.TestCase):
+
+    def test_normalized_query(self):
+        self.assertEqual(normalized_browse_query({"include": ["a", 3, ""], "exclude": "x"}),
+                         {"include": ["a"], "exclude": []})
+        self.assertEqual(normalized_browse_query({"exclude": ["b"]}), {"include": [], "exclude": ["b"]})
+        for bad in (None, "text", [], {}, {"include": []}, {"include": [7]}):
+            self.assertIsNone(normalized_browse_query(bad))
+
+    def test_a_new_one_browses_its_search(self):
+        scene = Scene()
+        box = scene.add_search_container(["car"], ["red"], 10, 20)
+        self.assertEqual((box.browse_mode, box.browse_folder), (True, ""))
+        self.assertEqual(box.browse_query, {"include": ["car"], "exclude": ["red"]})
+
+    def test_choosing_a_folder_replaces_the_search(self):
+        scene = Scene()
+        box = scene.add_search_container(["car"], [], 0, 0)
+        self.assertTrue(scene.set_browsing(box.id, True, "/media"))
+        self.assertIsNone(box.browse_query)
+        self.assertEqual(box.browse_folder, "/media")
+
+    def test_stopping_forgets_the_search(self):
+        scene = Scene()
+        box = scene.add_search_container(["car"], [], 0, 0)
+        self.assertTrue(scene.set_browsing(box.id, False))
+        self.assertIsNone(box.browse_query)
+
+    def test_saved_and_loaded(self):
+        scene = Scene()
+        box = scene.add_search_container(["car"], ["red"], 0, 0)
+        loaded, warnings = scene_from_dict(scene_to_dict(scene))
+        self.assertEqual(loaded.get(box.id).browse_query, {"include": ["car"], "exclude": ["red"]})
+        self.assertEqual(warnings, [])
+
+    def test_a_bad_saved_search_is_a_warning(self):
+        scene = Scene()
+        box = scene.add_search_container(["car"], [], 0, 0)
+        data = scene_to_dict(scene)
+        data["objects"][0]["browse_query"] = "nonsense"
+        loaded, warnings = scene_from_dict(data)
+        self.assertIsNone(loaded.get(box.id).browse_query)
+        self.assertTrue(any("tag search" in w for w in warnings), warnings)
+
+    def test_a_project_from_before_has_none(self):
+        scene = Scene()
+        box = scene.add_object("container", 0, 0)
+        data = scene_to_dict(scene)
+        del data["objects"][0]["browse_query"]
+        loaded, warnings = scene_from_dict(data)
+        self.assertIsNone(loaded.get(box.id).browse_query)
+        self.assertEqual(warnings, [])
+
+    def test_a_layout_doesnt_keep_the_search(self):
+        scene = Scene()
+        scene.add_search_container(["car"], [], 0, 0)
+        self.assertIsNone(layout_to_dict(scene)["objects"][0]["browse_query"])
+
+    def test_duplicate_keeps_the_search(self):
+        scene = Scene()
+        box = scene.add_search_container(["car"], [], 0, 0)
+        copied = scene.duplicate_object(box.id)
+        self.assertEqual(copied.browse_query, box.browse_query)
+        self.assertEqual(copied.browse_mode, True)
 
 
 class FittedSizeTests(unittest.TestCase):

@@ -10,6 +10,9 @@ ApplicationWindow {
     visible: true
     width: 1280
     height: 800
+    // Never so small that the toolbar is cut off, whatever the system's font.
+    minimumWidth: toolbarRow.implicitWidth + 20
+    minimumHeight: 500
     title: projectController.title
 
     color: "#181818"
@@ -39,9 +42,23 @@ ApplicationWindow {
     palette.disabled.windowText: "#9d9d9d"
     palette.disabled.text: "#9d9d9d"
 
+    // As wide as its label needs (the style's default of 80 is wider than most
+    // of them), so the whole toolbar fits a window that shares a screen.
+    component ToolbarButton: Button {
+        implicitWidth: Math.max(48, implicitContentWidth + 16)
+    }
+
     // Ask about unsaved changes before closing.
     onClosing: function(close) {
         close.accepted = projectController.confirmClose()
+        // The Library doesn't close with this window by itself, and the app
+        // runs until its last independent window has closed. Qt checks that
+        // as soon as this returns, before the Loader's window is really
+        // gone: so hide it first, or the app would stay running, unseen.
+        if (close.accepted && libraryLoader.item) {
+            libraryLoader.item.visible = false
+            libraryLoader.active = false
+        }
     }
 
 
@@ -119,6 +136,77 @@ ApplicationWindow {
     MemoryWindow {
         id: memoryWindow
         palette: window.palette
+    }
+
+    // The Library (readme section 44): created when opened and destroyed
+    // when closed, which frees its thumbnails.
+    Loader {
+        id: libraryLoader
+        active: false
+        source: "LibraryWindow.qml"
+
+        Connections {
+            target: libraryLoader.item
+            function onClosing() {
+                Qt.callLater(function() { libraryLoader.active = false })
+            }
+        }
+    }
+
+    function showLibrary() {
+        libraryLoader.active = true
+        var library = libraryLoader.item
+        library.palette = window.palette
+        library.wall = window
+        library.show()
+        library.raise()
+        library.requestActivate()
+    }
+
+    // Files from the Library or dropped on the wall ([{path, type}]), as one
+    // undo step: pictures and videos on the canvas, each a little further
+    // along, and audio in the Playback tab. Returns how many were added.
+    function addFilesToWall(files, x, y, inContainers) {
+        if (presenting)
+            return 0
+        var key = "addFiles:" + Date.now()
+        var placed = 0
+        for (var i = 0; i < files.length; i++) {
+            var f = files[i]
+            sceneModel.setMergeKey(key)
+            if (f.type === "audio") {
+                sceneModel.addAudioTrack(f.path, f.type)
+                continue
+            }
+            var px = x + (placed % 10) * 30
+            var py = y + (placed % 10) * 30
+            if (inContainers)
+                sceneModel.addMediaInNewContainer(f.path, f.type, px, py)
+            else
+                sceneModel.addMedia(f.path, f.type, px, py)
+            placed++
+        }
+        return files.length
+    }
+
+    // The Library's New Browsing Container from This Search. False during Present.
+    function addSearchContainer(search) {
+        if (presenting)
+            return false
+        sceneModel.addSearchContainer(search.include, search.exclude,
+                                      150 + Math.random() * 100, 150 + Math.random() * 100)
+        return true
+    }
+
+    // A file dropped on an empty container goes in it; otherwise on the
+    // canvas, from where it was dropped.
+    function dropFiles(files, x, y) {
+        if (files.length === 1 && files[0].type !== "audio") {
+            var container = sceneModel.containerAt(x, y, "")
+            if (container !== "" && sceneModel.addMediaToContainer(files[0].path, files[0].type, container) !== "")
+                return
+        }
+        addFilesToWall(files, x, y, false)
     }
 
     SettingsDialog {
@@ -257,18 +345,31 @@ ApplicationWindow {
             }
 
             RowLayout {
+                id: toolbarRow
+
                 anchors.fill: parent
                 anchors.leftMargin: 10
                 anchors.rightMargin: 10
 
-                spacing: 8
+                spacing: 5
 
-                Button { action: appActions.newWall }
+                ToolbarButton { action: appActions.settings; objectName: "toolbarSettings" }
+
+                // Divider
+                Rectangle {
+                    Layout.preferredWidth: 1
+                    Layout.preferredHeight: 28
+                    Layout.leftMargin: 4
+                    Layout.rightMargin: 4
+                    color: "#555555"
+                }
+
+                ToolbarButton { action: appActions.newWall }
                 // Open, with Open Recent on the ▾ beside it.
                 Row {
                     spacing: 1
 
-                    Button { action: appActions.open }
+                    ToolbarButton { action: appActions.open }
 
                     Button {
                         id: recentButton
@@ -327,11 +428,34 @@ ApplicationWindow {
                         }
                     }
                 }
-                Button { action: appActions.save }
-                Button { action: appActions.saveAs }
+
+                // Save, with Save As on the ▾ beside it.
+                Row {
+                    spacing: 1
+
+                    ToolbarButton { action: appActions.save }
+
+                    Button {
+                        id: saveMenuButton
+                        objectName: "saveMenuButton"   // found by tests/app
+                        width: 22
+                        text: "▾"
+                        onClicked: saveMenu.popup(saveMenuButton, 0, saveMenuButton.height)
+
+                        ToolTip.visible: hovered && !saveMenu.visible
+                        ToolTip.delay: 600
+                        ToolTip.text: "Save As"
+
+                        Menu {
+                            id: saveMenu
+
+                            MenuItem { action: appActions.saveAs }
+                        }
+                    }
+                }
 
                 // Layouts: a wall's containers only, saved for reuse.
-                Button {
+                ToolbarButton {
                     id: layoutButton
                     text: "Layout ▾"
                     onClicked: layoutMenu.popup(layoutButton, 0, layoutButton.height)
@@ -349,34 +473,61 @@ ApplicationWindow {
                 Rectangle {
                     Layout.preferredWidth: 1
                     Layout.preferredHeight: 28
-                    Layout.leftMargin: 6
-                    Layout.rightMargin: 6
+                    Layout.leftMargin: 4
+                    Layout.rightMargin: 4
                     color: "#555555"
                 }
 
-                Button { action: appActions.undo }
-                Button { action: appActions.redo }
+                Row {
+                    spacing: 1
+
+                    ToolbarButton { action: appActions.undo }
+                    ToolbarButton { action: appActions.redo }
+                }
 
                 // Divider
                 Rectangle {
                     Layout.preferredWidth: 1
                     Layout.preferredHeight: 28
-                    Layout.leftMargin: 6
-                    Layout.rightMargin: 6
+                    Layout.leftMargin: 4
+                    Layout.rightMargin: 4
                     color: "#555555"
                 }
 
-                Button { action: appActions.addBrowser }
-                Button { action: appActions.addContainer }
-                Button { action: appActions.addText; objectName: "toolbarAddText" }
+                ToolbarButton { action: appActions.addBrowser }
+                ToolbarButton { action: appActions.addContainer }
+                ToolbarButton { action: appActions.addText; objectName: "toolbarAddText" }
+                ToolbarButton { action: appActions.library; objectName: "toolbarLibrary" }
 
                 Item {
                     Layout.fillWidth: true
                 }
 
-                Button { action: appActions.fullScreen }
-                Button { action: appActions.present }
-                Button { action: appActions.settings }
+                ToolbarButton { action: appActions.fullScreen }
+                ToolbarButton { action: appActions.present; objectName: "toolbarPresent" }
+            }
+        }
+
+
+        // A real file drag, from the Library or a file manager (readme
+        // section 44.5).
+        DropArea {
+            id: fileDrop
+            objectName: "wallDrop"                     // found by tests/app
+
+            anchors.fill: parent
+            keys: ["text/uri-list"]
+            enabled: !window.presenting
+
+            onDropped: function(drop) {
+                var urls = []
+                for (var i = 0; i < drop.urls.length; i++)
+                    urls.push(drop.urls[i].toString())
+                var files = browserBackend.droppedFiles(urls)
+                if (files.length === 0)
+                    return
+                window.dropFiles(files, drop.x, drop.y)
+                drop.accept(Qt.CopyAction)
             }
         }
 

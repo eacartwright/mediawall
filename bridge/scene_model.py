@@ -50,7 +50,7 @@ BROWSER_FIELDS = ("folder", "current_index", "include_subfolders", "media_filter
 # the Fit/Fill mode it's framed with.
 CONTAINER_BROWSE_FIELDS = ("browse_mode", "browse_folder", "browse_subfolders",
                            "media_filter", "sort_by", "sort_descending", "continue_play",
-                           "new_first")
+                           "new_first", "browse_query")
 
 
 def _media_file_filter():
@@ -90,6 +90,7 @@ OBJECT_ROLE_NAMES = [
     "fitMode",
     "browseMode",
     "browseFolder",
+    "browseQuery",
     "browseSubfolders",
     "mediaFilter",
     "sortBy",
@@ -137,7 +138,7 @@ PLAYBACK_ROLES = [ROLES[n] for n in
 SOURCE_ROLES = [ROLES["source" + f] for f in SOURCE_FIELDS]
 CONTAINER_ROLES = [ROLES[n] for n in
                    ("lockContent", "locked", "clipShape", "fitMode", "browseMode",
-                    "browseFolder", "browseSubfolders", "mediaFilter",
+                    "browseFolder", "browseSubfolders", "browseQuery", "mediaFilter",
                     "sortBy", "sortDescending", "continuePlay", "newFirst",
                     "favorites")]
 CONTENT_ROLES = [ROLES[n] for n in CONTENT_ROLE_NAMES]
@@ -379,6 +380,8 @@ class SceneModel(QAbstractListModel):
             "fitMode": obj.fit_mode,
             "browseMode": obj.browse_mode,
             "browseFolder": obj.browse_folder,
+            # An empty one for none: QML reads this as a plain map.
+            "browseQuery": copy.deepcopy(obj.browse_query) or {},
             "browseSubfolders": obj.browse_subfolders,
             "mediaFilter": obj.media_filter,
             "sortBy": obj.sort_by,
@@ -706,6 +709,12 @@ class SceneModel(QAbstractListModel):
     @Slot(float, float, result=str)
     def addBrowser(self, x, y):
         return self._insert(lambda: self._scene.add_object("browser", x, y))
+
+    @Slot(list, list, float, float, result=str)
+    def addSearchContainer(self, include, exclude, x, y):
+        """The Library's New Browsing Container from This Search (section 44.5)."""
+        return self._insert(lambda: self._scene.add_search_container(
+            [str(n) for n in include], [str(n) for n in exclude], x, y))
 
     @Slot(float, float, result=str)
     def addContainer(self, x, y):

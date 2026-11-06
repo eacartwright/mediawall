@@ -92,6 +92,9 @@ Item {
         (isPlayer ? loader.item.failed === true
                   : loader.item.status === Image.Error)
 
+    // Something a click can play or pause: not a still picture, not a failure.
+    readonly property bool canPause: !missing && !failed && (isPlayer || isAnimated)
+
     // Player position/length in milliseconds.
     readonly property real position: player ? player.position : 0
     readonly property real duration: player ? player.duration : 0
@@ -101,6 +104,25 @@ Item {
     function seek(ms) {
         if (player)
             player.position = ms
+    }
+
+    // Forward or back by a share of the length, staying within the file.
+    function skip(fraction) {
+        if (player && duration > 0)
+            seek(Math.max(0, Math.min(duration, position + duration * fraction)))
+    }
+
+    // Tilting the wheel, for whoever owns this view to pass on: 10% of a video
+    // or audio file per notch, held at the same pace as stepping through files.
+    // True if it was taken: not for pictures or animated images, or a straight
+    // wheel event, which the owner goes on to deal with as usual.
+    FileStepper {
+        id: skipper
+        step: function(delta) { view.skip(delta * 0.1) }
+    }
+
+    function skipWheel(angleDelta) {
+        return isPlayer && canPause && skipper.wheel(angleDelta)
     }
 
     function replay() {

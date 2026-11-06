@@ -28,7 +28,8 @@ from core.speech import normalized_speech
 from core.scene import (
     CLIP_SHAPES, FIT_CONTAIN, FIT_MODES, MEDIA_FILTERS, OBJECT_TYPES, PLAYABLE_TYPES,
     SORT_KEYS, MediaSource, Scene, SceneObject,
-    clamp_loop_gap, clamp_speed, new_id, normalized_loop, normalized_text_style, one_line,
+    clamp_loop_gap, clamp_speed, new_id, normalized_browse_query, normalized_loop,
+    normalized_text_style, one_line,
 )
 
 
@@ -47,7 +48,7 @@ TYPE_FIELDS = {
     "container": ["lock_content", "locked", "clip_shape", "fit_mode",
                   "browse_mode", "browse_folder", "browse_subfolders",
                   "media_filter", "sort_by", "sort_descending", "continue_play",
-                  "new_first", "favorites"],
+                  "new_first", "favorites", "browse_query"],
     "audio": ["source_id", "playing", "muted", "volume", "loop",
               "speed", "preserve_pitch", "loop_a", "loop_b", "speech",
               "loop_gap", "continue_play"],
@@ -259,6 +260,11 @@ def scene_from_dict(data, project_path=None):
 
         for name in COMMON_FIELDS[2:] + TYPE_FIELDS[object_type]:
             if name not in raw:
+                continue
+            if name == "browse_query":
+                obj.browse_query = normalized_browse_query(raw[name])
+                if obj.browse_query is None and raw[name] is not None:
+                    warnings.append("Ignored a bad tag search on a browsing container.")
                 continue
             try:
                 setattr(obj, name, _coerce(raw[name], getattr(obj, name)))

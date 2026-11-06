@@ -585,6 +585,7 @@ Dialog {
                             "Mouse back / forward buttons"])
                     r.push(["Browsing files", "Previous / next file",
                             "Tilt the wheel left / right"])
+                    cmd("View", a.library)
                     cmd("View", a.fullScreen)
                     cmd("View", a.present)
                     r.push(["View", "Leave Present", dialog.keys("Esc")])
@@ -601,6 +602,20 @@ Dialog {
                             "Hold Shift while dragging"])
                     r.push(["Moving and resizing", "Place freely, without snapping",
                             "Hold Ctrl while dragging or resizing"])
+                    r.push(["Library", "Apply the top result (Find: add it as a filter)", dialog.keys("Return")])
+                    r.push(["Library", "Create a tag from exactly what was typed",
+                            dialog.keys("Shift+Return")])
+                    r.push(["Library", "Choose a different result", dialog.keys("Up") + " / " + dialog.keys("Down")])
+                    r.push(["Library", "Previous / next file, with the box empty",
+                            dialog.keys("Left") + " / " + dialog.keys("Right")])
+                    r.push(["Library", "Remove the last tag applied (Find: the last filter), with the box empty",
+                            dialog.keys("Backspace")])
+                    r.push(["Library", "Play or pause the current file, with sound", dialog.keys("Ctrl+Space")])
+                    r.push(["Library", "Add the selection to the wall", dialog.keys("Ctrl+Return")])
+                    r.push(["Library", "Switch between Tag and Find", dialog.keys("Tab")])
+                    r.push(["Library", "Undo / redo tagging",
+                            dialog.keys("Ctrl+Z") + " / " + dialog.keys("Ctrl+Y")])
+                    r.push(["Library", "Clear the box; with it empty, back to the grid", dialog.keys("Esc")])
                     return r
                 }
 

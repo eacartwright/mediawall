@@ -11,12 +11,14 @@ These need a display, PySide6, and the sample media in tests/media/
 fast unit tests in tests/, which `python -m unittest` runs.
 
 Settings: MEDIAWALL_SETTINGS is pointed at a scratch .ini file (set by
-run.py, or here if missing), so the real settings are never touched.
+run.py, or here if missing), so the real settings are never touched. The
+tag library and its thumbnails get scratch places too.
 """
 
 import os
 import sys
 import tempfile
+import time
 from pathlib import Path
 
 APP_DIR = Path(__file__).resolve().parents[2]
@@ -29,6 +31,8 @@ MEDIA = APP_DIR / "tests" / "media"
 OUT = Path(os.environ.get("MEDIAWALL_CHECK_OUT") or tempfile.mkdtemp(prefix="mediawall-checks-"))
 OUT.mkdir(parents=True, exist_ok=True)
 os.environ.setdefault("MEDIAWALL_SETTINGS", str(OUT / "settings.ini"))
+os.environ.setdefault("MEDIAWALL_LIBRARY", str(OUT / "library.sqlite"))
+os.environ.setdefault("MEDIAWALL_THUMBNAILS", str(OUT / "thumbnails"))
 
 from PySide6.QtCore import QPoint, QPointF, Qt, QTimer            # noqa: E402
 from PySide6.QtGui import QGuiApplication, QWheelEvent             # noqa: E402
@@ -209,12 +213,16 @@ class Check:
     def release(self, x, y, button=Qt.LeftButton):
         QTest.mouseRelease(self.win, button, Qt.NoModifier, QPoint(round(x), round(y)))
 
-    def wheel(self, x, y, delta, buttons=Qt.NoButton, dx=0):
-        """A wheel event: delta is vertical, dx horizontal (tilt)."""
+    def wheel(self, x, y, delta, buttons=Qt.NoButton, dx=0, window=None):
+        """A wheel event: delta is vertical, dx horizontal (tilt). In the main window by default."""
+        window = window or self.win
         pos = QPointF(x, y)
-        QGuiApplication.sendEvent(self.win, QWheelEvent(
-            pos, self.win.mapToGlobal(pos), QPoint(), QPoint(dx, delta),
-            buttons, Qt.NoModifier, Qt.NoScrollPhase, False))
+        event = QWheelEvent(pos, window.mapToGlobal(pos), QPoint(), QPoint(dx, delta),
+                            buttons, Qt.NoModifier, Qt.NoScrollPhase, False)
+        # As a real one has: lists and trees scroll by the time between events,
+        # and ignore a wheel that seems to come before the last input.
+        event.setTimestamp(int(time.monotonic() * 1000))
+        QGuiApplication.sendEvent(window, event)
 
     def open_sidebar(self, tab="layersTab"):
         """Open the left-edge flyout (if closed) and choose a tab."""

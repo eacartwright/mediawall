@@ -7,7 +7,7 @@ import os
 
 import shutil
 
-from harness import (Check, GIF, MEDIA, OUT, PHOTO, Qt, folder_files, media)
+from harness import (Check, GIF, MEDIA, OUT, PHOTO, Qt, SCREENSHOT, folder_files, media)
 from core.scene import FIT_CONTAIN, Scene
 from PySide6.QtCore import QTimer
 from PySide6.QtTest import QTest
@@ -29,6 +29,17 @@ box.browse_mode, box.browse_folder = True, str(MEDIA)
 second = scene.add_object("container", 700, 80, width=500, height=420)      # stepped to a video next
 scene.add_media_to_container(shot.id, second.id)
 empty = scene.add_object("container", 60, 540, width=300, height=200)     # double-click: browse
+
+# A folder of pictures only, for tilting (on a video, a tilt skips instead).
+STILLS = OUT / "stills"
+STILLS.mkdir(parents=True, exist_ok=True)
+for i in range(12):
+    shutil.copy(media(SCREENSHOT), STILLS / f"{i:02}.png")
+still = scene.add_source(str(STILLS / "00.png"), "image", 0, 0)
+stills = scene.add_object("container", 400, 540, width=280, height=200)
+scene.add_media_to_container(still.id, stills.id)
+stills.browse_mode, stills.browse_folder = True, str(STILLS)
+STILLS_SPOT = (540, 640)
 
 
 def content(cid=box.id):
@@ -64,10 +75,11 @@ def step_controls():
     c.check("back button: previous file", shown() == names[i0], shown())
     audio = [e["name"] for e in folder_files(("audio",))]
     c.check("audio files are skipped", audio and not set(audio) & set(names), str(audio))
-    c.wheel(360, 290, 0, dx=-120)
-    c.check("tilting the wheel right: next file", shown() == names[(i0 + 1) % len(names)], shown())
-    c.wheel(360, 290, 0, dx=120)
-    c.check("tilting it left: previous file", shown() == names[i0], shown())
+    # On a video a tilt skips instead (check_tilt_skip), so these are on stills.
+    c.wheel(STILLS_SPOT[0], STILLS_SPOT[1], 0, dx=-120)
+    c.check("tilting the wheel right: next file", shown(stills.id) == "01.png", shown(stills.id))
+    c.wheel(STILLS_SPOT[0], STILLS_SPOT[1], 0, dx=120)
+    c.check("tilting it left: previous file", shown(stills.id) == "00.png", shown(stills.id))
     c.sm.select(box.id)
     c.key(Qt.Key_Right)
     c.check("Right arrow (selected): next file", shown() == names[(i0 + 1) % len(names)], shown())
@@ -110,8 +122,9 @@ def step_hold_key2():
     c.check("...and stops when the key is let go", c.later == c.after_key, f"{c.after_key} -> {c.later}")
     # A held tilt: the mouse sends a notch every 30 ms; Settings paces it.
     for t in range(0, 1000, 30):
-        QTimer.singleShot(t, lambda: (c.wheel(360, 290, 0, dx=-120), c.tilted.append(shown())))
-    c.tilted = [shown()]
+        QTimer.singleShot(t, lambda: (c.wheel(STILLS_SPOT[0], STILLS_SPOT[1], 0, dx=-120),
+                                      c.tilted.append(shown(stills.id))))
+    c.tilted = [shown(stills.id)]
 
 
 def step_hold_tilt():
@@ -122,6 +135,9 @@ def step_hold_tilt():
 
 
 def step_pan_and_move():
+    # A still picture, whichever file the steps above stopped on: double-clicking
+    # one resets its framing, while on a GIF it restarts the animation instead.
+    c.sm.showInContainer(box.id, media(PHOTO), "image")
     b0, c0 = geo(c.scene.get(box.id)), geo(content())
     c.drag((360, 290), (420, 330))
     c.check("left-drag pans the picture, container stays",

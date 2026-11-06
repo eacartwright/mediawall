@@ -120,8 +120,18 @@ PIPER_PATH_KEY = "speech/piperPath"
 VOICES_FOLDER_KEY = "speech/voicesFolder"
 
 
+# The Library window (readme section 44): the folder last shown, and the
+# size of its tiles in the grid, in pixels.
+LIBRARY_FOLDER_KEY = "library/folder"
+LIBRARY_SUBFOLDERS_KEY = "library/subfolders"
+LIBRARY_TILE_KEY = "library/tileSize"
+LIBRARY_TILE_DEFAULT = 180
+LIBRARY_TILE_RANGE = (100, 320)
+
+
 class AppSettings(QObject):
 
+    libraryChanged = Signal()
     zoomStepChanged = Signal()
     speedRangeChanged = Signal()
     stepRepeatChanged = Signal()
@@ -321,6 +331,44 @@ class AppSettings(QObject):
     voicesFolder = Property(str, lambda self: self._get_text(VOICES_FOLDER_KEY),
                             lambda self, v: self._set_text(VOICES_FOLDER_KEY, v),
                             notify=speechChanged)
+
+    # ---- The Library window ----
+
+    def _get_library_folder(self):
+        return str(self._settings.value(LIBRARY_FOLDER_KEY, "") or "")
+
+    def _set_library_folder(self, value):
+        self._settings.setValue(LIBRARY_FOLDER_KEY, str(value or ""))
+        self._settings.sync()
+        self.libraryChanged.emit()
+
+    libraryFolder = Property(str, _get_library_folder, _set_library_folder, notify=libraryChanged)
+
+    def _get_library_subfolders(self):
+        return str(self._settings.value(LIBRARY_SUBFOLDERS_KEY, "false")).lower() == "true"
+
+    def _set_library_subfolders(self, value):
+        self._settings.setValue(LIBRARY_SUBFOLDERS_KEY, "true" if value else "false")
+        self._settings.sync()
+        self.libraryChanged.emit()
+
+    librarySubfolders = Property(bool, _get_library_subfolders, _set_library_subfolders,
+                                 notify=libraryChanged)
+
+    def _get_library_tile_size(self):
+        try:
+            value = int(self._settings.value(LIBRARY_TILE_KEY, LIBRARY_TILE_DEFAULT))
+        except (TypeError, ValueError):
+            value = LIBRARY_TILE_DEFAULT
+        return min(LIBRARY_TILE_RANGE[1], max(LIBRARY_TILE_RANGE[0], value))
+
+    def _set_library_tile_size(self, value):
+        self._settings.setValue(LIBRARY_TILE_KEY, int(value))
+        self._settings.sync()
+        self.libraryChanged.emit()
+
+    libraryTileSize = Property(int, _get_library_tile_size, _set_library_tile_size,
+                               notify=libraryChanged)
 
     @Slot("QVariant", result=str)
     def localPath(self, url):

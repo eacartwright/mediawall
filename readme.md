@@ -58,13 +58,13 @@ venv/bin/python main.py                         # Windows: venv\Scripts\python.e
 
 The rest of this file is the design document: the principles, object model, and decisions behind the app, the current state (section 50), the backlog (section 51), and the decision log (section 55).
 
-**Last updated:** 2026-09-29 22:52 EDT  
+**Last updated:** 2026-11-04  
 **Project status:** In daily use; minor tweaks and polish (see section 51)  
 **Target platform:** Cross-platform desktop; Linux (Mint/Ubuntu) primary, Windows also used for development  
 **Primary implementation language:** Python  
 **UI framework:** PySide6 + QML  
 **Media playback:** QtMultimedia (FFmpeg backend)  
-**Project/layout persistence:** JSON, with SQLite reserved for a later media index/library  
+**Project/layout persistence:** JSON, with SQLite planned for the tag library (section 44)  
 **Rendering philosophy:** GPU-accelerated Qt/QML scene graph; avoid CPU-side pixel processing for normal canvas operations
 
 ---
@@ -278,6 +278,7 @@ Initial target formats:
 - MOV
 - WMV
 - 3GP
+- WebM
 
 Playback is delegated to QtMultimedia (Qt's own player, using its FFmpeg backend) rather than implemented in Python. See the decision log.
 
@@ -387,7 +388,7 @@ The default should be aspect-ratio preserving.
 
 ## 5.3 Animated images (GIF, WebP)
 
-- GIF and WebP files play when they have more than one frame. Each instance can be paused from its right-click menu (**Pause / Play Animation**).
+- GIF and WebP files play when they have more than one frame. **Click** a selected one to pause or play it (the click that selects it doesn't; section 25), or use its right-click menu (**Pause / Play Animation**).
 - **Double-click** an animated image to start it over from its first frame (and play it, if paused). This also works inside a container (where a double-click on a still picture resets the zoom instead) and in Present. It is window state only: nothing is saved and there is no undo step. It is also the fix for animations that freeze, which happens now and then on Linux Mint (cause unknown; pausing and playing again unsticks them too, `MediaView.restartAnimation`).
 - **Speed ▸** in the right-click menu (animated images and video): 0.25× to 4×, saved per instance like a video's speed (it is the same `speed` field; the Playback tab's slider is for video and audio).
 - Browsers and browsing containers can show **Animated and Videos** (right-click; `media_filter` "animated"): everything that moves, animated GIF/WebP and video (videos added 2026-11-01; it was animated images only). For images, a file's format isn't enough, since both formats can be still, so the file is read: a GIF is animated if it has a second frame, a WebP if its header has the animation flag (`core/media_browser.py`, `is_animated`; cached by path, size, and modification time). Files are read only when this filter is on.
@@ -520,7 +521,7 @@ This should be a property of the media/container relationship.
 - **Every container works like a picture viewer (qView)**, browsing or not, selected or not: **left-drag pans** the picture, the **mouse wheel zooms** it around the pointer, and **double-click resets** it to the Fit/Fill framing. The **border strip** (about 10 px inside the edge; a move cursor shows there; resize handles take priority when selected) moves the container on a left-drag and **scales it on the wheel**, around the pointer and content included, so the view inside doesn't change (whether or not "Scale Content with Container" is on; that setting only affects the resize handles). A **middle-button drag** moves it from anywhere. An **empty** container moves and scales from anywhere, which makes building layouts quick. In Present, every container's picture still pans and zooms; nothing moves or scales. Panning and zooming are undoable, except in browsing containers (workspace state, below).
 - **Rotating the picture inside**: drag the rotation knob with **Ctrl** held (otherwise the knob turns the container), or use Adjust mode.
 - **Flip Horizontally** (right-click; checkable) mirrors the picture of a free image or video, or a container's picture, without moving it (`mirrored` on the media instance; saved, undoable, copied by Duplicate). In a browsing container it turns off when the next file is shown, since a flip suits one picture, not the whole folder (changed 2026-10-29; it used to stay on). There's no vertical flip: that's a horizontal flip plus a 180° turn. It sits near the top of the menu, above Fit Content (moved 2026-11-01, to be nearer the pointer).
-- **Browsing containers** (right-click → **Browse This Folder**; section 13): the container steps through the images and videos in a folder, by default the folder of the file it shows (an empty container asks for a folder; **double-clicking an empty container** does the same). **Browse Folder…** picks any folder, for any container, even a filled or already browsing one: it moves to that folder's first file unless the file it shows is in that folder, keeping the same media instance (volume, loop, and so on). A browsing container's menu can also limit it to **images only**, **videos only**, or **animated only** (GIF/WebP that really move; `media_filter`, section 5.3; moving to the first matching file if the one shown is filtered out). Subfolders can be included (**Browse Subfolders Too**). **Sort by** (a submenu) sets the order it steps through: **Name** (natural order, the folder's own files first, then each subfolder; the default), **Date Modified**, **Type** (images, then animated images, then videos, by extension), or **Random** (a shuffle fixed per container, seeded by its id, so stepping back and forth stays consistent), then **Ascending** or **Descending** (not for Random). Re-sorting keeps the file shown. ("Date Modified" rather than created: Linux doesn't record when a file was created.) **Continue Play** (checkable; next to Play and Mute in the menu, and in the Playback tab): when a video ends, the container goes on to the folder's next video (skipping images, wrapping around) and plays it; when it's off, the video loops. It is a browsing container's only end-of-video setting: the menu and Playback tab show it instead of Loop, and the content's own Loop is ignored. An A-B loop overrides it (the A-B span keeps looping), and a locked container keeps playing on. On top of the usual container controls (pan, zoom, double-click reset; above), the **back/forward mouse buttons** (thumb buttons) go to the previous/next file (wrapping around; hold one to keep stepping, after a short pause), as do **tilting the wheel** left/right and, while it's selected, the **Left/Right arrow keys**. In Present all of this keeps working (a hand-driven slideshow). An empty browsing container starts on the folder's first file as soon as the folder is scanned (after choosing it, or when a project or layout is opened), instead of waiting at "0 / n". Each file replaces the content in place (same instance, volume, mute, loop, and speed; A-B points cleared) and **starts playing**, even if the previous one was paused, framed with the container's Fit/Fill mode. Nothing marks a container as browsing (the `⇅` badge was dropped 2026-11-01: browsing is the usual case, and stepping shows it); when selected with nothing to show, its top-left corner says "Browsing · no media found" (or "no favorites yet"). **Stop Browsing** keeps whatever is showing. **Favorites**: a browsing container keeps its own list of favorite files (`favorites`, paths as scanned; saved and undoable). The **☆ / ★** button in its top-left corner (shown while it's selected or under the pointer), or **Favorite** in the right-click menu, marks the file shown; **Show Favorites Only** (a filter, `media_filter` "favorites") steps through just those. **Show New Files First** (checkable; `new_first`): each step looks at the folder again (at most once a second), and files that weren't there before are shown first, newest first (e.g. a download arriving in ~/Downloads); after them, stepping goes on from the file shown before them, in the filter's order. Continue Play takes new videos first too. Empty files are skipped until they have content (Firefox writes a download beside an empty placeholder). Which files are "new" is remembered only for the session: what's in the folder when it's opened (or the folder, filter, or option changes) counts as seen. Browse settings (folder, subfolders, filter, sort, Continue Play, Show New Files First), and while browsing the content itself (which file, its pan and zoom, and the Fit/Fill mode), are workspace state: saved, but never changed by Undo (section 47).
+- **Browsing containers** (right-click → **Browse This Folder**; section 13): the container steps through the images and videos in a folder, by default the folder of the file it shows (an empty container asks for a folder; **double-clicking an empty container** does the same). **Browse Folder…** picks any folder, for any container, even a filled or already browsing one: it moves to that folder's first file unless the file it shows is in that folder, keeping the same media instance (volume, loop, and so on). A browsing container's menu can also limit it to **images only**, **videos only**, or **animated only** (GIF/WebP that really move; `media_filter`, section 5.3; moving to the first matching file if the one shown is filtered out). Subfolders can be included (**Browse Subfolders Too**). **Sort by** (a submenu) sets the order it steps through: **Name** (natural order, the folder's own files first, then each subfolder; the default), **Date Modified**, **Type** (images, then animated images, then videos, by extension), or **Random** (a shuffle fixed per container, seeded by its id, so stepping back and forth stays consistent), then **Ascending** or **Descending** (not for Random). Re-sorting keeps the file shown. ("Date Modified" rather than created: Linux doesn't record when a file was created.) **Continue Play** (checkable; next to Play and Mute in the menu, and in the Playback tab): when a video ends, the container goes on to the folder's next video (skipping images, wrapping around) and plays it; when it's off, the video loops. It is a browsing container's only end-of-video setting: the menu and Playback tab show it instead of Loop, and the content's own Loop is ignored. An A-B loop overrides it (the A-B span keeps looping), and a locked container keeps playing on. On top of the usual container controls (pan, zoom, double-click reset; above), the **back/forward mouse buttons** (thumb buttons) go to the previous/next file (wrapping around; hold one to keep stepping, after a short pause), as do **tilting the wheel** left/right (on a video or audio file a tilt skips 10% instead) and, while it's selected, the **Left/Right arrow keys**. In Present all of this keeps working (a hand-driven slideshow). An empty browsing container starts on the folder's first file as soon as the folder is scanned (after choosing it, or when a project or layout is opened), instead of waiting at "0 / n". Each file replaces the content in place (same instance, volume, mute, loop, and speed; A-B points cleared) and **starts playing**, even if the previous one was paused, framed with the container's Fit/Fill mode. Nothing marks a container as browsing (the `⇅` badge was dropped 2026-11-01: browsing is the usual case, and stepping shows it); when selected with nothing to show, its top-left corner says "Browsing · no media found" (or "no favorites yet"). **Stop Browsing** keeps whatever is showing. **Favorites**: a browsing container keeps its own list of favorite files (`favorites`, paths as scanned; saved and undoable). The **☆ / ★** button in its top-left corner (shown while it's selected or under the pointer), or **Favorite** in the right-click menu, marks the file shown; **Show Favorites Only** (a filter, `media_filter` "favorites") steps through just those. **Show New Files First** (checkable; `new_first`): each step looks at the folder again (at most once a second), and files that weren't there before are shown first, newest first (e.g. a download arriving in ~/Downloads); after them, stepping goes on from the file shown before them, in the filter's order. Continue Play takes new videos first too. Empty files are skipped until they have content (Firefox writes a download beside an empty placeholder). Which files are "new" is remembered only for the session: what's in the folder when it's opened (or the folder, filter, or option changes) counts as seen. Browse settings (folder, subfolders, filter, sort, Continue Play, Show New Files First), and while browsing the content itself (which file, its pan and zoom, and the Fit/Fill mode), are workspace state: saved, but never changed by Undo (section 47).
 - **Adjust mode** (right-click → Adjust Content, or Crop / Zoom Inside) is for framing with free rotation: the rotation knob turns the content, every drag pans (the border strip too), and the part of the content outside the frame shows as a faint ghost (a live texture of the content itself, so video and GIF ghosts stay in sync and nothing is loaded twice). It has an orange outline and no toolbar (Fit and Fill are in the right-click menu). Enter or Space finishes, as do clicking elsewhere and Escape.
 - **Lock Container** (right-click; checkable; `locked`, saved and undoable): a locked container can't be moved, resized, rotated, or wheel-scaled, its picture can't be panned, zoomed, reset, flipped, released, removed, or replaced, nothing can be dropped into it, and a browsing one doesn't step to other files until it's unlocked. Continue Play still goes on to the next video, since it's part of how the container was set up (its checkbox is greyed out while locked; `Scene.show_file_in_container(..., continuing=True)`). The menu items that would change it are greyed out; playback (play, mute, volume, speed), favorites, z-order, Duplicate, and Delete still work. When selected it shows a **Locked** badge (top-left, after the star) and no handles. `core` refuses the changes as well (`Scene._editable_container`), so no other path gets round it. (Not to be confused with `lock_content`, "Scale Content with Container".)
 - **Release Content** turns the content back into a free object at the position, size, and rotation it currently appears on the canvas. **Remove Content** deletes it. Deleting a container deletes its content.
@@ -795,6 +796,8 @@ Sort:
 ```
 
 A Browse Object can use a collection as its source.
+
+Tags are planned separately, in the Library (section 44). Its saved tag search on a browsing container covers part of what a collection would do.
 
 ---
 
@@ -1437,7 +1440,7 @@ Settings so far:
 
 - **Mouse-wheel zoom step**: percent per wheel notch, 1 to 50, default 10. Used by every wheel zoom: free images, containers and their pictures, and browser previews.
 - **Playback speed range**: the slowest and fastest speed offered by the Playback tab's speed slider, default **0.5× to 3×** (slowest 0.25–1×, fastest 1–4×, in 0.25× steps). Core's limits (`SPEED_MIN` / `SPEED_MAX`, 0.25× to 4×) remain the outer bounds any saved speed is kept within; a video already set outside the chosen range keeps its speed.
-- **Holding previous / next file**: holding Left/Right, a thumb button, a sideways wheel tilt, or a browser's ◀ ▶ steps once, waits (default **400 ms**, 100–2000), then steps every **150 ms** (30–1000) until let go. A held tilt arrives as whole notches at the mouse driver's pace; `FileStepper` paces those the same way, so it can't step faster than the driver sends (trackpad swipes, in small deltas, are left alone).
+- **Holding previous / next file** (a held tilt that's skipping through a video keeps this pace too): holding Left/Right, a thumb button, a sideways wheel tilt, or a browser's ◀ ▶ steps once, waits (default **400 ms**, 100–2000), then steps every **150 ms** (30–1000) until let go. A held tilt arrives as whole notches at the mouse driver's pace; `FileStepper` paces those the same way, so it can't step faster than the driver sends (trackpad swipes, in small deltas, are left alone).
 - **Container background**: the colour behind a container's picture (around a Fit picture, or in an empty container), default **#252525**, chosen with a colour dialog.
 - **Snapping**: *Snap to the wall's edges and other objects*, default **on** (see Snapping below).
 - **Hardware video decoding** (Performance tab; applies after a restart): Automatic (Qt's choice), Off (software only), or one backend (Linux: CUDA or VA-API; Windows: D3D11 or CUDA). `main.py` sets Qt's `QT_FFMPEG_DECODING_HW_DEVICE_TYPES` from it before anything plays (`apply_hw_decoding`; `,`, an empty list, turns hardware decoders off). If that variable is already set outside the app, it wins and the setting is greyed out. Each hardware-decoded video keeps a pool of frames in video memory (roughly 60–100 MB at 1080p); when the card runs out, FFmpeg logs `CUDA_ERROR_OUT_OF_MEMORY` / `hwaccel initialisation returned error` and decodes that video on the CPU instead.
@@ -1515,7 +1518,7 @@ The browser is kept compact, with the media as large as possible:
 │                                             │
 │        MEDIA PREVIEW (see-through)          │
 │                                             │
-│  [Pause] ───●────────── 0:12 / 1:40 [Mute]  │  ← videos/audio only
+│  ─────────●────────── 0:12 / 1:40 [Mute]    │  ← videos/audio only
 │  [◀] [▶] [Add to Canvas] [New Container] [Add to Container]  37 / 142 │  ← overlaid
 └─────────────────────────────────────────────┘
 ```
@@ -1524,7 +1527,7 @@ The browser is kept compact, with the media as large as possible:
 - **File…** (Add File, 2026-11-01) adds one or more files chosen in a file dialog (filtered to supported media, or to images, videos, or audio), without browsing their folder: pictures and videos go on the canvas beside the browser, as with Add to Canvas, and audio files become tracks in the Playback tab. Everything from one choice is one undo step. The dialog opens in the browser's folder, if it has one. (`browserBackend.chooseFiles`; the patterns come from `file_patterns` in `core/media_browser.py`, upper case too for Linux.)
 - The preview background is about 60% transparent (the same gray, `#66202020`), so the canvas shows through around the media.
 - Browsers always draw above other canvas objects (they are workspace tools). Among themselves they keep their normal stacking order, and z-order operations move them only among browsers (section 23).
-- Over the preview (viewer-style, like a browsing container): the **wheel zooms** around the pointer and left-drag then pans (not for audio files, which stay centered); the **back/forward mouse buttons** go to the previous/next file, as do ◀ ▶, **tilting the wheel** left/right, and the **Left/Right arrow keys** while the browser is selected. Holding a thumb button or ◀ ▶ keeps stepping after a short pause (`qml/FileStepper.qml`, shared with browsing containers). The zoom is temporary and resets when the file changes. Double-clicking adds the current file to the canvas.
+- Over the preview (viewer-style, like a browsing container): a **click** on a selected browser's video, audio, or animated image pauses or plays it (any click in Present, where nothing is selected); the **wheel zooms** around the pointer and left-drag then pans (not for audio files, which stay centered); the **back/forward mouse buttons** go to the previous/next file, as do ◀ ▶, **tilting the wheel** left/right (on a video or audio file a tilt skips 10% instead), and the **Left/Right arrow keys** while the browser is selected. Holding a thumb button or ◀ ▶ keeps stepping after a short pause (`qml/FileStepper.qml`, shared with browsing containers). The zoom is temporary and resets when the file changes. Double-clicking adds the current file to the canvas.
 - New media from **Add to Canvas** (or double-click) is placed **beside the browser**, level with its top: to the right of a browser in the left half of the canvas, to the left of one in the right half (switching sides when that side has too little room and the other has more), kept inside the visible canvas. Repeated adds step 24 px down and outward so they don't pile up exactly.
 - **New Container** (images and videos) does the same, but puts the file in a new container of its own, 300 px wide and shaped like the image (`Scene.add_container_with_media`; one undo step). A video's container starts at 16:9 until its real size is known, and the video is then framed to the container's Fit/Fill mode. **Add to Container** (shown while a container is selected) instead fills that existing empty container.
 - **Filter** (right-click the browser): Show All Media, or Images / Videos / Audio Only. The position label then names the type ("2 / 3 videos"). Saved with the project (`media_filter`), like the folder, and not undone.
@@ -1934,6 +1937,7 @@ mediawall/
 │   ├── history.py          undo/redo history (scene snapshots)
 │   ├── layout.py           layouts: containers only, saved for reuse
 │   ├── version.py          the app's version number
+│   ├── library.py          the tag database (section 44)
 │   └── media_browser.py    folder scanning, media type detection
 │
 ├── bridge/                 Qt glue between core and QML
@@ -1943,6 +1947,8 @@ mediawall/
 │   ├── app_settings.py     app-wide settings (QSettings), for Settings
 │   ├── memory_release.py   gives memory back after New / Open
 │   ├── scene_model.py      exposes Scene to QML as a list model
+│   ├── library_model.py    the Library window's files, selection, and tags
+│   ├── thumbnails.py       the Library's background thumbnails and their disk cache
 │   ├── text_shaper.py      text outlines: wrap, arc, tilt (section 5.4)
 │   └── project_controller.py  New/Open/Save dialogs, title, unsaved prompts
 │
@@ -1958,7 +1964,7 @@ mediawall/
 │   ├── AudioTrackObject.qml audio track (a player with no canvas item)
 │   ├── AppActions.qml      every command, defined once (text, shortcut, enabled)
 │   ├── MediaView.qml       displays one media source (image, GIF/WebP, video, audio)
-│   ├── VideoControls.qml   play/seek/mute bar for video and audio
+│   ├── VideoControls.qml   seek/mute bar for video and audio
 │   ├── MediaErrorBox.qml   "Missing file" / "Can't display file" box
 │   ├── RotationHandle.qml  shared rotation knob
 │   ├── ResizeHandles.qml   shared four-corner resize handles
@@ -1966,6 +1972,11 @@ mediawall/
 │   ├── SettingsDialog.qml  the Settings dialog
 │   ├── LogWindow.qml       the Log window
 │   ├── MemoryWindow.qml    the Media Memory window (estimated video memory per media)
+│   ├── LibraryWindow.qml   the Library: tag media (section 44); its search box and keys
+│   ├── LibraryFolders.qml  ...its folder tree
+│   ├── LibraryGrid.qml     ...its grid of files
+│   ├── LibraryStrip.qml    ...one large file above a row of the others
+│   ├── LibraryTags.qml     ...its tags: on the selection, and the tree
 │   ├── Sidebar.qml         Wall Features flyout (left edge): Layers, Playback, Speech, Text tabs
 │   └── Zoom.js             shared mouse-wheel zoom step
 │
@@ -1981,6 +1992,7 @@ mediawall/
 │
 ├── tools/
 │   ├── create_launchers.py shortcuts / menu entries for this machine
+│   ├── library_probe.py    measures the Library's unknowns (section 44.8; throwaway)
 │   └── run_debug.sh        Linux debug launcher (keeps the terminal open)
 │
 └── tests/
@@ -1993,6 +2005,7 @@ mediawall/
     ├── test_text.py
     ├── test_layout.py
     ├── test_video.py
+    ├── test_library.py
     └── app/                app checks: run.py, harness.py, check_*.py
 ```
 
@@ -2227,6 +2240,12 @@ These are deliberately later features.
 
 ---
 
+## Phase 13 — Library and tags — **Built** (all of section 44's build order; still to try on Mint, and a real drag by hand: 44.8)
+
+Tag media quickly in a separate Library window, then find it by tag and put it on the wall.
+
+---
+
 # 40. Important UX Goals
 
 The application should avoid forcing the user through rigid workflows.
@@ -2335,28 +2354,160 @@ Deleting a cache must never delete the user's original media.
 
 ---
 
-# 44. Future Media Library
+# 44. Media Library and Tags
 
-SQLite may eventually maintain an indexed library.
+**Status: built, not yet tried on Mint** (agreed 2026-11-04; Phase 13). Everything below is in the app, tested on Windows. Still to do are the checks in 44.8: the same on Mint, a real drag by hand on both, and opening the Library in an installed copy. The goal is to tag media manually as quickly as possible, one file or many, then use the tags to find media and put it on the wall.
 
-Potential indexed data:
+The rest of the app keeps working directly from filesystem paths and never needs the library. There is no import step (section 41): a file gets a database row only when it is first tagged, and "untagged" is simply a folder scan minus the database.
+
+## 44.1 The Library window
+
+One separate top-level window (like the Log and Media Memory windows, in the same process, so it can call `sceneModel` directly) handles both tagging and finding. It is about as large as the main window, and created only when opened (destroyed when closed, freeing its thumbnails; what it shows lives in `bridge/library_model.py`, so nothing is lost), so it costs nothing otherwise. Unlike those windows it can go behind the main window (`transientParent: null`), or it could never get out of the way of the wall on one monitor; so the main window closes it on quitting. Library on the toolbar, or Ctrl+L.
 
 ```text
-path
-media type
-width
-height
-duration
-creation date
-modification date
-thumbnail
-folder
-metadata
+┌──────────────────────────────────────────────────────────────────┐
+│ [Tag|Find]  [ race c__________ ]   Tagging 12 files   [Grid|Strip]│
+│             ▸ race car (214)                                     │
+├──────────┬────────────────────────────────────┬──────────────────┤
+│ Folders  │ ▓▓▓▓▓  ▓▓▓▓▓  ▓▓▓▓▓  ▓▓▓▓▓         │ On selection     │
+│ ▸ Cars   │ ▓▓▓▓▓  ▓▓▓▓▓  ▓▓▓▓▓  ▓▓▓▓▓         │  race car  12/12 │
+│ ▸ Japan  │ ▓▓▓▓▓  ▓▓▓▓▓  ▓▓▓▓▓  ▓▓▓▓▓         │  ferrari    3/12 │
+│          │                                    │ All tags         │
+│          │                                    │ ▾ Location       │
+│          │                                    │    Boston   (40) │
+│          │                                    │    London   (12) │
+│ □ Subfolders  □ Untagged only                 │ ▾ car      (214) │
+└──────────┴────────────────────────────────────┴──────────────────┘
 ```
 
-This is a future optimization and should not be required for the first prototype.
+- **Folders pane (left):** a folder tree (the arrow opens and closes a folder, a click on its name chooses it, and a double-click also opens or closes it), with a Subfolders option and an **Untagged only** filter, which shows what is left to do. A file tagged while that's on stays in view until the next scan, so a series of tags can go on it. Tiles with tags have a green dot.
+- **Tags pane (right):** the selection's tags with counts (`3/12` means 3 of the 12 selected files have it), then the whole tag tree (44.3). Clicking a tag applies or removes it.
+- **Grid view:** large thumbnails, row after row, scrolling like a file browser. The tile size is adjustable, by dragging its slider or with the wheel over it.
+- **Strip view:** one large file above a single carousel row. Grid and Strip share one file list and selection. Double-click opens Strip (or the Strip button), and Esc returns to Grid (Esc clears the box first, if there's text in it). While stepping, the thumbnail shows at once and the file itself opens an eighth of a second later, so holding an arrow key doesn't open every file on the way.
+- **Strip view by mouse:** the thumb buttons go to the previous or next file, anywhere in the view (with the same hold-to-step pace as browsers, `FileStepper`). Over the large file a **click** pauses or plays it, the **wheel zooms** around the pointer, a drag then pans, a double-click resets the zoom (each file starts unzoomed), and **tilting the wheel** skips 10% of a video or audio file, or goes to the previous or next file if it's anything else. Over the row, the wheel scrolls it, two files to a notch, and a tilt always changes file.
+- **Top bar:** the Library ▾ menu and Undo / Redo on the left; Tag / Find and the search box in the middle of the window, with what's selected beside them; Add to Wall and Grid / Strip on the right. The window's minimum size is 800 × 500, where the box narrows to fit.
+- **Selection:** click, Ctrl+click, and Shift+click, and Ctrl+A with the box empty. A folder's first file starts selected, so typing can begin at once. It lives in the model rather than in delegates, because the grid reuses delegates as it scrolls. It stays after tagging, for adding more tags to a series of files. The "Tagging 12 files" label always shows what Enter will affect.
 
-The application should work directly from filesystem paths before introducing a database.
+## 44.2 The search box
+
+The box is always visible and keeps focus through tagging, so the hands stay on the keyboard.
+
+| Key | Action |
+|---|---|
+| Typing | Results filter with each letter |
+| **Enter** | Apply the top result (Find: add it as a filter), clear the box, keep focus |
+| **Up / Down** | Choose a different result |
+| **Shift+Enter** | Create a new tag from exactly what was typed, and apply it |
+| **Enter, box empty** | Go to the next file |
+| **Left / Right, box empty** | Previous or next file (with text in the box, they move the cursor) |
+| **Backspace, box empty** | Remove the last tag applied |
+| **Ctrl+Space** | Play or pause the current file, with sound |
+| **Ctrl+Enter** | Add the selection to the wall |
+| **Tab** | Switch between Tag and Find |
+| **Ctrl+Z / Ctrl+Y** | Undo or redo tagging (44.6) |
+
+- **Creating needs its own key.** Otherwise typing "race" to create that tag, while "race car" exists, would apply "race car". If nothing matches, plain Enter offers to create the tag, shown as a `Create "…"` row. New tags start at the top level of the tree, to be sorted later, so creating one doesn't interrupt tagging.
+- **Ranking:** exact name, then start of the name, start of any word, and anywhere in the name; ties go to the most used.
+- **Results are synchronous and in memory.** All tags are held in memory and filtered on each key, so a fast Enter can never apply a stale result.
+- Each result shows where the tag sits, for example `Boston  Location ▸ Massachusetts`. Groups (44.3) are never results in Tag mode, because they can't be applied.
+- Tag and Find modes look clearly different, so a search can't be mistaken for tagging.
+
+## 44.3 Organizing tags: groups and parent tags
+
+Tags form one tree in the tags pane, with two kinds of parent:
+
+- **Group:** a heading for keeping the pane orderly, and nothing more. It can't be applied to a file. `Location` is a group holding `Boston` and `London`.
+- **Parent tag:** a real tag whose child tags imply it. With `car` as the parent of `ferrari`, a file tagged `ferrari` also counts as `car`, without `car` being stored on it.
+
+```text
+Location                 (group: never on a file)
+├── Massachusetts        (tag)
+│   └── Boston           (tag: a file tagged Boston also counts as Massachusetts, not as Location)
+└── London               (tag)
+car                      (tag)
+└── ferrari              (tag: a file tagged ferrari also counts as car)
+```
+
+The rules:
+
+- **Implied tags are worked out when read, never stored.** So moving a tag in the tree updates every file straight away, and undoing or removing a tag leaves nothing behind.
+- **Removing:** an implied tag is shown dimmed in the pane ("from ferrari") and goes away when `ferrari` is removed. A file tagged both `ferrari` and `car` directly keeps `car`.
+- **Finding:** searching `car` finds files tagged `car` or anything under it.
+- **Names are unique** across all tags and groups, ignoring case in any alphabet, since typing must be unambiguous. Runs of spaces collapse to one, and a name can't start with `-`, which means "exclude" in Find. A tag has one parent, so it has one place in the pane. Several parents can be added later if they are really needed; the database's version number allows the change.
+- **What can hold what:** a group can hold groups and tags; a tag holds only tags. Otherwise a tag's implied parents could pass through a group. The core refuses this, and refuses loops.
+- **Editing** happens in the tags pane: drag a tag onto another or onto a group to move it, and right-click to New Group, Rename, Merge Into, Make Group / Make Tag, or Delete. Deleting a group moves its contents up a level and never deletes tags. Deleting a tag used by files asks first, showing how many. A tag can become a group only when no files use it directly. Siblings sort by name.
+
+## 44.4 Thumbnails and playback
+
+| Where | Image | GIF / animated WebP / video | Audio |
+|---|---|---|---|
+| **Grid, at rest** | Still thumbnail | Still frame from about 10% in (to skip black intros), with a type and duration badge | Tile with an icon, name, and duration |
+| **Grid, hovered** | Same | Plays muted from the start, one at a time | No sound on hover (Ctrl+Space plays it) |
+| **Strip, current file** | Large image | Plays in full and loops, muted, with a sound toggle (the first Ctrl+Space brings up the sound, then it pauses and resumes; the choice carries from file to file); a click on it pauses and resumes | Plays with sound |
+
+Nothing plays across the whole grid. Section 51 records 8 copies of one GIF reaching 833 MB and busy walls running out of video memory, and a grid of large tiles would hit the same limits. At most one file decodes at a time: the grid has a single `MediaView`, moved over whichever tile is playing, so a second can't happen. It shows in the Media Memory window as "library". Hovering waits a quarter of a second, so the pointer crossing tiles starts nothing, and scrolling stops it. Ctrl+Space plays the current file with sound; while it does, hovering leaves the player alone, and moving to another file stops it.
+
+A GIF or WebP's length comes from the frame timings in the file (`animation_duration_ms`), a video or audio file's from a `QMediaPlayer` with no output, on a thread of its own, one file at a time. Each length is saved beside the thumbnail, as a small text file, so a file isn't opened again to show it.
+
+Thumbnails are made by background workers and kept in a disk cache, keyed by path, size, and modification time: `%LOCALAPPDATA%/Mediawall/thumbnails` on Windows, `~/.cache/Mediawall/thumbnails` on Linux (`$XDG_CACHE_HOME` if set). QML shows them with an asynchronous `Image` and a placeholder until each is ready. Large folders need a background scan and a real list model (`QAbstractListModel`, `GridView` with `reuseItems`), not the UI-thread scan and JS array the browser uses (section 50).
+
+## 44.5 Finding media and putting it on the wall
+
+In Find mode the same box builds a search: Enter adds the tag as a chip, chips combine as AND, and `-ferrari` excludes. Find searches the whole library, and clicking a folder limits it to that folder (with Subfolders, those too), shown as another chip. A group can be a filter: it finds anything under it. The tags pane shows which tags remain in the results, with counts, and clicking one narrows the search. Files that have gone missing show the "Missing file" box and can't be added.
+
+There are three ways from the Library to the wall:
+
+1. **Add to Wall** (button and Ctrl+Enter, for the selection): pictures and videos go on the canvas and audio to the Playback tab, through the existing `addMedia` and `addAudioTrack`, or from the ▾ beside it, each picture or video in a new container (`addMediaInNewContainer`). It's one undo step on the wall, and does nothing during Present. This comes first, because a window as large as the main one covers the wall when there is only one monitor.
+2. **Drag to the wall**, onto the canvas or a container, when the windows are side by side. It's a real file drag (`text/uri-list`), so the main window gets a `DropArea`. So drags from a file manager work too. One file dropped on an empty container goes in it; otherwise files go on the canvas from where they're dropped.
+3. **New Browsing Container from This Search**: a browsing container whose files come from the search rather than a folder, picking up newly tagged files at its next rescan. The search stays in the Library, with no search UI on containers. The container only stores the query, in a new saved field (`browse_query`, added to `TYPE_FIELDS`), holding tag names as `include` and `exclude` lists, and `rescanBrowse` is the one place its file list loads. Its favorites, sorting, and stepping keep working. A tag that no longer exists (renamed or deleted, or a project opened on another machine) matches nothing and the container says so, as with a missing folder; an excluded tag that no longer exists just excludes nothing. It looks again whenever tagging pauses in the Library. A folder limit in the Library isn't part of what's saved. It's in the Add to Wall ▾ menu, and shown in the container's right-click menu; Browse Folder… there turns it into an ordinary folder container, and Stop Browsing forgets the search. A layout doesn't keep it, as with a folder. Opening a project with one opens the database, without the window.
+
+## 44.6 The database
+
+One SQLite file per machine, shared by all projects, and never on a shared drive: `%LOCALAPPDATA%/Mediawall/library.sqlite` on Windows, `~/.local/share/Mediawall/library.sqlite` on Linux (`$XDG_DATA_HOME` if set). `MEDIAWALL_LIBRARY` overrides the path, so app checks never touch the real library (like `MEDIAWALL_SETTINGS`).
+
+```text
+tags       id, name, name_key (unique: the name ignoring case), parent_id, is_group, created_at, last_used
+files      id, path, path_key (unique), media_type, size, mtime, fingerprint
+file_tags  file_id, tag_id, added_at  (primary key: file_id + tag_id)
+```
+
+- **Tags belong to a file path** (decided 2026-11-04). Two identical copies of a file are tagged separately. `path_key` is the normalized path (`os.path.normcase`), so a case difference on Windows doesn't make a second file.
+- **Moved and renamed files:** `fingerprint` is the file size plus a hash of a few sampled chunks, computed when a file is first tagged. When a scan finds an unknown file the same size as a missing row, its fingerprint is checked, and exactly one match each way moves the tags to the new path (identical copies leave it alone, rather than guess), with a line in the Log. So a moved file gets its tags back when its new folder is opened in the Library. Tags of missing files stay until Clean Up (Library ▾) removes them. It can't be undone, and a drive that isn't connected looks just like missing files, so it counts them first, off the UI thread, and asks, saying how many and where.
+- **Undo** is the Library's own session list of tagging actions (a bulk action is one step). Wall undo stores scene snapshots (section 47), and tags aren't part of the scene, so tagging never adds to wall undo. Undoing a Shift+Enter also removes the tag it created, unless that tag has since gained files or child tags. Editing the tree isn't undoable (deleting asks first): any edit clears redo, and deleting, merging, or making a group forgets the undo steps of the tags involved, so a step can never act on a tag that has gone or put a group on a file.
+- **A file's row stays when its last tag is removed**, which keeps its fingerprint and lets undo put the tags back. "Untagged" and Find go by `file_tags`, so such a row counts as untagged. Clean Up (step 8) can remove these too.
+- **Export and import** (Library window menu): a JSON file, written atomically. **Export Everything** holds the tag tree and every tagged file's path, fingerprint, and tags, as a backup. **Export Tags Only** holds just the tree, to start another machine with the same tags. Import merges by tag name and never deletes: a tag that already exists keeps its place and kind. Bad entries become warnings, as when opening a project, and only an unreadable file fails. Imported file rows whose paths don't exist here are treated as missing, so the fingerprint check can reattach them.
+- Bulk changes run in one transaction. The schema version is kept in `PRAGMA user_version`. Python's `sqlite3` needs no new dependency, and Qt's `Sql` modules remain excluded from the installers.
+
+## 44.7 Layers
+
+- `core/library.py`: the database, tree rules, implied tags, ranking, queries, relinking, and export/import, all plain Python, unit-tested with a temporary or `:memory:` database (`tests/test_library.py`).
+- `bridge/library_model.py`: the file list, selection, and tag results for QML. `bridge/thumbnails.py`: the workers and cache.
+- `qml/LibraryWindow.qml` and its panes; commands go in `AppActions.qml` as usual. Check new QML imports (such as `TreeView`) against `UNUSED_QT`.
+
+## 44.8 Build order
+
+Each step ends with something testable, unit tests and `tests/app/check_library*.py` included.
+
+1. **Check the unknowns** below, on the dev VM (Windows and Mint). **Windows measured, except the drag; Mint to do.**
+2. **Database:** `core/library.py` and its unit tests, including groups, parent tags, and export/import. **Done** (2026-11-04). 
+3. **Library window:** folder tree, image grid with thumbnails, selection, search box, and tags pane with the tree. Tagging images works from here on. **Done** (2026-11-04), with export and import in the Library ▾ menu. `tests/app/check_library.py`.
+4. **GIFs, video, and audio:** their tiles, thumbnails, and hover playback. **Done** (2026-11-04), with Ctrl+Space. `tests/app/check_library_media.py`.
+5. **Strip view.** **Done** (2026-11-04). `tests/app/check_library_strip.py`.
+6. **Find mode, Add to Wall, and drag to the wall.** **Done** (2026-11-04), apart from trying a real drag by hand (above). `tests/app/check_library_find.py`.
+7. **Browsing containers from a search.** **Done** (2026-11-04). `tests/app/check_library_search.py`.
+8. **Relinking moved files** in the scan, and Clean Up. **Done** (2026-11-04). `tests/app/check_library_relink.py`.
+
+### To check first
+
+`tools/library_probe.py` (delete it when this list is finished) takes these measurements on either platform: `images`, `video`, and `drag`. Results so far, on the Windows dev VM (6 threads, no working hardware video decoding, files already in the disk cache), 2026-11-04:
+
+- **Video frames: `QMediaPlayer` with `QVideoSink` is good enough, so no PyAV.** 300 videos at 12.7 a second, none failed, none blank (median 33 ms WebM, 62 ms MOV, 105 ms for a 268 MB MP4), and each frame at most 200 ms from the 10% point. A phone clip's rotation comes out right. **Run it on its own thread:** on the UI thread it stalled the UI for up to 129 ms (36 gaps over 33 ms), against 68 ms (8 gaps) on its own thread, at the same speed. **To do:** the same on Mint, with its hardware decoder: the frame has to be read back from the graphics card there. If that's slow or fails, the thumbnail player may need to decode in software.
+- **Thumbnail workers: fine.** `QImageReader` with a scaled size on Qt's thread pool made 2000 thumbnails at 211 a second, including 24-megapixel JPEGs, and the UI thread's longest gap was 40 ms, so Python's global lock isn't a problem here. In the real window, on a folder of 3,000 of them: scanned and open in 0.5 s, and scrolling at about 2,500 px a second while thumbnails were being made never stalled the UI for more than 21 ms. **To do:** the same on Mint, and from a folder not already in the disk cache.
+- **GIF still frames:** `QImageReader` reached the frame at 10% of a 13 MB, 111-frame GIF in 63 ms, so these can use the same workers.
+- **Dragging between windows: to do by hand, on both platforms.** Drag a tile (or several selected) from the Library to the wall, and a file from the file manager. The app checks cover what a drag carries and the wall's side, with synthetic drop events, but a real drag can't be automated: it waits for a real mouse. `library_probe.py drag` tries just the drag, in two test windows.
+- **`sqlite3` in the installers:** a Windows PyInstaller build has `sqlite3.dll`, `_sqlite3.pyd`, and the Library's QML files, at 144 MB, so `UNUSED_QT` isn't dropping them. **To do:** the Linux build, and open the Library in an installed app on each, to see it create its database.
+
+`core/library.py`, measured on a generous library (5,000 tags, 100,000 files, about 400,000 tag links): a search on a key press 2 to 19 ms, Find about 150 to 330 ms, applying a tag to 2,000 known files 29 ms, the tags of a 2,000-file selection 63 ms. Two costs to design around in step 3: **every tag's count takes about 770 ms** at this size, so the pane should update counts as tags change rather than ask again each time; and **first-time tagging reads each file for its fingerprint**, about 1.2 s per 3,000 files already in the disk cache and more from a slow drive, so large first-time selections may need to run in the background. Step 3 does the first by recounting only once tagging pauses for 300 ms (at a more usual 40,000 tag links, about 80 ms). The second is still on the UI thread: watch for it.
 
 ---
 
@@ -2469,6 +2620,11 @@ Ctrl+Shift+Up     bring to front
 Ctrl+Up           bring forward
 Ctrl+Down         send backward
 Ctrl+Shift+Down   send to back
+Wheel tilt        skip back/forward 10% of a video or audio file (free,
+                  in a container, in a browser preview, or the Library's
+                  large file; a held tilt keeps skipping at the Settings
+                  pace); on anything else in a browser, browsing container,
+                  or Strip, the previous/next file
 Mouse wheel       zoom around the pointer: a browser preview, or the
                   picture in any container (also in Present); scale a
                   container (on its border strip, or anywhere on an
@@ -2480,7 +2636,12 @@ Up / Down         turn the picture a quarter turn right / left, as in
                   the picture turns and the container stays; not while
                   typing in a field; also in the right-click menu)
 Back / Forward    previous/next file (thumb buttons; over a browser
-  mouse buttons   preview or a browsing container, also in Present)
+  mouse buttons   preview or a browsing container, also in Present;
+                  in the Library's Strip view)
+Click             pause or play a selected video, audio file, or animated
+                  image: free, in a container (not on its border strip, or
+                  while adjusting), or in a browser preview (also in
+                  Present); the large file in the Library's Strip view
 Left-drag         pan (a zoomed browser preview; a container's picture,
                   except on its border strip, which moves it)
 Middle-drag       move a container from anywhere on it
@@ -2503,7 +2664,7 @@ Exact bindings can still change.
 
 The prototype currently provides:
 
-- a canvas with a toolbar (New, Open with Open Recent ▾, Save, Save As, Undo, Redo, Add Browser, Add Container, Add Text, Full Screen, Present, Settings; the Log window opens from Settings → About)
+- a canvas with a toolbar (Settings; New, Open with Open Recent ▾, Save with Save As ▾, Layout ▾; Undo, Redo; Add Browser, Add Container, Add Text, Library; and at the far right Full Screen, Present; its buttons are as wide as their labels, and the window can't be narrower than the toolbar or shorter than 500; the Log window opens from Settings → About)
 - Full Screen (editing) and Present (view-only canvas, browsers still usable) modes (section 15); Full Screen has ✕, ▶ (Present), and Save buttons in the corner, Present has ✕ and Save; Full Screen can keep the taskbar showing (a setting)
 - a right-click menu on empty canvas (Add Browser Here, Add Container Here)
 - project save/load to `.mediawall` files, with unsaved-changes prompts and the project name in the window title; a modal "Opening…" popup while a project opens
@@ -2520,10 +2681,12 @@ The prototype currently provides:
 - EXIF orientation applied to photos, on the canvas and in browser previews
 - animated GIF and WebP playback, on the canvas and in browser previews; each instance can be paused or played and its speed set from its right-click menu, and double-clicking one starts it over (section 5.3)
 - text objects ("WordArt"): listed in the Text tab, each with a Lock that lets the mouse through to what's behind; a line of text, or words wrapped to the box, with presets, font, size, gradient fill, outline, 3D depth, glow, arc, and perspective tilt, colour emoji, and looping animations, any together (Wiggle, Pulse, Ripple, Fade, Glow pulse, Gradient shift, Color cycle; speed and intensity); typed on the canvas (double-click) and styled in the Text tab (section 5.4)
-- video on the canvas, in containers, and in browser previews, with per-instance play/pause, mute, and loop (right-click menu), and an on-object seek bar when selected
+- video on the canvas, in containers, and in browser previews, with per-instance play/pause (click it once selected, or the right-click menu), mute and loop (right-click menu), an on-object seek bar when selected, and skipping 10% by tilting the wheel over it
 - per-video speed (0.5x to 3x by default; the range is a setting), Keep pitch, and A-B loop; a Playback tab in the Wall Features panel with every video's sound and playback settings, and a master volume for the window (not saved; section 14.5)
 - a Settings dialog (toolbar): the mouse-wheel zoom step, the speed range, the hold-to-step pace, the container background colour, and snapping; a Performance tab (hardware video decoding, largest still image size, the Media Memory window); a Speech tab (Piper and its voices); a Shortcuts tab listing every key; an About tab with the version (section 25)
 - audio tracks added from a browser (double-click or Add to Audio), controlled in the Playback tab; a track can step through its folder (◀ ▶), play through it (Continue Play), and pause before it loops or goes on (section 14.5)
+- the Library (section 44, in progress): a separate window for tagging media quickly from the keyboard, with a folder tree, a grid of thumbnails (a video or GIF plays muted while hovered, and Ctrl+Space plays a file with sound), a Strip view (one large file above a row of the others, also driven by mouse: thumb buttons to step, click to pause, wheel to zoom, tilt to skip through a video or audio file), tag groups and parent tags, tagging undo, export/import, Find mode (search by tags, excluding some), Add to Wall, and browsing containers that step through a saved tag search
+- files dragged onto the wall, from the Library or a file manager (section 44.5)
 - single files added from a browser's **File…** button (pictures and videos to the canvas, audio to the Playback tab), without browsing a folder (section 26)
 - video as audio: Convert to Audio Track (right-click a video), or Add to Audio for a video in a browser (section 14.2)
 - browsing containers: viewer-style (qView) controls: pan, wheel zoom, back/forward buttons, double-click reset; moved by the border strip or middle-drag; also in Present (section 6.4); containers remember Fit/Fill
@@ -2544,7 +2707,7 @@ The prototype currently provides:
 - Speech: text to speech with Piper (installed by the user, set up in Settings), added as speech tracks that keep only their words and settings (clips are made when needed and deleted when the app closes), so they can be edited; the tab's contents are saved with the project (section 14.6)
 - new container content framed with Fit (the whole picture) by default
 - unit tests for `core/`, and app checks that drive the real app (section 37)
-- installers: a Windows `Setup.exe` and a Linux `.deb`, built by `packaging/build.py` (section 37); 0.9.14 is the current version (build the Linux `.deb` on Linux; the Windows installer is built on Windows)
+- installers: a Windows `Setup.exe` and a Linux `.deb`, built by `packaging/build.py` (section 37); 0.9.14 is the latest release, and 0.10.1, with the Library, is being tried on branch `library` (build the Linux `.deb` on Linux; the Windows installer is built on Windows)
 
 ### How interactions reach the model
 
@@ -2562,6 +2725,7 @@ During a drag, resize, or rotate, QML moves the item directly so interaction sta
 - **Media Memory figures are estimates** from decoded sizes: Qt doesn't report GPU memory per image or player, or whether a given player actually got a hardware decoder. Driver overhead (e.g. a CUDA context per decoder) isn't counted.
 - **Some video memory stays after New** (Linux Mint, NVIDIA, 2026-10-30): about 850 MB after clearing a wall with two videos, against 9 MB at a fresh start. Probably CUDA decoder contexts or driver state that live until the app exits; not confirmed yet (see section 51).
 - **Off-screen and hidden videos keep decoding** (and keep their decoders' memory).
+- **The Library's thumbnail cache only grows** so far: no size limit or clean-up yet (it can always be deleted; it never touches the originals). The first tag on a large selection of new files runs on the UI thread (section 44.8).
 - **Harmless FFmpeg messages in the Log.** `[aac @ …] Could not update timestamps for skipped samples` repeats for some video/audio files (e.g. `test_mov.mov` in tests/media): FFmpeg trimming the encoder's start-up delay samples. Playback is unaffected. The `Input #0, …` summaries printed whenever a file is opened are normal too. (FFmpeg's log level could be lowered if the noise ever matters.)
 
 ---
@@ -2573,6 +2737,14 @@ Reviewed 2026-09-26. Keep this list current; it replaces the phase notes as the 
 ### Inbox
 
 New errors (with the Log window's output), requested changes, and feature ideas go here first, then get sorted into the lists below (or done). This replaces the old `docs/changes.txt` working list, whose items were all fixed or built by 2026-09-26 (see git history).
+
+From trying the Library, branch `library` (2026-11-05):
+
+- **To look into: `check_library` is flaky on the Windows VM** (seen 2026-11-05): some runs lose or misplace keystrokes (a tag came out as `azebrab`), and later checks then fail in a chain. It happens on the commit before this work too (a489a62: 3 runs of 5), so it isn't from the changes below. The Library may be losing the active window now and then; the check prints a NOTE when it isn't active.
+
+- **Done 2026-11-05** (`check_click_play` added, `check_library_strip` and `check_library_media` extended; all pass on Windows, not yet tried on Mint or with a real M510, since the checks send synthetic thumb-button and tilt events): **Grid playback fixed**: the hover player was drawn under the tiles (same z, earlier in the list), and in the wrong place once a new tile size or pane width had moved the grid's origin, so it showed only as a sliver in the gaps a tile or so away. **Strip by mouse** (section 44.1): thumb buttons step, the wheel zooms the large file and scrolls the row. **Click to pause** on the wall and in Strip, and the Pause button is gone. **Tile size** follows the wheel. **Minimum window sizes**: the Library 800 × 500, the wall as wide as its toolbar (about 970) × 500. **Library's top bar rearranged**: the search in the middle, Library ▾ and Undo / Redo at the left.
+- **Done 2026-11-05** (`check_library_folders` added): **the Library's folder tree works by mouse.** Its arrows, double-clicks, and clicks on a name did nothing in the check that reproduced it: the tree's own pointer navigation is off so the search box keeps the focus, which also turns off the arrows, and the row's `TapHandler` wasn't getting the clicks. A `MouseArea` on each row now does all three. The tree no longer scrolls sideways by itself when a deep folder is chosen, which hid the rows above and their arrows; a wheel tilt or the scroll bar goes across, and it stays where it's put. The Tags pane also starts narrower (200, was 300; it can go down to 140).
+- **Done 2026-11-05** (second batch; `check_tilt_skip` added, `check_browsing` tilts on a folder of pictures now; all pass on Windows, same caveat about a real M510): the **wall's toolbar** is now Settings | New, Open ▾, Save ▾ (Save As is on it), Layout ▾ | Undo, Redo | Add Browser, Add Container, Add Text, Library, then Full Screen and Present at the far right. **Tilting the wheel skips 10%** of a video or audio file: free, in a container, in a browser's preview, or the Library's large file (also over its seek bar). GIFs and animated WebPs don't skip.
 
 From testing 0.9.13 (2026-11-01). Branch `inbox-2026-11` (the seven batches below) passed the app checks on Windows and on the Mint dev VM (342/344 there: `check_text` and `check_text_animation`, the slow-VM timing noted below) and was merged into `main` and released as 0.9.14 (2026-11-01; Windows `Setup.exe` and Linux `.deb` both on the release), and the branch was deleted:
 
@@ -2629,7 +2801,9 @@ Watching (2026-10-17):
 
 ### Next
 
-Nothing queued. Also done 2026-10-17: Speech, text to speech with Piper (section 14.6), and Continue Play replaces Loop in browsing containers (off = loop; next to Play and Mute), an A-B loop overrides it, and a locked container keeps playing on (section 6.4). The 2026-10-17 batch is done: a Size control for text (wrapped or not); colour emoji in text; the glow now follows arc and tilt changes; a fix for presets applying only partly (to confirm on Linux, above); a master volume for the window; Lock Container; a container background colour setting; favorites per browsing container with a Show Favorites Only filter; Show New Files First; and Fit as the default framing (sections 5.4, 6.4, 14.5, 25).
+- **Library and tags** (Phase 13, on branch `library`): the design and build order are in section 44. It all works on Windows. Still to try: "To check first" (44.8: Mint, a real drag on both, and an installed copy). The build order is finished (steps 2 to 8). The thumbnail cache has no size limit or clean-up yet.
+
+Also done 2026-10-17: Speech, text to speech with Piper (section 14.6), and Continue Play replaces Loop in browsing containers (off = loop; next to Play and Mute), an A-B loop overrides it, and a locked container keeps playing on (section 6.4). The 2026-10-17 batch is done: a Size control for text (wrapped or not); colour emoji in text; the glow now follows arc and tilt changes; a fix for presets applying only partly (to confirm on Linux, above); a master volume for the window; Lock Container; a container background colour setting; favorites per browsing container with a Show Favorites Only filter; Show New Files First; and Fit as the default framing (sections 5.4, 6.4, 14.5, 25).
 
 The 2026-10-16 batch is done: an Add Text button on the toolbar; Wrap to box, arc, perspective tilt, and glow for text; typing on the canvas; a faster font list (type to find, three rows a wheel notch); Sort by for browsers and browsing containers; and Continue Play (sections 5.4, 6.4, 26). Arrow-key nudging was dropped.
 
@@ -2659,7 +2833,7 @@ Done since the review: browsing containers (section 6.4), layouts (section 17), 
 - Layers: visibility and locking.
 - Rotation snapping (e.g. 15° steps).
 - Resize modifiers (e.g. Alt to resize around the center).
-- Background folder scanning (scanning is fast enough so far; revisit if large folders or network drives freeze the app).
+- Background folder scanning for browsers and browsing containers (scanning is fast enough so far; revisit if large folders or network drives freeze the app). The Library needs it from the start (section 44.4), and they can share it then.
 - Duplicate videos playing in sync / sharing one decoder (each instance decodes separately today).
 - Pausing and releasing the decoders of off-screen or hidden videos, if the Media Memory window shows videos are what fills video memory (2026-10-29).
 - Frosted-glass (acrylic) browser background: blur the canvas behind a browser with `MultiEffect`, as an option in Settings, falling back to the plain translucent grey.
@@ -2816,7 +2990,7 @@ The following design decisions are currently established:
 - Layers/z-order are fundamental.
 - Missing media should produce a recoverable error state rather than breaking the project.
 - Animation is a future capability and the data model should leave room for it.
-- SQLite is a future optimization/library index, not a first requirement.
+- SQLite holds the tag library (section 44, planned), and nothing else needs it: projects and layouts stay JSON.
 - C++ is not required for the initial implementation.
 - GPU/QML/QtMultimedia should handle performance-sensitive work.
 - Development should proceed incrementally, testing a working application at every major stage.
@@ -2932,6 +3106,17 @@ The following design decisions are currently established:
 - **Container badges are in the top-left corner** (2026-11-01): the favorite star, the Locked badge, and the empty-folder note, since Full Screen and Present put their ✕ / ▶ / Save buttons in the window's top-right, where they covered a container there. The `⇅` browsing badge was dropped. **Animated Only became Animated and Videos** (everything that moves); the saved `media_filter` value stays "animated", so older projects keep working. The wheel over the Text tab's words field moves the cursor (3 letters a notch) rather than scrolling the text without it, so the spot reached is where typing goes.
 
 - **Renamed MediaWall to Mediawall** (2026-10-29, 0.9.12): everywhere the name appears, and in the internal names too. On Linux the settings move from `~/.config/MediaWall/MediaWall.conf` to `~/.config/Mediawall/Mediawall.conf`: when the new one is empty the old settings are copied over (`_open_settings`; the old file is left in place), and the installed app renames `~/.local/state/MediaWall` (the logs). Windows ignores case in the registry and in paths, so nothing moves there; the installer's `AppId` is unchanged, so 0.9.12 upgrades an older install. The file formats (`mediawall-project`, `.mediawall`) were already lower case.
+
+- **The Library is one separate window for tagging and finding** (2026-11-04; planned, section 44), rather than a mode of the main window, so the wall isn't disturbed. Tag and Find share one search box, so finding uses the same typing habit. Search lives in the Library rather than on containers, which only store a query. Add to Wall comes before dragging, because a window this large covers the wall on one monitor.
+- **The tag database is per machine, with export** (2026-11-04): media isn't shared between the Windows and Mint machines, so no path mapping is needed. Tags belong to a file path, so identical copies are tagged separately; a sampled fingerprint only serves to reattach tags after a move. Audio files are tagged too.
+- **Tags form one tree with groups and parent tags** (2026-11-04): a group (`Location`) only organizes the pane and can't be applied; a parent tag (`car` over `ferrari`) is implied by its children. Implied tags are worked out when read, not stored, so moving a tag takes effect everywhere and undo leaves nothing behind. One parent per tag for now.
+- **Nothing autoplays in the Library's grid** (2026-11-04): stills at rest, one muted file playing on hover, for the memory reasons in section 51.
+- **The Library can go behind the wall** (2026-11-04, building it): unlike the Log and Media Memory windows, it isn't kept in front of the main window. The main window hides and destroys it on closing, before Qt decides whether any window is left, or the app would keep running with nothing on screen.
+- **`.webm` is a supported video type** (2026-11-04): it was missing from the list, so the Library and browsers didn't show WebM files, although the player can play them.
+- **Tree edits aren't undone; tagging is** (2026-11-04, building `core/library.py`): the Library's undo covers tagging only, as planned. A tree edit clears redo and forgets the steps of a tag it removes, rather than growing undo into a second system of snapshots. A tag's name can't start with `-`, which Find uses to exclude; case is ignored through a stored `name_key`, because SQLite's `NOCASE` covers only ASCII.
+
+- **A click pauses only what's already selected** (2026-11-05): on the wall the first click has always selected, so pausing there as well would stop a video whenever it's chosen to be moved or resized. In Strip there's no selecting to do, so any click pauses, and in Present a browser's preview does too, since nothing is selected there (the rest of the canvas stays view-only). A double-click (add to canvas, reset the zoom, restart an animation) takes back what its first click did, rather than delaying every click until it's clear no second is coming, so pausing stays immediate. Click toggles carry a merge key, so a run of them is one undo step.
+- **A tilt over a video or audio file skips 10%, everywhere** (2026-11-05, the user's idea), rather than changing file, even in a browser or browsing container, where it used to step: one rule for what a tilt does to a video. It means a tilt or a held tilt stops at the first video in a folder, and thumb buttons and arrow keys are how to step past one; anything else (a picture, GIF, or animated WebP) still steps, and the row in the Library's Strip view always does. 10% of the length rather than a fixed number of seconds, since clips here run from seconds to hours. `MediaView.skipWheel`, with a `FileStepper` of its own for the pace of a held tilt. A free object skips without being selected, but not in Present, where it stays view-only.
 
 ### Open decisions
 

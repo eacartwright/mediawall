@@ -16,6 +16,7 @@ from PySide6.QtWidgets import QApplication, QFileDialog
 
 from bridge.app_settings import AppSettings, apply_hw_decoding
 from bridge.key_release import KeyReleaseWatcher
+from bridge.library_model import TagLibrary
 from bridge.log_capture import LogCapture
 from bridge.media_memory import MediaMemory
 from bridge.memory_release import MemoryRelease
@@ -88,6 +89,12 @@ class BrowserBackend(QObject):
         paths, _ = QFileDialog.getOpenFileNames(None, "Add Files", start_folder or "", filters)
         return [{"path": p, "type": media_type_for(p)} for p in paths if media_type_for(p)]
 
+    # Files dropped on the wall: those of them that Mediawall can show.
+    @Slot(list, result=list)
+    def droppedFiles(self, urls):
+        paths = [QUrl(str(u)).toLocalFile() for u in urls]
+        return [{"path": p, "type": media_type_for(p)} for p in paths if p and media_type_for(p)]
+
     @Slot(str, result=bool)
     def folderExists(self, folder):
         return bool(folder) and Path(folder).is_dir()
@@ -154,6 +161,8 @@ def main():
     text_shaper = TextShaper()
     speech_engine = SpeechEngine(app_settings)
     app.aboutToQuit.connect(speech_engine.shutdown)
+    tag_library = TagLibrary(app_settings)
+    app.aboutToQuit.connect(tag_library.shutdown)
 
     engine = QQmlApplicationEngine()
     context = engine.rootContext()
@@ -165,6 +174,7 @@ def main():
     context.setContextProperty("mediaMemory", media_memory)
     context.setContextProperty("textShaper", text_shaper)
     context.setContextProperty("speechEngine", speech_engine)
+    context.setContextProperty("tagLibrary", tag_library)
     context.setContextProperty("keyRelease", key_release)
     context.setContextProperty("appVersion", VERSION)
     context.setContextProperty("appIconUrl", QUrl.fromLocalFile(str(ICON_PATH)))

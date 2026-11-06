@@ -5,7 +5,7 @@ from pathlib import Path
 
 
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".webp"}
-VIDEO_EXTENSIONS = {".mp4", ".avi", ".mkv", ".mov", ".wmv", ".3gp"}
+VIDEO_EXTENSIONS = {".mp4", ".avi", ".mkv", ".mov", ".wmv", ".3gp", ".webm"}
 AUDIO_EXTENSIONS = {".mp3", ".m4a", ".wav"}
 
 # Image formats that may contain animation. Displayed with an animated
@@ -142,6 +142,97 @@ def is_animated(path):
         result = False
     _animated_cache[key] = result
     return result
+
+
+# ---- How long is it? (shown on the Library's tiles) ----
+# Read from the file's own frame timings, so nothing needs decoding.
+
+def _gif_duration_ms(f):
+    header = f.read(13)
+    if len(header) < 13 or header[:3] != b"GIF":
+        return 0
+    if header[10] & 0x80:                # global color table
+        f.seek(3 * (2 << (header[10] & 7)), 1)
+
+    def skip_sub_blocks():
+        while True:
+            size = f.read(1)
+            if not size or size[0] == 0:
+                return
+            f.seek(size[0], 1)
+
+    total = 0
+    while True:
+        block = f.read(1)
+        if not block or block[0] == 0x3B:
+            return total
+        if block[0] == 0x2C:             # a frame
+            desc = f.read(9)
+            if len(desc) < 9:
+                return total
+            if desc[8] & 0x80:           # local color table
+                f.seek(3 * (2 << (desc[8] & 7)), 1)
+            f.read(1)                    # LZW minimum code size
+            skip_sub_blocks()
+        elif block[0] == 0x21:           # extension: label, then sub-blocks
+            label = f.read(1)
+            if label == b"\xF9":         # graphic control: a frame's delay
+                data = f.read(5)
+                if len(data) == 5:
+                    delay = int.from_bytes(data[2:4], "little") * 10
+                    # Too short to be meant: players show these at 100 ms.
+                    total += delay if delay >= 20 else 100
+            skip_sub_blocks()
+        else:
+            return total
+
+
+def _webp_duration_ms(f):
+    if f.read(4) != b"RIFF":
+        return 0
+    f.read(4)
+    if f.read(4) != b"WEBP":
+        return 0
+    total = 0
+    while True:
+        chunk = f.read(8)
+        if len(chunk) < 8:
+            return total
+        size = int.from_bytes(chunk[4:], "little")
+        if chunk[:4] == b"ANMF":         # a frame: position, size, then duration
+            data = f.read(15)
+            if len(data) < 15:
+                return total
+            total += int.from_bytes(data[12:15], "little")
+            f.seek(size - 15, 1)
+        else:
+            f.seek(size, 1)
+        if size % 2:                     # chunks are padded to even sizes
+            f.seek(1, 1)
+
+
+def animation_duration_ms(path):
+    """One loop of an animated GIF or WebP, in ms: 0 if it isn't one or can't be read."""
+    suffix = Path(path).suffix.lower()
+    if suffix not in ANIMATABLE_EXTENSIONS:
+        return 0
+    try:
+        with open(path, "rb") as f:
+            return _gif_duration_ms(f) if suffix == ".gif" else _webp_duration_ms(f)
+    except OSError:
+        return 0
+
+
+def format_duration(ms):
+    """"0:04", "1:30", "1:02:03". A blank for no length; anything shorter than a second is 0:01."""
+    if ms <= 0:
+        return ""
+    seconds = max(1, (int(ms) + 500) // 1000)
+    hours, seconds = divmod(seconds, 3600)
+    minutes, seconds = divmod(seconds, 60)
+    if hours:
+        return f"{hours}:{minutes:02}:{seconds:02}"
+    return f"{minutes}:{seconds:02}"
 
 
 def matches_filter(entry, media_filter, favorites=()):
