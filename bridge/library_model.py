@@ -12,7 +12,7 @@ import sqlite3
 import threading
 
 from PySide6.QtCore import (
-    Property, QAbstractListModel, QDir, QModelIndex, QObject, Qt, QTimer, Signal, Slot,
+    Property, QAbstractListModel, QDir, QFile, QModelIndex, QObject, Qt, QTimer, Signal, Slot,
 )
 from PySide6.QtWidgets import QFileDialog, QFileSystemModel
 
@@ -33,6 +33,14 @@ COUNTS_DELAY_MS = 300
 
 # How long a refusal or result stays in the status bar.
 MESSAGE_MS = 8000
+
+
+TRASH_NAME = "Recycle Bin" if os.name == "nt" else "Trash"
+
+
+def move_to_trash(path):
+    """False if the file stays where it is."""
+    return QFile.moveToTrash(path)
 
 
 class FilesModel(QAbstractListModel):
@@ -156,6 +164,41 @@ class FilesModel(QAbstractListModel):
                                {self._rows[p] for p in was_selected if p in self._rows},
                                self._rows.get(was_current, -1))
         self.endResetModel()
+        self.selectionChanged.emit()
+
+    def remove_paths(self, paths):
+        """
+        These files have gone. Row by row, so the view stays where it's
+        scrolled to. What's left of the selection stays selected; if nothing
+        is, the next file (or the last, if the end went) is.
+        """
+        gone = sorted(self._rows[p] for p in set(paths) if p in self._rows)
+        if not gone:
+            return
+        selected = {self._entries[r]["path"] for r in self.selection.selected - set(gone)}
+        tagged = {self._entries[r]["path"] for r in self._tagged}
+        current = self._entries[self.selection.current]["path"] if self.selection.current >= 0 else None
+
+        spans = []                       # (first, last) of each run of rows
+        for row in gone:
+            if spans and spans[-1][1] == row - 1:
+                spans[-1][1] = row
+            else:
+                spans.append([row, row])
+        for first, last in reversed(spans):
+            self.beginRemoveRows(QModelIndex(), first, last)
+            del self._entries[first:last + 1]
+            self.endRemoveRows()
+
+        self._rows = {e["path"]: row for row, e in enumerate(self._entries)}
+        self._tagged = {self._rows[p] for p in tagged if p in self._rows}
+        rows = {self._rows[p] for p in selected}
+        fallback = min(gone[0], len(self._entries) - 1)
+        if not rows and fallback >= 0:
+            rows = {fallback}
+        self.selection.restore(len(self._entries), rows, self._rows.get(current, fallback))
+        self._emit_rows(self.selection.selected | {self.selection.current} - {-1},
+                        [self.SelectedRole, self.CurrentRole])
         self.selectionChanged.emit()
 
     def paths(self):
@@ -340,6 +383,7 @@ class TagLibrary(QObject):
 
     _scanned = Signal(int, object)
     _missing_counted = Signal(object)
+    _trashed = Signal(object, object)
 
     def __init__(self, app_settings, parent=None):
         super().__init__(parent)
@@ -373,6 +417,8 @@ class TagLibrary(QObject):
         self._scanned.connect(self._scan_finished)
         self._missing_counted.connect(self._clean_up_counted)
         self._clean_up_ids = []
+        self._trashed.connect(self._trash_finished)
+        self._trashing = False
 
     # -------------------------------------------------
     # Opening and closing
@@ -698,6 +744,53 @@ class TagLibrary(QObject):
         if row not in self._files.selection.selected:
             self.clickFile(row, False, False)
         return "\r\n".join(e["url"] for e in self._files.selected_entries() if e["url"])
+
+    # -------------------------------------------------
+    # Deleting files (section 44.1)
+    # -------------------------------------------------
+
+    trashName = Property(str, lambda self: TRASH_NAME, constant=True)
+
+    @Slot()
+    def trashSelected(self):
+        """
+        Move the selected files that are still there to the Trash, off the
+        UI thread: a large selection or a slow drive can take a while.
+        QML has asked first, and let go of any file it was playing.
+        """
+        if self._files is None or self._trashing:
+            return
+        paths = [e["path"] for e in self._files.selected_entries() if not e.get("missing", False)]
+        if not paths:
+            return
+        self._trashing = True
+        self._say(f"Moving to the {TRASH_NAME}…")
+
+        def work():
+            gone, failed = [], []
+            for path in paths:
+                (gone if move_to_trash(path) else failed).append(path)
+            self._trashed.emit(gone, failed)
+
+        threading.Thread(target=work, daemon=True).start()
+
+    def _trash_finished(self, gone, failed):
+        self._trashing = False
+        if self._library is None:
+            return
+        self._say("")
+        self._files.remove_paths(gone)
+        if gone:
+            self._tree_edited(lambda: self._library.forget_files(gone))
+        for path in failed:
+            print(f"Library: couldn't move {path} to the {TRASH_NAME}", flush=True)  # the Log window
+        text = f'Moved {len(gone)} {"file" if len(gone) == 1 else "files"} to the {TRASH_NAME}.' if gone else ""
+        if failed:
+            many = len(failed) > 1
+            text += (f' {len(failed)} {"files" if many else "file"} couldn\'t be moved'
+                     f' ({"they may be" if many else "it may be"} open on the wall): see the Log.')
+        self._say(text.strip())
+        self.currentRowChanged.emit(self._files.selection.current)
 
     # -------------------------------------------------
     # Finding (section 44.5)

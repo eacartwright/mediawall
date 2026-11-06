@@ -308,7 +308,8 @@ Rectangle {
         }
         MenuItem {
             text: "Rename…"
-            onTriggered: nameDialog.ask("Rename", rowMenu.tagName, function(name) {
+            objectName: "libraryRenameItem"              // found by tests/app
+            onTriggered: nameDialog.ask("Rename " + rowMenu.tagName, rowMenu.tagName, function(name) {
                 return tagLibrary.renameTag(rowMenu.tagId, name)
             })
         }

@@ -23,8 +23,17 @@ Rectangle {
 
     signal focusReturned()
     signal dragStarted(int row)
+    signal fileMenuRequested()
 
     required property Item dragProxy
+
+    // Before a file is deleted: Windows won't move a file that's open.
+    // showCurrent() opens it again, if it stays.
+    function releaseFile() {
+        openDelay.stop()
+        openFile = null
+        fileReady = false
+    }
 
     // The current file, at once. Its thumbnail shows straight away, and the
     // real thing a moment later, so holding an arrow key through a folder
@@ -353,6 +362,7 @@ Rectangle {
 
                 MouseArea {
                     anchors.fill: parent
+                    acceptedButtons: Qt.LeftButton | Qt.RightButton
                     preventStealing: true        // a drag here is a file drag, not a scroll
                     drag.target: cell.missing ? null : strip.dragProxy
                     drag.threshold: 12
@@ -361,6 +371,13 @@ Rectangle {
                             strip.dragStarted(cell.index)
                     }
                     onClicked: function(mouse) {
+                        // The menu acts on the selection if this is among it, else on this alone.
+                        if (mouse.button === Qt.RightButton) {
+                            if (!cell.selected)
+                                tagLibrary.clickFile(cell.index, false, false)
+                            strip.fileMenuRequested()
+                            return
+                        }
                         strip.focusReturned()
                         tagLibrary.clickFile(cell.index,
                                              (mouse.modifiers & Qt.ControlModifier) !== 0,

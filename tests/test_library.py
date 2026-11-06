@@ -493,6 +493,24 @@ class CleanUpTests(LibraryTestCase):
         self.lib.clean_up(missing)
         self.assertFalse(self.lib.can_undo())
 
+    def test_forgetting_deleted_files_takes_only_them(self):
+        a, b, c = self.files("a.jpg", "b.jpg", "c.jpg")
+        tag = self.lib.create_tag("t")
+        self.lib.apply_tag(tag.id, [a, b])
+        self.lib.apply_tag(self.lib.create_tag("u").id, [c])
+        self.lib.remove_tag(self.lib.tag_by_name("u").id, [c])   # c's row stays, with no tags
+        self.lib.forget_files([a])
+        self.assertEqual({path for _, path in self.lib.file_rows()}, {b, c})
+        self.assertEqual(self.lib.tag(tag.id).used, 1)
+        self.assertEqual(self.found([tag.id]), ["b.jpg"])
+        self.lib.undo()                          # c's removal keeps its undo
+        self.assertEqual(self.lib.untagged([c]), [])
+
+    def test_forgetting_a_file_with_no_row_is_nothing(self):
+        path = self.file("a.jpg")
+        self.lib.forget_files([path, str(self.dir / "never.jpg")])
+        self.assertEqual(self.lib.file_rows(), [])
+
     def test_summary_says_where_most_first(self):
         paths = [os.path.join("x", "a"), os.path.join("x", "b"), os.path.join("y", "c")]
         self.assertEqual(missing_summary(paths), "x (2), y (1)")
@@ -755,6 +773,75 @@ class UndoTests(LibraryTestCase):
         self.lib.rename(a.id, "renamed")
         self.assertFalse(self.lib.can_redo())
         self.assertTrue(self.lib.can_undo())
+
+    def test_rename_is_one_step(self):
+        tag = self.lib.create_tag("race-car")
+        self.lib.rename(tag.id, "race car")
+        self.assertTrue(self.lib.undo())
+        self.assertEqual(self.lib.tag(tag.id).name, "race-car")
+        self.assertIsNone(self.lib.tag_by_name("race car"))
+        self.assertFalse(self.lib.can_undo())
+        self.assertTrue(self.lib.redo())
+        self.assertEqual(self.lib.tag(tag.id).name, "race car")
+        self.assertIsNone(self.lib.tag_by_name("race-car"))
+
+    def test_rename_undo_survives_reopening_the_database_row(self):
+        tag = self.lib.create_tag("old")
+        self.lib.rename(tag.id, "new")
+        self.lib.undo()
+        name = self.lib._db.execute("SELECT name FROM tags WHERE id = ?", (tag.id,)).fetchone()[0]
+        self.assertEqual(name, "old")
+
+    def test_rename_of_a_group_can_be_undone(self):
+        group = self.lib.create_group("Places")
+        self.lib.rename(group.id, "Location")
+        self.lib.undo()
+        self.assertEqual(self.lib.tag(group.id).name, "Places")
+
+    def test_rename_to_the_same_name_isnt_a_step(self):
+        tag = self.lib.create_tag("same")
+        self.lib.rename(tag.id, " same ")
+        self.assertFalse(self.lib.can_undo())
+
+    def test_undoing_a_rename_refuses_a_taken_name_and_keeps_the_step(self):
+        tag = self.lib.create_tag("old")
+        self.lib.rename(tag.id, "new")
+        other = self.lib.create_tag("OLD")
+        with self.assertRaises(LibraryError):
+            self.lib.undo()
+        self.assertEqual(self.lib.tag(tag.id).name, "new")
+        self.assertTrue(self.lib.can_undo())
+        self.lib.delete(other.id)
+        self.assertTrue(self.lib.undo())
+        self.assertEqual(self.lib.tag(tag.id).name, "old")
+
+    def test_undoing_past_a_rename_keeps_order(self):
+        # A wrong rename, then the old name made again: undo unwinds both.
+        path = self.file("a.jpg")
+        tag = self.lib.create_tag("race-car")
+        self.lib.rename(tag.id, "race car2")
+        again = self.lib.create_and_apply("race-car", [path])
+        self.assertNotEqual(again.id, tag.id)
+        self.lib.undo()
+        self.assertIsNone(self.lib.tag(again.id))
+        self.lib.undo()
+        self.assertEqual(self.lib.tag(tag.id).name, "race-car")
+
+    def test_deleting_a_tag_forgets_its_rename(self):
+        tag = self.lib.create_tag("old")
+        self.lib.rename(tag.id, "new")
+        self.lib.delete(tag.id)
+        self.assertFalse(self.lib.can_undo())
+
+    def test_a_rename_outlives_forgetting_files(self):
+        path = self.file("a.jpg")
+        tag = self.lib.create_tag("old")
+        self.lib.apply_tag(tag.id, [path])
+        self.lib.rename(tag.id, "new")
+        self.lib.forget_files([path])
+        self.assertTrue(self.lib.undo())
+        self.assertEqual(self.lib.tag(tag.id).name, "old")
+        self.assertFalse(self.lib.can_undo())    # the tagging step went with its file
 
     def test_making_a_group_forgets_its_steps(self):
         path = self.file("a.jpg")

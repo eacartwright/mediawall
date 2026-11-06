@@ -2382,11 +2382,12 @@ One separate top-level window (like the Log and Media Memory windows, in the sam
 
 - **Folders pane (left):** a folder tree (the arrow opens and closes a folder, a click on its name chooses it, and a double-click also opens or closes it), with a Subfolders option and an **Untagged only** filter, which shows what is left to do. A file tagged while that's on stays in view until the next scan, so a series of tags can go on it. Tiles with tags have a green dot.
 - **Tags pane (right):** the selection's tags with counts (`3/12` means 3 of the 12 selected files have it), then the whole tag tree (44.3). Clicking a tag applies or removes it.
-- **Grid view:** large thumbnails, row after row, scrolling like a file browser. The tile size is adjustable, by dragging its slider or with the wheel over it.
+- **Grid view:** large thumbnails, row after row, scrolling like a file browser: the wheel moves one row of tiles a notch, whatever their size. The tile size is adjustable, by dragging its slider or with the wheel over it.
 - **Strip view:** one large file above a single carousel row. Grid and Strip share one file list and selection. Double-click opens Strip (or the Strip button), and Esc returns to Grid (Esc clears the box first, if there's text in it). While stepping, the thumbnail shows at once and the file itself opens an eighth of a second later, so holding an arrow key doesn't open every file on the way.
 - **Strip view by mouse:** the thumb buttons go to the previous or next file, anywhere in the view (with the same hold-to-step pace as browsers, `FileStepper`). Over the large file a **click** pauses or plays it, the **wheel zooms** around the pointer, a drag then pans, a double-click resets the zoom (each file starts unzoomed), and **tilting the wheel** skips 10% of a video or audio file, or goes to the previous or next file if it's anything else. Over the row, the wheel scrolls it, two files to a notch, and a tilt always changes file.
 - **Top bar:** the Library ▾ menu and Undo / Redo on the left; Tag / Find and the search box in the middle of the window, with what's selected beside them; Add to Wall and Grid / Strip on the right. The window's minimum size is 800 × 500, where the box narrows to fit.
 - **Selection:** click, Ctrl+click, and Shift+click, and Ctrl+A with the box empty. A folder's first file starts selected, so typing can begin at once. It lives in the model rather than in delegates, because the grid reuses delegates as it scrolls. It stays after tagging, for adding more tags to a series of files. The "Tagging 12 files" label always shows what Enter will affect.
+- **Deleting files:** Delete with the box empty, or right-click a tile (in the grid or Strip's row) for Move to Recycle Bin / Trash, acts on the selection, or on the tile alone if it isn't selected. It always asks first (Enter confirms, Esc cancels), and files go to the system's Recycle Bin or Trash, never erased outright (`QFile.moveToTrash`, off the UI thread). Their tags are forgotten, and that can't be undone, so restoring a file brings it back untagged. The next file is selected and the view stays where it is. A file that can't be moved stays, listed and selected, with a message and a line in the Log; on Windows that's usually one open on the wall (the Library lets go of its own player when it asks). A missing file has nothing to move: Clean Up forgets those (44.6).
 
 ## 44.2 The search box
 
@@ -2401,10 +2402,11 @@ The box is always visible and keeps focus through tagging, so the hands stay on 
 | **Enter, box empty** | Go to the next file |
 | **Left / Right, box empty** | Previous or next file (with text in the box, they move the cursor) |
 | **Backspace, box empty** | Remove the last tag applied |
+| **Delete, box empty** | Move the selected files to the Recycle Bin or Trash, asking first (44.1) |
 | **Ctrl+Space** | Play or pause the current file, with sound |
 | **Ctrl+Enter** | Add the selection to the wall |
 | **Tab** | Switch between Tag and Find |
-| **Ctrl+Z / Ctrl+Y** | Undo or redo tagging (44.6) |
+| **Ctrl+Z / Ctrl+Y** | Undo or redo tagging or a rename (44.6) |
 
 - **Creating needs its own key.** Otherwise typing "race" to create that tag, while "race car" exists, would apply "race car". If nothing matches, plain Enter offers to create the tag, shown as a `Create "…"` row. New tags start at the top level of the tree, to be sorted later, so creating one doesn't interrupt tagging.
 - **Ranking:** exact name, then start of the name, start of any word, and anywhere in the name; ties go to the most used.
@@ -2435,7 +2437,7 @@ The rules:
 - **Finding:** searching `car` finds files tagged `car` or anything under it.
 - **Names are unique** across all tags and groups, ignoring case in any alphabet, since typing must be unambiguous. Runs of spaces collapse to one, and a name can't start with `-`, which means "exclude" in Find. A tag has one parent, so it has one place in the pane. Several parents can be added later if they are really needed; the database's version number allows the change.
 - **What can hold what:** a group can hold groups and tags; a tag holds only tags. Otherwise a tag's implied parents could pass through a group. The core refuses this, and refuses loops.
-- **Editing** happens in the tags pane: drag a tag onto another or onto a group to move it, and right-click to New Group, Rename, Merge Into, Make Group / Make Tag, or Delete. Deleting a group moves its contents up a level and never deletes tags. Deleting a tag used by files asks first, showing how many. A tag can become a group only when no files use it directly. Siblings sort by name.
+- **Editing** happens in the tags pane: drag a tag onto another or onto a group to move it, and right-click to New Group, Rename, Merge Into, Make Group / Make Tag, or Delete. Deleting a group moves its contents up a level and never deletes tags. Deleting a tag used by files asks first, showing how many. A tag can become a group only when no files use it directly. Siblings sort by name. Renaming can be undone (44.6).
 
 ## 44.4 Thumbnails and playback
 
@@ -2473,7 +2475,7 @@ file_tags  file_id, tag_id, added_at  (primary key: file_id + tag_id)
 
 - **Tags belong to a file path** (decided 2026-11-04). Two identical copies of a file are tagged separately. `path_key` is the normalized path (`os.path.normcase`), so a case difference on Windows doesn't make a second file.
 - **Moved and renamed files:** `fingerprint` is the file size plus a hash of a few sampled chunks, computed when a file is first tagged. When a scan finds an unknown file the same size as a missing row, its fingerprint is checked, and exactly one match each way moves the tags to the new path (identical copies leave it alone, rather than guess), with a line in the Log. So a moved file gets its tags back when its new folder is opened in the Library. Tags of missing files stay until Clean Up (Library ▾) removes them. It can't be undone, and a drive that isn't connected looks just like missing files, so it counts them first, off the UI thread, and asks, saying how many and where.
-- **Undo** is the Library's own session list of tagging actions (a bulk action is one step). Wall undo stores scene snapshots (section 47), and tags aren't part of the scene, so tagging never adds to wall undo. Undoing a Shift+Enter also removes the tag it created, unless that tag has since gained files or child tags. Editing the tree isn't undoable (deleting asks first): any edit clears redo, and deleting, merging, or making a group forgets the undo steps of the tags involved, so a step can never act on a tag that has gone or put a group on a file.
+- **Undo** is the Library's own session list of tagging actions and renames (a bulk action is one step). Wall undo stores scene snapshots (section 47), and tags aren't part of the scene, so tagging never adds to wall undo. Undoing a Shift+Enter also removes the tag it created, unless that tag has since gained files or child tags. Undoing a rename puts the old name back, unless something else has taken it since: then it says so and the step stays, to undo once that name is free. Other edits to the tree aren't undoable (deleting asks first): any edit clears redo, and deleting, merging, or making a group forgets the undo steps of the tags involved, so a step can never act on a tag that has gone or put a group on a file.
 - **A file's row stays when its last tag is removed**, which keeps its fingerprint and lets undo put the tags back. "Untagged" and Find go by `file_tags`, so such a row counts as untagged. Clean Up (step 8) can remove these too.
 - **Export and import** (Library window menu): a JSON file, written atomically. **Export Everything** holds the tag tree and every tagged file's path, fingerprint, and tags, as a backup. **Export Tags Only** holds just the tree, to start another machine with the same tags. Import merges by tag name and never deletes: a tag that already exists keeps its place and kind. Bad entries become warnings, as when opening a project, and only an unreadable file fails. Imported file rows whose paths don't exist here are treated as missing, so the fingerprint check can reattach them.
 - Bulk changes run in one transaction. The schema version is kept in `PRAGMA user_version`. Python's `sqlite3` needs no new dependency, and Qt's `Sql` modules remain excluded from the installers.
@@ -2707,7 +2709,7 @@ The prototype currently provides:
 - Speech: text to speech with Piper (installed by the user, set up in Settings), added as speech tracks that keep only their words and settings (clips are made when needed and deleted when the app closes), so they can be edited; the tab's contents are saved with the project (section 14.6)
 - new container content framed with Fit (the whole picture) by default
 - unit tests for `core/`, and app checks that drive the real app (section 37)
-- installers: a Windows `Setup.exe` and a Linux `.deb`, built by `packaging/build.py` (section 37); 0.9.14 is the latest release, and 0.10.1, with the Library, is being tried on branch `library` (build the Linux `.deb` on Linux; the Windows installer is built on Windows)
+- installers: a Windows `Setup.exe` and a Linux `.deb`, built by `packaging/build.py` (section 37); 0.10.2 is the latest release; for now releases carry only the Linux `.deb`, until a final version is ready for Windows (build the `.deb` on Linux; the Windows installer is built on Windows)
 
 ### How interactions reach the model
 
@@ -2740,6 +2742,7 @@ New errors (with the Log window's output), requested changes, and feature ideas 
 
 From trying the Library, branch `library` (2026-11-05):
 
+- **Done 2026-11-05** (`check_library_edits` added, unit tests; passes on Windows, including a run against the real Recycle Bin, not yet tried on Mint; released as 0.10.2): **deleting files in the Library** (Delete or a tile's right-click menu, to the Recycle Bin or Trash, section 44.1); **the Grid scrolls a row of tiles a wheel notch**, where a flick's own speed was too slow; the **Tags pane starts 230 wide** (was 200); the **rename dialog's title names the tag** ("Rename race-car"); **renames can be undone** (44.6). The two similar tags reported with this weren't reproduced, and no code path makes one from a rename: the likely way is typing the old name after the rename, which offers to create it. Merge Into puts such a pair back together.
 - **To look into: `check_library` is flaky on the Windows VM** (seen 2026-11-05): some runs lose or misplace keystrokes (a tag came out as `azebrab`), and later checks then fail in a chain. It happens on the commit before this work too (a489a62: 3 runs of 5), so it isn't from the changes below. The Library may be losing the active window now and then; the check prints a NOTE when it isn't active.
 
 - **Done 2026-11-05** (`check_click_play` added, `check_library_strip` and `check_library_media` extended; all pass on Windows, not yet tried on Mint or with a real M510, since the checks send synthetic thumb-button and tilt events): **Grid playback fixed**: the hover player was drawn under the tiles (same z, earlier in the list), and in the wrong place once a new tile size or pane width had moved the grid's origin, so it showed only as a sliver in the gaps a tile or so away. **Strip by mouse** (section 44.1): thumb buttons step, the wheel zooms the large file and scrolls the row. **Click to pause** on the wall and in Strip, and the Pause button is gone. **Tile size** follows the wheel. **Minimum window sizes**: the Library 800 × 500, the wall as wide as its toolbar (about 970) × 500. **Library's top bar rearranged**: the search in the middle, Library ▾ and Undo / Redo at the left.
@@ -2991,6 +2994,7 @@ The following design decisions are currently established:
 - Missing media should produce a recoverable error state rather than breaking the project.
 - Animation is a future capability and the data model should leave room for it.
 - SQLite holds the tag library (section 44, planned), and nothing else needs it: projects and layouts stay JSON.
+- Deleting a file from the Library moves it to the system's Recycle Bin or Trash, after asking, and never erases it outright (decided 2026-11-05). Its tags are forgotten rather than kept for a possible restore, so deleted files don't linger as missing in Find and Clean Up.
 - C++ is not required for the initial implementation.
 - GPU/QML/QtMultimedia should handle performance-sensitive work.
 - Development should proceed incrementally, testing a working application at every major stage.

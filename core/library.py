@@ -12,9 +12,10 @@ Design rules:
   file at once.
 - The whole tree is held in memory, so searching on each key press is
   synchronous and can't return a stale result.
-- Tagging has its own session undo, since tags aren't part of the scene.
-  Editing the tree isn't undone (deleting asks first): it clears redo,
-  and forgets the undo steps of a tag it removes or makes a group.
+- Tagging and renaming have their own session undo, since tags aren't part
+  of the scene. Other edits to the tree aren't undone (deleting asks
+  first): they clear redo, and forget the undo steps of a tag they remove
+  or make a group.
 
 Use a Library from one thread only (sqlite3 connections are per thread).
 """
@@ -92,11 +93,12 @@ class Tag:
 
 @dataclass
 class _Step:
-    """One undoable tagging action. Links are (file_id, tag_id, added_at)."""
+    """One undoable action. Links are (file_id, tag_id, added_at)."""
     tag_id: int
     added: list = field(default_factory=list)
     removed: list = field(default_factory=list)
     created: Tag | None = None           # the tag, if this action created it
+    renamed: tuple | None = None         # (old name, new name), if this was a rename
 
 
 def default_library_path():
@@ -465,14 +467,21 @@ class Library:
     def create_group(self, name, parent_id=None):
         return self.create_tag(name, parent_id, is_group=True)
 
-    def rename(self, tag_id, name):
-        self._require(tag_id)
-        name = normalized_name(name)
+    def _set_name(self, tag_id, name):
         self._check_name_free(name, ignoring=tag_id)
+        self._db.execute("UPDATE tags SET name = ?, name_key = ? WHERE id = ?",
+                         (name, _name_key(name), tag_id))
+
+    def rename(self, tag_id, name):
+        """Rename a tag or group (one undo step)."""
+        old_name = self._require(tag_id).name
+        name = normalized_name(name)
+        if name == old_name:
+            return
         with self._db:
-            self._db.execute("UPDATE tags SET name = ?, name_key = ? WHERE id = ?",
-                             (name, _name_key(name), tag_id))
+            self._set_name(tag_id, name)
         self._tree_changed()
+        self._record(_Step(tag_id, renamed=(old_name, name)))
 
     def move(self, tag_id, parent_id):
         """Put it under `parent_id` (None for the top level). Refuses loops."""
@@ -585,7 +594,7 @@ class Library:
         return added
 
     def _record(self, step):
-        if step.added or step.removed or step.created:
+        if step.added or step.removed or step.created or step.renamed:
             self._undo.append(step)
             self._redo.clear()
 
@@ -651,10 +660,16 @@ class Library:
         return bool(self._redo)
 
     def undo(self):
+        """
+        Undo the last step. A rename whose old name has been taken since
+        is refused with LibraryError, and stays next to undo.
+        """
         if not self._undo:
             return False
-        step = self._undo.pop()
+        step = self._undo[-1]
         with self._db:
+            if step.renamed is not None:
+                self._set_name(step.tag_id, step.renamed[0])
             self._delete_links(step.added)
             self._insert_links(step.removed)
             if step.created is not None:
@@ -664,6 +679,7 @@ class Library:
                 if not self._children.get(step.tag_id) and not self._db.execute(
                         "SELECT 1 FROM file_tags WHERE tag_id = ? LIMIT 1", (step.tag_id,)).fetchone():
                     self._db.execute("DELETE FROM tags WHERE id = ?", (step.tag_id,))
+        self._undo.pop()
         self._load_tags()
         self._redo.append(step)
         return True
@@ -671,8 +687,10 @@ class Library:
     def redo(self):
         if not self._redo:
             return False
-        step = self._redo.pop()
+        step = self._redo[-1]
         with self._db:
+            if step.renamed is not None:
+                self._set_name(step.tag_id, step.renamed[1])
             if step.created is not None and step.tag_id not in self._tags:
                 tag = step.created
                 self._db.execute(
@@ -682,6 +700,7 @@ class Library:
                      tag.created_at, tag.last_used))
             self._insert_links(step.added)
             self._delete_links(step.removed)
+        self._redo.pop()
         self._load_tags()
         self._undo.append(step)
         return True
@@ -882,12 +901,28 @@ class Library:
             gone = set(missing_ids) | {file_id for (file_id,) in self._db.execute(f"SELECT id {untagged}")}
             self._db.execute(f"DELETE {untagged}")
         self._load_tags()
+        self._forget_undo_of_files(gone)
+        return len(had_tags)
+
+    def forget_files(self, paths):
+        """
+        These files were deleted: forget them and their tags. Not undoable,
+        so undo steps for them go too. Other files' rows and steps stay.
+        """
+        file_ids = list(self._file_ids(paths).values())
+        with self._db:
+            for chunk in _chunks(file_ids):
+                self._db.execute(f"DELETE FROM files WHERE id IN ({_marks(chunk)})", chunk)
+        self._load_tags()
+        self._forget_undo_of_files(set(file_ids))
+
+    def _forget_undo_of_files(self, gone):
         for steps in (self._undo, self._redo):
             for step in steps:
                 step.added = [link for link in step.added if link[0] not in gone]
                 step.removed = [link for link in step.removed if link[0] not in gone]
-            steps[:] = [step for step in steps if step.added or step.removed or step.created]
-        return len(had_tags)
+            steps[:] = [step for step in steps
+                        if step.added or step.removed or step.created or step.renamed]
 
     # ---- Export and import (44.6) ----
 

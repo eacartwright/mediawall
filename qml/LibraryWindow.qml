@@ -30,6 +30,21 @@ ApplicationWindow {
     property bool stripView: false
 
     property alias cleanUp: cleanUpDialog     // found by tests/app
+    property alias trashAsk: trashDialog      // found by tests/app
+
+    // Delete, or the tiles' menu: the selected files that are still there, asking first.
+    function askToTrash() {
+        var files = tagLibrary.selectedForWall()
+        if (files.length === 0) {
+            if (tagLibrary.selectedCount > 0)
+                tagLibrary.say("That file is missing already. Clean Up, in the Library menu, forgets its tags.")
+            return
+        }
+        // Let go of them now: Windows won't move a file that's open.
+        fileGrid.releaseFile()
+        fileStrip.releaseFile()
+        trashDialog.ask(files)
+    }
 
     // The main window, set when it opens this one: where Add to Wall goes.
     property var wall: null
@@ -264,6 +279,8 @@ ApplicationWindow {
                             tagLibrary.stepFile(1)
                         } else if (event.key === Qt.Key_Backspace && plain && empty) {
                             tagLibrary.removeLastApplied()
+                        } else if (event.key === Qt.Key_Delete && plain && empty) {
+                            libraryWindow.askToTrash()
                         } else if (event.key === Qt.Key_Space && (event.modifiers & Qt.ControlModifier)) {
                             if (libraryWindow.stripView)
                                 fileStrip.togglePlay()
@@ -573,6 +590,7 @@ ApplicationWindow {
                 onFocusReturned: libraryWindow.refocus()
                 onOpenStrip: libraryWindow.stripView = true
                 onDragStarted: function(row) { libraryWindow.dragFiles(row) }
+                onFileMenuRequested: fileMenu.popup()
             }
 
             LibraryStrip {
@@ -583,14 +601,67 @@ ApplicationWindow {
                 dragProxy: dragProxyItem
                 onFocusReturned: libraryWindow.refocus()
                 onDragStarted: function(row) { libraryWindow.dragFiles(row) }
+                onFileMenuRequested: fileMenu.popup()
             }
         }
 
         LibraryTags {
-            SplitView.preferredWidth: 200
+            objectName: "libraryTagsPane"                // found by tests/app
+            SplitView.preferredWidth: 230
             SplitView.minimumWidth: 140
             onFocusReturned: libraryWindow.refocus()
         }
+    }
+
+    // ---- Deleting files ----
+
+    Menu {
+        id: fileMenu
+        onClosed: if (!trashDialog.visible) libraryWindow.refocus()
+
+        MenuItem {
+            objectName: "libraryTrashItem"               // found by tests/app
+            text: "Move to " + tagLibrary.trashName + "…"
+            onTriggered: libraryWindow.askToTrash()
+        }
+    }
+
+    Dialog {
+        id: trashDialog
+        objectName: "libraryTrashDialog"                 // found by tests/app
+
+        parent: Overlay.overlay
+        anchors.centerIn: parent
+        modal: true
+        width: 420
+        title: "Move to " + tagLibrary.trashName
+        standardButtons: Dialog.Ok | Dialog.Cancel
+
+        property string question: ""
+
+        function ask(files) {
+            var one = files.length === 1
+            question = "Move " + (one ? '"' + files[0].path.replace(/^.*[\\/]/, "") + '"' : files.length + " files")
+                       + " to the " + tagLibrary.trashName + "?\n\n"
+                       + (one ? "Its tags are forgotten, even if it's restored from there."
+                              : "Their tags are forgotten, even if they're restored from there.")
+            open()
+            trashText.forceActiveFocus()
+        }
+
+        Label {
+            id: trashText
+            width: parent.width
+            wrapMode: Text.WrapAtWordBoundaryOrAnywhere
+            text: trashDialog.question
+            // The hands stay on the keys: Delete, then Enter.
+            Keys.onReturnPressed: trashDialog.accept()
+            Keys.onEnterPressed: trashDialog.accept()
+        }
+
+        onAccepted: tagLibrary.trashSelected()
+        onRejected: fileStrip.showCurrent()              // it let go of the file
+        onClosed: libraryWindow.refocus()
     }
 
     // ---- Clean Up: it can't be undone, so it says what it will do ----
