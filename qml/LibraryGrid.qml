@@ -21,6 +21,12 @@ Rectangle {
     signal focusReturned()
     signal openStrip()
     signal dragStarted(int row)
+    signal fileMenuRequested()
+
+    // Before a file is deleted: Windows won't move a file that's open.
+    function releaseFile() {
+        tilePlayer.stop()
+    }
 
     // What MouseAreas drag: never shown. LibraryWindow.qml starts the real
     // drag; this just gives a tile's MouseArea something to move.
@@ -174,6 +180,7 @@ Rectangle {
             MouseArea {
                 anchors.fill: parent
                 hoverEnabled: true
+                acceptedButtons: Qt.LeftButton | Qt.RightButton
                 preventStealing: true            // a drag here is a file drag, not a scroll
                 drag.target: tile.missing ? null : pane.dragProxy
                 drag.threshold: 12
@@ -188,12 +195,22 @@ Rectangle {
                         tilePlayer.hoverEnded(tile.index)
                 }
                 onClicked: function(mouse) {
+                    // The menu acts on the selection if this is among it, else on this alone.
+                    if (mouse.button === Qt.RightButton) {
+                        if (!tile.selected)
+                            tagLibrary.clickFile(tile.index, false, false)
+                        pane.fileMenuRequested()
+                        return
+                    }
                     tagLibrary.clickFile(tile.index,
                                          (mouse.modifiers & Qt.ControlModifier) !== 0,
                                          (mouse.modifiers & Qt.ShiftModifier) !== 0)
                     pane.focusReturned()
                 }
-                onDoubleClicked: pane.openStrip()
+                onDoubleClicked: function(mouse) {
+                    if (mouse.button === Qt.LeftButton)
+                        pane.openStrip()
+                }
             }
         }
 
@@ -215,6 +232,7 @@ Rectangle {
         Connections {
             target: pane.files
             function onModelReset() { tilePlayer.stop() }
+            function onRowsRemoved() { tilePlayer.stop() }
         }
 
         Text {
@@ -226,6 +244,21 @@ Rectangle {
                   : tagLibrary.folder === "" ? "Choose a folder on the left"
                   : tagLibrary.untaggedOnly ? "Nothing untagged here"
                   : "No media in this folder"
+        }
+    }
+
+    // The wheel moves a row of tiles a notch, whatever their size. A flick's
+    // own speed is far too slow for tiles this large. Takes no buttons, so
+    // clicks and hovering reach the tiles beneath.
+    MouseArea {
+        objectName: "libraryGridWheel"                   // found by tests/app
+        anchors.fill: grid
+        acceptedButtons: Qt.NoButton
+        onWheel: function(wheel) {
+            var distance = wheel.pixelDelta.y !== 0 ? wheel.pixelDelta.y
+                                                    : wheel.angleDelta.y / 120 * grid.cellHeight
+            var furthest = Math.max(grid.originY, grid.originY + grid.contentHeight - grid.height)
+            grid.contentY = Math.max(grid.originY, Math.min(furthest, grid.contentY - distance))
         }
     }
 
